@@ -12,6 +12,7 @@ import {
   formatComplaintStatus,
   formatCurrency,
   formatDateTime,
+  formatJoinStatus,
   formatOrderStatus,
   formatPayStatus,
   formatReceiveStatus,
@@ -24,12 +25,6 @@ const orderStore = useOrderStore()
 
 const receiptDialogVisible = ref(false)
 const activeReceiptUrl = ref('')
-
-const joinStatusTextMap = {
-  ACTIVE: '已参与',
-  CANCELED: '已取消',
-  EXITED: '已退出',
-}
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
@@ -177,7 +172,18 @@ const nextStepHint = computed(() => {
   return '当前页面主要用于查看订单聚合信息，按钮是否可操作完全以 actionFlags 为准。'
 })
 
-const formatJoinStatus = (value) => joinStatusTextMap[value] || value || '--'
+const timelineToneMap = {
+  COMPLAINT_CREATED: 'danger',
+  INITIATOR_JOINED: 'primary',
+  MEMBER_EXITED: 'info',
+  MEMBER_JOINED: 'primary',
+  ORDER_CREATED: 'primary',
+  ORDER_DELIVERED: 'success',
+  ORDER_STATUS: 'warning',
+  RECEIPT_UPLOADED: 'success',
+}
+
+const getTimelineType = (action) => timelineToneMap[action] || 'info'
 
 const runPrimaryAction = async () => {
   if (!primaryAction.value) {
@@ -444,9 +450,18 @@ onMounted(() => {
             <h3>当前成员信息</h3>
             <ul v-if="detail.currentUserMember" class="detail-list">
               <li><span>我的角色</span><strong>{{ formatRole(detail.currentUserMember.myRole) }}</strong></li>
-              <li><span>加入状态</span><strong>{{ formatJoinStatus(detail.currentUserMember.joinStatus) }}</strong></li>
-              <li><span>支付状态</span><strong>{{ formatPayStatus(detail.currentUserMember.payStatus) }}</strong></li>
-              <li><span>收货状态</span><strong>{{ formatReceiveStatus(detail.currentUserMember.receiveStatus) }}</strong></li>
+              <li>
+                <span>加入状态</span>
+                <StatusTag :value="detail.currentUserMember.joinStatus" :text="formatJoinStatus(detail.currentUserMember.joinStatus)" />
+              </li>
+              <li>
+                <span>支付状态</span>
+                <StatusTag :value="detail.currentUserMember.payStatus" :text="formatPayStatus(detail.currentUserMember.payStatus)" />
+              </li>
+              <li>
+                <span>收货状态</span>
+                <StatusTag :value="detail.currentUserMember.receiveStatus" :text="formatReceiveStatus(detail.currentUserMember.receiveStatus)" />
+              </li>
               <li>
                 <span>退款合计</span>
                 <strong>{{ formatCurrency(detail.currentUserMember.refundAmountTotal) }}</strong>
@@ -596,6 +611,7 @@ onMounted(() => {
                 v-for="item in detail.timeline"
                 :key="`${item.action}-${item.at}`"
                 :timestamp="formatDateTime(item.at)"
+                :type="getTimelineType(item.action)"
               >
                 {{ item.description }}
               </el-timeline-item>

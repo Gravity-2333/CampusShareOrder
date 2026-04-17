@@ -117,22 +117,49 @@
   padding: var(--space-sm);
 }
 
+.app-shell.is-collapsed {
+  grid-template-columns: var(--layout-sidebar-collapsed-width) minmax(0, 1fr);
+}
+
 .app-sidebar {
   background: var(--color-sidebar-bg);
   border-radius: var(--radius-large);
   color: var(--color-text-inverse);
   overflow: hidden;
   padding: var(--space-sm);
+  transition:
+    width 0.22s ease,
+    padding 0.22s ease,
+    border-radius 0.22s ease,
+    transform 0.22s ease;
 }
 
 .app-sidebar.collapsed {
-  width: var(--layout-sidebar-collapsed-width);
+  padding: 0.9rem 0.7rem;
 }
 
 .brand-block {
   border-bottom: 1px solid var(--color-border-inverse);
+  display: grid;
+  gap: 0.45rem;
   margin-bottom: var(--space-sm);
   padding: 0.5rem 0.25rem 1rem;
+}
+
+.brand-mark {
+  align-items: center;
+  background: linear-gradient(135deg, rgba(242, 203, 184, 0.22), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 16px;
+  color: #fff6ea;
+  display: inline-flex;
+  font-family: var(--font-family-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  height: 40px;
+  justify-content: center;
+  letter-spacing: 0.08em;
+  width: 40px;
 }
 
 .brand-block h1 {
@@ -157,6 +184,40 @@
   --el-menu-text-color: var(--color-sidebar-menu-text);
   --el-menu-active-color: var(--color-sidebar-menu-active);
   --el-menu-hover-bg-color: var(--color-sidebar-menu-hover);
+  --el-menu-border-color: transparent;
+}
+
+.shell-menu .el-menu-item {
+  border-radius: 14px;
+  margin-bottom: 0.25rem;
+  min-height: 46px;
+}
+
+.shell-menu .el-menu-item.is-active {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(242, 203, 184, 0.18));
+}
+
+.app-sidebar.collapsed .brand-block {
+  justify-items: center;
+  padding-inline: 0;
+}
+
+.app-sidebar.collapsed .brand-kicker,
+.app-sidebar.collapsed .brand-block h1 {
+  display: none;
+}
+
+.app-sidebar.collapsed .shell-menu.el-menu--collapse {
+  width: 100%;
+}
+
+.app-sidebar.collapsed .shell-menu .el-menu-item {
+  justify-content: center;
+  padding: 0;
+}
+
+.app-sidebar.collapsed .shell-menu .el-menu-tooltip__trigger {
+  justify-content: center;
 }
 
 .app-main {

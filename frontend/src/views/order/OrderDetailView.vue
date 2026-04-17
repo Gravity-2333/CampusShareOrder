@@ -52,6 +52,14 @@ const receivedMemberCount = computed(
     ).length,
 )
 
+const activeMembersNeedPay = computed(
+  () => activeMemberList.value.filter((member) => member.payStatus === 'UNPAID').length,
+)
+
+const activeMembersWaitingReceive = computed(
+  () => activeMemberList.value.filter((member) => member.receiveStatus === 'WAIT_CONFIRM').length,
+)
+
 const paymentDeltaText = computed(() => {
   if (!detail.value || !hasActualAmount.value) {
     return '--'
@@ -239,14 +247,6 @@ const getMemberLatestEvent = (member) => {
   return '--'
 }
 
-const activeMembersNeedPay = computed(
-  () => activeMemberList.value.filter((member) => member.payStatus === 'UNPAID').length,
-)
-
-const activeMembersWaitingReceive = computed(
-  () => activeMemberList.value.filter((member) => member.receiveStatus === 'WAIT_CONFIRM').length,
-)
-
 const riskAlerts = computed(() => {
   if (!detail.value) {
     return []
@@ -338,6 +338,108 @@ const formatRiskToneText = (tone) => {
 
   return '正常'
 }
+
+const toDate = (value) => {
+  if (!value) {
+    return null
+  }
+
+  const normalized = String(value).replace(' ', 'T')
+  const date = new Date(normalized)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+const milestoneTagTypeMap = {
+  danger: 'danger',
+  info: 'info',
+  success: 'success',
+  warning: 'warning',
+}
+
+const makeMilestone = ({ key, label, time, doneText, pendingText, skipped = false, done = false }) => {
+  if (skipped || !time) {
+    return {
+      key,
+      label,
+      statusText: '当前不适用',
+      tag: 'info',
+      timeText: '--',
+    }
+  }
+
+  if (done) {
+    return {
+      key,
+      label,
+      statusText: doneText,
+      tag: 'success',
+      timeText: formatDateTime(time),
+    }
+  }
+
+  const targetDate = toDate(time)
+  const now = new Date()
+  const expired = targetDate ? now.getTime() > targetDate.getTime() : false
+
+  return {
+    key,
+    label,
+    statusText: expired ? '已超时' : pendingText,
+    tag: expired ? 'danger' : 'warning',
+    timeText: formatDateTime(time),
+  }
+}
+
+const milestoneItems = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  return [
+    makeMilestone({
+      key: 'deadline',
+      label: '招募截止',
+      time: detail.value.basicInfo.deadlineAt,
+      done: detail.value.basicInfo.status !== 'OPEN',
+      doneText: '招募阶段已结束',
+      pendingText: '仍在招募中',
+    }),
+    makeMilestone({
+      key: 'receipt',
+      label: '凭证上传截止',
+      time: detail.value.basicInfo.receiptUploadDeadlineAt,
+      done: Boolean(detail.value.receiptInfo?.uploadedAt),
+      doneText: '凭证已上传',
+      pendingText: '待上传凭证',
+      skipped:
+        !detail.value.basicInfo.receiptUploadDeadlineAt &&
+        !detail.value.receiptInfo?.uploadedAt,
+    }),
+    makeMilestone({
+      key: 'delivery',
+      label: '预计送达截止',
+      time: detail.value.basicInfo.expectedDeliveryEndAt,
+      done: Boolean(detail.value.receiveInfo.deliveredAt),
+      doneText: '已确认送达',
+      pendingText: '待送达',
+      skipped:
+        !detail.value.basicInfo.expectedDeliveryEndAt &&
+        !detail.value.receiveInfo.deliveredAt,
+    }),
+    makeMilestone({
+      key: 'auto-confirm',
+      label: '自动确认收货',
+      time: detail.value.receiveInfo.autoConfirmDeadlineAt,
+      done: detail.value.basicInfo.status === 'COMPLETED',
+      doneText: '收货阶段已完成',
+      pendingText: '待成员确认收货',
+      skipped:
+        !detail.value.receiveInfo.autoConfirmDeadlineAt &&
+        detail.value.basicInfo.status !== 'COMPLETED',
+    }),
+  ]
+})
 
 const stats = computed(() => {
   if (!detail.value) {
@@ -675,6 +777,25 @@ onMounted(() => {
                 {{ formatRiskToneText(item.tone) }}
               </el-tag>
               <strong>{{ item.text }}</strong>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
+          title="关键时限"
+          description="把当前阶段的截止时间集中展示，便于判断是否超时或已完成。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in milestoneItems"
+              :key="item.key"
+              class="surface-card action-summary-card is-enabled"
+            >
+              <span>{{ item.label }}</span>
+              <el-tag :type="milestoneTagTypeMap[item.tag] || 'info'" effect="light" round>
+                {{ item.statusText }}
+              </el-tag>
+              <strong>{{ item.timeText }}</strong>
             </div>
           </div>
         </PageSection>

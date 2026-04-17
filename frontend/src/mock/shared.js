@@ -248,10 +248,15 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
     },
     currentUserMember: currentUserMember
       ? {
+          exitedAt: currentUserMember.exitedAt || null,
           joinStatus: currentUserMember.joinStatus,
+          joinedAt: currentUserMember.joinedAt || null,
           memberId: currentUserMember.memberId,
           myRole: currentUserMember.role,
+          paidAt: currentUserMember.paidAt || null,
+          payAmount: currentUserMember.payAmount,
           payStatus: currentUserMember.payStatus,
+          receivedAt: currentUserMember.receivedAt || null,
           receiveStatus: currentUserMember.receiveStatus,
           refundAmountTotal: currentUserMember.refundAmountTotal,
         }
@@ -263,10 +268,14 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
       userId: order.creatorUserId,
     },
     memberList: order.members.map((member) => ({
+      exitedAt: member.exitedAt || null,
       joinStatus: member.joinStatus,
+      joinedAt: member.joinedAt || null,
       nickname: member.nickname,
+      paidAt: member.paidAt || null,
       payAmount: member.payAmount,
       payStatus: member.payStatus,
+      receivedAt: member.receivedAt || null,
       receiveStatus: member.receiveStatus,
       refundAmountTotal: member.refundAmountTotal,
       role: member.role,
@@ -294,6 +303,7 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
       deliveredAt: order.deliveredAt,
       receiveStatusSummary: order.members.map((item) => ({
         nickname: item.nickname,
+        receivedAt: item.receivedAt || null,
         receiveStatus: item.receiveStatus,
       })),
     },

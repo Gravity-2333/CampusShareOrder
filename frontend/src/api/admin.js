@@ -2,6 +2,8 @@ import provider from './provider'
 
 export const getAdminUsers = (params) => provider.admin.getUsers(params)
 
+export const getAdminUserDetail = (userId) => provider.admin.getUserDetail(userId)
+
 export const banUser = (userId, payload) => provider.admin.banUser(userId, payload)
 
 export const unbanUser = (userId) => provider.admin.unbanUser(userId)

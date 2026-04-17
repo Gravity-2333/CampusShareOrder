@@ -6,10 +6,35 @@ export const getUsers = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
-  return pageResult(getDatabase().users, Number(params.page || 1), Number(params.pageSize || 10))
+  const keyword = String(params.keyword || '').trim()
+  const status = String(params.status || '').trim()
+  const list = getDatabase().users.filter((user) => {
+    const matchKeyword =
+      !keyword || user.nickname.includes(keyword) || user.phone.includes(keyword)
+    const matchStatus = !status || user.status === status
+    return matchKeyword && matchStatus
+  })
+
+  return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }
 
-export const banUser = async (userId) => {
+export const getUserDetail = async (userId) => {
+  await requireAdmin()
+  await sleep()
+
+  const user = getDatabase().users.find((item) => item.userId === Number(userId))
+
+  if (!user) {
+    makeFailure(40401, '用户不存在')
+  }
+
+  return {
+    ...user,
+    creditRecords: user.creditRecords || [],
+  }
+}
+
+export const banUser = async (userId, payload = { reason: '管理员封禁用户' }) => {
   await requireAdmin()
 
   mutateDatabase((draft) => {
@@ -20,6 +45,19 @@ export const banUser = async (userId) => {
     }
 
     user.status = 'BANNED'
+
+    const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
+    draft.logs.unshift({
+      action: 'USER_BANNED',
+      createdAt: timestamp(),
+      logId: nextLogId,
+      operatorName: '管理员',
+      targetNo: `USER-${user.userId}`,
+    })
+
+    if (payload.reason) {
+      user.contactInfo = `${user.contactInfo || ''} [封禁原因] ${payload.reason}`.trim()
+    }
   })
 
   return {
@@ -39,6 +77,15 @@ export const unbanUser = async (userId) => {
     }
 
     user.status = 'NORMAL'
+
+    const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
+    draft.logs.unshift({
+      action: 'USER_UNBANNED',
+      createdAt: timestamp(),
+      logId: nextLogId,
+      operatorName: '管理员',
+      targetNo: `USER-${user.userId}`,
+    })
   })
 
   return {

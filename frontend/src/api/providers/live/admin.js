@@ -2,6 +2,8 @@ import request from '../../request'
 
 export const getUsers = (params) => request.get('/api/admin/users', { params })
 
+export const getUserDetail = (userId) => request.get(`/api/admin/users/${userId}`)
+
 export const banUser = (userId, payload) => request.post(`/api/admin/users/${userId}/ban`, payload)
 
 export const unbanUser = (userId) => request.post(`/api/admin/users/${userId}/unban`)

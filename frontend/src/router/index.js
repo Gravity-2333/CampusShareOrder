@@ -101,6 +101,11 @@ const routes = [
         meta: { requiresAuth: true, role: 'ADMIN', title: '用户管理' },
       },
       {
+        path: '/admin/users/:userId',
+        component: () => import('../views/admin/AdminUserDetailView.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN', title: '用户详情' },
+      },
+      {
         path: '/admin/orders',
         component: () => import('../views/admin/AdminOrderView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '订单管理' },

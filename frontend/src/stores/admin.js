@@ -7,6 +7,7 @@ import {
   getAdminComplaints,
   getAdminOrderDetail,
   getAdminOrders,
+  getAdminUserDetail,
   getAdminUsers,
   getCapitalRecords,
   getOperationLogs,
@@ -51,9 +52,13 @@ export const useAdminStore = defineStore('admin', {
     recordsLoading: false,
     recordsPage: defaultPageData(),
     submitting: false,
+    userDetail: null,
+    userDetailLoading: false,
     usersFilters: {
+      keyword: '',
       page: 1,
       pageSize: 10,
+      status: '',
     },
     usersLoading: false,
     usersPage: defaultPageData(),
@@ -73,17 +78,37 @@ export const useAdminStore = defineStore('admin', {
         this.usersLoading = false
       }
     },
-    async toggleUserStatus(row) {
+    async loadUserDetail(userId) {
+      this.userDetailLoading = true
+
+      try {
+        this.userDetail = await getAdminUserDetail(userId)
+        return this.userDetail
+      } finally {
+        this.userDetailLoading = false
+      }
+    },
+    async toggleUserStatus(row, payload = { reason: '管理员封禁用户' }) {
       this.submitting = true
 
       try {
         if (row.status === 'NORMAL') {
-          await banUser(row.userId, { reason: 'mock ban' })
+          await banUser(row.userId, payload)
         } else {
           await unbanUser(row.userId)
         }
 
-        return await this.loadUsers(this.usersFilters)
+        const refreshTasks = [
+          this.loadUsers(this.usersFilters),
+          this.loadDashboardMetrics(),
+        ]
+
+        if (this.userDetail?.userId === Number(row.userId)) {
+          refreshTasks.push(this.loadUserDetail(row.userId))
+        }
+
+        await Promise.allSettled(refreshTasks)
+        return this.usersPage
       } finally {
         this.submitting = false
       }

@@ -22,6 +22,11 @@ const normalizeMember = (member = {}) => ({
   userId: Number(member.userId || 0),
 })
 
+const normalizeCurrentUserMember = (member = {}) => ({
+  ...normalizeMember(member),
+  myRole: member.myRole || member.role || 'MEMBER',
+})
+
 const normalizeReceiveStatusItem = (item = {}) => ({
   nickname: item.nickname || '',
   receivedAt: item.receivedAt || null,
@@ -63,7 +68,9 @@ export const normalizeOrderDetail = (detail = {}) => ({
         : Number(detail.complaintInfo.myComplaintId),
     myComplaintStatus: detail.complaintInfo?.myComplaintStatus || null,
   },
-  currentUserMember: detail.currentUserMember ? normalizeMember(detail.currentUserMember) : null,
+  currentUserMember: detail.currentUserMember
+    ? normalizeCurrentUserMember(detail.currentUserMember)
+    : null,
   initiatorInfo: {
     nickname: detail.initiatorInfo?.nickname || '',
     phoneMasked: detail.initiatorInfo?.phoneMasked || '',

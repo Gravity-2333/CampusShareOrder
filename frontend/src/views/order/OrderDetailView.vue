@@ -441,6 +441,77 @@ const milestoneItems = computed(() => {
   ]
 })
 
+const phaseItems = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  const status = detail.value.basicInfo.status
+  const items = [
+    {
+      key: 'open',
+      label: '招募阶段',
+      hint: '成员加入并完成支付',
+      done: ['GROUPED', 'WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
+      current: status === 'OPEN',
+    },
+    {
+      key: 'grouped',
+      label: '成团待凭证',
+      hint: '发起人上传购买凭证',
+      done: ['WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
+      current: status === 'GROUPED',
+    },
+    {
+      key: 'delivery',
+      label: '待确认送达',
+      hint: '凭证已上传，等待发起人确认送达',
+      done: ['WAIT_RECEIVE', 'COMPLETED'].includes(status),
+      current: status === 'WAIT_DELIVERY',
+    },
+    {
+      key: 'receive',
+      label: '待确认收货',
+      hint: '成员确认收货或系统自动确认',
+      done: status === 'COMPLETED',
+      current: status === 'WAIT_RECEIVE',
+    },
+    {
+      key: 'completed',
+      label: '订单完成',
+      hint: '流程全部结束',
+      done: status === 'COMPLETED',
+      current: status === 'COMPLETED',
+    },
+  ]
+
+  if (status === 'CANCELED') {
+    return items.map((item) => ({
+      ...item,
+      current: false,
+    }))
+  }
+
+  return items
+})
+
+const phaseSummaryText = computed(() => {
+  if (!detail.value) {
+    return '--'
+  }
+
+  if (detail.value.basicInfo.status === 'CANCELED') {
+    return '订单已取消，当前不再继续推进后续阶段。'
+  }
+
+  if (detail.value.basicInfo.status === 'COMPLETED') {
+    return '订单已经完成，招募、凭证、送达、收货流程均已结束。'
+  }
+
+  const currentPhase = phaseItems.value.find((item) => item.current)
+  return currentPhase ? `当前处于“${currentPhase.label}”阶段。` : '--'
+})
+
 const stats = computed(() => {
   if (!detail.value) {
     return []
@@ -745,6 +816,31 @@ onMounted(() => {
             <p v-else class="muted-text">当前账号尚未加入该订单。</p>
           </div>
         </div>
+
+        <PageSection
+          title="阶段进度"
+          description="按业务阶段展示订单当前所处位置，便于快速判断还差哪一步。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in phaseItems"
+              :key="item.key"
+              class="surface-card action-summary-card"
+              :class="{ 'is-enabled': item.done || item.current }"
+            >
+              <span>{{ item.label }}</span>
+              <el-tag
+                :type="item.done ? 'success' : item.current ? 'warning' : 'info'"
+                effect="light"
+                round
+              >
+                {{ item.done ? '已完成' : item.current ? '当前阶段' : '未开始' }}
+              </el-tag>
+              <strong>{{ item.hint }}</strong>
+            </div>
+          </div>
+          <p class="muted-text">{{ phaseSummaryText }}</p>
+        </PageSection>
 
         <PageSection
           title="动作概览"

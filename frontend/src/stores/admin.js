@@ -5,6 +5,7 @@ import {
   cancelAdminOrder,
   getAdminComplaintDetail,
   getAdminComplaints,
+  getAdminOrderDetail,
   getAdminOrders,
   getAdminUsers,
   getCapitalRecords,
@@ -38,11 +39,22 @@ export const useAdminStore = defineStore('admin', {
       orders: 0,
       users: 0,
     },
+    orderDetail: null,
+    orderDetailLoading: false,
+    ordersFilters: {
+      page: 1,
+      pageSize: 10,
+      status: '',
+    },
     ordersLoading: false,
     ordersPage: defaultPageData(),
     recordsLoading: false,
     recordsPage: defaultPageData(),
     submitting: false,
+    usersFilters: {
+      page: 1,
+      pageSize: 10,
+    },
     usersLoading: false,
     usersPage: defaultPageData(),
   }),
@@ -51,7 +63,11 @@ export const useAdminStore = defineStore('admin', {
       this.usersLoading = true
 
       try {
-        this.usersPage = await getAdminUsers(params)
+        this.usersFilters = {
+          ...this.usersFilters,
+          ...params,
+        }
+        this.usersPage = await getAdminUsers(this.usersFilters)
         return this.usersPage
       } finally {
         this.usersLoading = false
@@ -67,33 +83,52 @@ export const useAdminStore = defineStore('admin', {
           await unbanUser(row.userId)
         }
 
-        return await this.loadUsers({
-          page: this.usersPage.page || 1,
-          pageSize: this.usersPage.pageSize || 10,
-        })
+        return await this.loadUsers(this.usersFilters)
       } finally {
         this.submitting = false
       }
     },
-    async loadOrders(params = { page: 1, pageSize: 10 }) {
+    async loadOrders(params = { page: 1, pageSize: 10, status: '' }) {
       this.ordersLoading = true
 
       try {
-        this.ordersPage = await getAdminOrders(params)
+        this.ordersFilters = {
+          ...this.ordersFilters,
+          ...params,
+        }
+        this.ordersPage = await getAdminOrders(this.ordersFilters)
         return this.ordersPage
       } finally {
         this.ordersLoading = false
       }
     },
-    async cancelOrder(orderId) {
+    async loadOrderDetail(orderId) {
+      this.orderDetailLoading = true
+
+      try {
+        this.orderDetail = await getAdminOrderDetail(orderId)
+        return this.orderDetail
+      } finally {
+        this.orderDetailLoading = false
+      }
+    },
+    async cancelOrder(orderId, payload = { reason: '管理员取消订单' }) {
       this.submitting = true
 
       try {
-        await cancelAdminOrder(orderId, { reason: 'mock cancel' })
-        return await this.loadOrders({
-          page: this.ordersPage.page || 1,
-          pageSize: this.ordersPage.pageSize || 10,
-        })
+        await cancelAdminOrder(orderId, payload)
+
+        const refreshTasks = [
+          this.loadOrders(this.ordersFilters),
+          this.loadDashboardMetrics(),
+        ]
+
+        if (this.orderDetail?.basicInfo?.orderId === Number(orderId)) {
+          refreshTasks.push(this.loadOrderDetail(orderId))
+        }
+
+        await Promise.allSettled(refreshTasks)
+        return this.ordersPage
       } finally {
         this.submitting = false
       }
@@ -130,10 +165,7 @@ export const useAdminStore = defineStore('admin', {
 
         const refreshTasks = [
           this.loadComplaints(this.complaintsFilters),
-          this.loadOrders({
-            page: this.ordersPage.page || 1,
-            pageSize: this.ordersPage.pageSize || 10,
-          }),
+          this.loadOrders(this.ordersFilters),
           this.loadDashboardMetrics(),
         ]
 

@@ -51,15 +51,21 @@ export const getOrders = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
-  const list = getDatabase().orders.map((order) => ({
-    creatorNickname: order.initiatorNickname,
-    currentMemberCount: order.currentMemberCount,
-    orderId: order.orderId,
-    orderNo: order.orderNo,
-    productName: order.productName,
-    status: order.status,
-    totalMemberCount: order.totalMemberCount,
-  }))
+  const status = String(params.status || '').trim()
+  const list = getDatabase()
+    .orders.filter((order) => !status || order.status === status)
+    .map((order) => ({
+      creatorNickname: order.initiatorNickname,
+      currentMemberCount: order.currentMemberCount,
+      deadlineAt: order.deadlineAt,
+      estimatedTotalAmount: order.estimatedTotalAmount,
+      orderId: order.orderId,
+      orderNo: order.orderNo,
+      pickupPoint: order.pickupPoint,
+      productName: order.productName,
+      status: order.status,
+      totalMemberCount: order.totalMemberCount,
+    }))
 
   return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }
@@ -69,7 +75,7 @@ export const getOrderDetail = async (orderId) => {
   return buildOrderDetail(orderId, null, true)
 }
 
-export const cancelOrder = async (orderId) => {
+export const cancelOrder = async (orderId, payload = { reason: '管理员取消订单' }) => {
   await requireAdmin()
 
   mutateDatabase((draft) => {
@@ -80,6 +86,19 @@ export const cancelOrder = async (orderId) => {
     }
 
     order.status = 'CANCELED'
+
+    const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
+    draft.logs.unshift({
+      action: 'ORDER_CANCELED_BY_ADMIN',
+      createdAt: timestamp(),
+      logId: nextLogId,
+      operatorName: '管理员',
+      targetNo: order.orderNo,
+    })
+
+    if (payload.reason) {
+      order.productDesc = `${order.productDesc || ''}\n[管理员取消原因] ${payload.reason}`.trim()
+    }
   })
 
   return {

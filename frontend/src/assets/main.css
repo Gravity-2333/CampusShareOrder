@@ -78,12 +78,24 @@
 .stat-hint {
   color: var(--color-text-muted);
   font-size: 0.9rem;
+  max-width: 22ch;
 }
 
 .page-section {
   display: grid;
   gap: var(--space-sm);
   padding: 1.4rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.page-section::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(216, 123, 77, 0.35), transparent 55%);
+  pointer-events: none;
 }
 
 .section-header {
@@ -96,6 +108,7 @@
 .section-header h3 {
   font-family: var(--font-family-display);
   font-size: 1.6rem;
+  line-height: 1.2;
 }
 
 .section-description {
@@ -349,6 +362,7 @@
 
 .page-actions .el-button {
   min-height: 40px;
+  border-radius: 999px;
 }
 
 .wrap-actions {
@@ -391,6 +405,11 @@
   padding: 1.2rem;
 }
 
+.detail-panel {
+  align-content: start;
+  min-height: 100%;
+}
+
 .order-card:hover,
 .detail-panel:hover,
 .stat-card:hover,
@@ -417,15 +436,18 @@
 }
 
 .action-summary-card {
-  align-items: center;
+  align-items: flex-start;
   display: flex;
-  gap: var(--space-xs);
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.45rem;
+  justify-content: flex-start;
   padding: 1rem 1.1rem;
 }
 
 .action-summary-card strong {
   color: var(--color-text-muted);
+  line-height: 1.65;
+  width: 100%;
 }
 
 .action-summary-card.is-enabled {
@@ -473,14 +495,20 @@
 }
 
 .detail-list li {
-  align-items: center;
-  display: flex;
-  gap: var(--space-sm);
-  justify-content: space-between;
+  align-items: start;
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(84px, 110px) minmax(0, 1fr);
 }
 
 .detail-list span {
   color: var(--color-text-muted);
+}
+
+.detail-list strong {
+  line-height: 1.7;
+  text-align: right;
+  word-break: break-word;
 }
 
 .detail-note {
@@ -504,6 +532,10 @@
   justify-items: start;
   padding: var(--space-lg);
   text-align: left;
+}
+
+.empty-state > p {
+  max-width: 42ch;
 }
 
 .pagination-bar {
@@ -563,5 +595,14 @@
   .pagination-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .detail-list li {
+    gap: 0.2rem;
+    grid-template-columns: 1fr;
+  }
+
+  .detail-list strong {
+    text-align: left;
   }
 }

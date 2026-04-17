@@ -7,6 +7,7 @@
 - 保证 `develop` 作为主开发集成分支稳定可控
 - 保证前端开发在独立分支内进行，不直接污染 `develop`
 - 保证每个具体功能都在独立模块分支开发，便于协作、测试和回滚
+- 保证模块分支的创建、提交、合并过程都能在 GitHub 上被清晰看到
 - 保证最终发布路径清晰：`frontend -> develop -> release/main`
 
 ## 1. 分支职责
@@ -91,7 +92,11 @@
 规则：
 
 - 每个模块开发前，必须从 `frontend` 再创建一个新的模块分支
+- 模块分支创建后，必须立即推送到远程，并建立对应的远程同名分支，不能只在本地存在
+- 之所以必须推送到远程，是因为老师需要在 GitHub 上看到按模块开发、提交、合并的完整过程
 - 模块开发、调试、测试都在该模块分支完成
+- 模块分支按功能目标划分，不要求改动文件绝对隔离
+- 为完成一个模块，可以联动修改相关页面、路由、`api`、`store`、`types`、公共组件以及必要的工具文件
 - 模块完成后合并回 `frontend`
 - 模块分支完成合并后可保留，也可视情况删除
 
@@ -117,13 +122,15 @@
 1. 切到 `frontend`
 2. 确认 `frontend` 已同步到最新状态
 3. 从 `frontend` 创建新的模块分支
-4. 在模块分支上开发、提交、测试
-5. 测试通过后，将模块分支合并回 `frontend`
+4. 立即将该模块分支推送到远程，建立远程同名分支
+5. 在模块分支上开发、提交、测试
+6. 测试通过后，将模块分支合并回 `frontend`
 
 规则：
 
 - 模块开发绝不直接写在 `frontend`
 - 更不允许直接写在 `develop`
+- 模块分支推送到远程属于正式流程的一部分，不可省略
 
 ### 2.3 前端阶段性集成
 
@@ -136,6 +143,7 @@
 规则：
 
 - `frontend` 是前端集成分支，不是单个功能开发分支
+- `frontend` 上应能清晰看到各模块分支合并回来的记录
 
 ### 2.4 前端完成后回合到 `develop`
 
@@ -166,14 +174,18 @@
 
 1. AI 在开始写前端代码前，先确认当前所在分支
 2. 如果要开发具体模块，AI 必须先从 `frontend` 新建模块分支
-3. AI 不允许直接在 `develop` 上写前端功能代码
-4. AI 不允许直接在 `main` 或 `release` 上开发日常功能
-5. AI 在模块完成后，只能先合并回 `frontend`
-6. AI 在没有明确要求时，不得擅自把 `frontend` 合并到 `develop`
-7. AI 在没有明确要求时，不得擅自创建 `release` 或修改 `main`
-8. AI 在执行 Git 操作前，应先检查工作区是否干净
-9. AI 不得使用破坏性命令，例如 `git reset --hard`
-10. AI 在推送远程分支前，应明确分支名称和目标远程分支是否一致
+3. 模块分支创建后，AI 必须立即推送到远程，并确认远程同名分支已存在
+4. AI 不允许直接在 `develop` 上写前端功能代码
+5. AI 不允许直接在 `main` 或 `release` 上开发日常功能
+6. AI 在模块完成后，只能先合并回 `frontend`
+7. AI 在没有明确要求时，不得擅自把 `frontend` 合并到 `develop`
+8. AI 在没有明确要求时，不得擅自创建 `release` 或修改 `main`
+9. AI 在执行 Git 操作前，应先检查工作区是否干净，或明确当前未提交改动是否属于本次任务
+10. AI 不得使用破坏性命令，例如 `git reset --hard`
+11. AI 在推送远程分支前，应明确分支名称和目标远程分支是否一致
+12. AI 在开发模块时，应以功能目标为边界，而不是强行要求只修改单一目录
+13. 如果某个模块需要联动修改页面、路由、`api`、`store`、`types`、公共组件，AI 可以在同一模块分支内一并完成
+14. AI 在同步文档或流程规则到多个分支时，应确保各分支对应文档内容一致
 
 ## 4. 推荐操作模板
 
@@ -192,23 +204,34 @@ git checkout -b frontend
 git push -u origin frontend
 ```
 
-### 4.3 从 `frontend` 创建模块分支
+### 4.3 从 `frontend` 创建并推送模块分支
 
 ```bash
 git checkout frontend
 git pull origin frontend
 git checkout -b order-detail
+git push -u origin order-detail
 ```
 
-### 4.4 模块完成后合并回 `frontend`
+### 4.4 在模块分支上提交开发结果
+
+```bash
+git checkout order-detail
+git add .
+git commit -m "feat: complete order detail module"
+git push origin order-detail
+```
+
+### 4.5 模块完成后合并回 `frontend`
 
 ```bash
 git checkout frontend
+git pull origin frontend
 git merge order-detail
 git push origin frontend
 ```
 
-### 4.5 前端整体完成后合并回 `develop`
+### 4.6 前端整体完成后合并回 `develop`
 
 ```bash
 git checkout develop
@@ -217,7 +240,7 @@ git merge frontend
 git push origin develop
 ```
 
-### 4.6 发布时创建 `release`
+### 4.7 发布时创建 `release`
 
 ```bash
 git checkout develop
@@ -226,7 +249,7 @@ git checkout -b release
 git push -u origin release
 ```
 
-### 4.7 发布到 `main`
+### 4.8 发布到 `main`
 
 ```bash
 git checkout main
@@ -260,17 +283,19 @@ git push origin main
 1. develop 是主开发集成分支，对应远程 origin/develop。
 2. frontend 是前端团队主开发分支，从 develop 创建，并同步推送到远程。
 3. 每次开发具体前端功能时，必须从 frontend 再创建一个模块分支，分支名直接用模块名。
-4. 功能开发、调试、测试都在模块分支完成。
-5. 模块测试通过后，只能先合并回 frontend。
-6. 所有前端功能完成后，才允许将 frontend 合并到 develop。
-7. develop 与后端联调完成后，再从 develop 创建 release。
-8. release 验收通过后，再合并到 main。
-9. 不允许直接在 develop、release、main 上写日常前端功能代码。
-10. 每次执行 Git 操作前，先检查当前分支和工作区状态；不要使用破坏性 Git 命令。
+4. 模块分支创建后，必须立即 push 到远程，不能只在本地存在，因为老师需要在 GitHub 上看到按模块开发和合并的过程。
+5. 功能开发、调试、测试都在模块分支完成。
+6. 模块分支按功能目标划分，不要求改动文件绝对隔离；为完成一个模块，可以联动修改相关页面、路由、api、store、types、公共组件。
+7. 模块测试通过后，只能先合并回 frontend。
+8. 所有前端功能完成后，才允许将 frontend 合并到 develop。
+9. develop 与后端联调完成后，再从 develop 创建 release。
+10. release 验收通过后，再合并到 main。
+11. 不允许直接在 develop、release、main 上写日常前端功能代码。
+12. 每次执行 Git 操作前，先检查当前分支和工作区状态；不要使用破坏性 Git 命令。
 ```
 
 ## 7. 一句话总结
 
 本项目的前端开发必须严格遵守：
 
-`功能开发在模块分支，模块合并到 frontend，前端完成再合并到 develop，联调完成再发布到 release 和 main。`
+`功能开发在模块分支，模块分支必须同步到远程，模块按功能目标组织，模块合并到 frontend，前端完成再合并到 develop，联调完成再发布到 release 和 main。`

@@ -4,6 +4,10 @@ defineProps({
     default: '',
     type: String,
   },
+  kicker: {
+    default: '模块区块',
+    type: String,
+  },
   title: {
     required: true,
     type: String,
@@ -15,7 +19,7 @@ defineProps({
   <section class="page-section surface-card">
     <div class="section-header">
       <div>
-        <p class="section-kicker">Module</p>
+        <p class="section-kicker">{{ kicker }}</p>
         <h3>{{ title }}</h3>
       </div>
       <p v-if="description" class="section-description">{{ description }}</p>

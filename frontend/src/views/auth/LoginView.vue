@@ -55,7 +55,7 @@ const handleSubmit = async () => {
 <template>
   <div class="auth-page">
     <section class="auth-hero">
-      <p class="section-kicker">Mock Friendly Frontend</p>
+      <p class="section-kicker">契约优先前端</p>
       <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
       <p>
         当前运行模式为 <strong>{{ appStore.apiMode }}</strong
@@ -77,7 +77,7 @@ const handleSubmit = async () => {
       <template #header>
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">User Auth</p>
+            <p class="section-kicker">用户入口</p>
             <h2>用户登录</h2>
           </div>
           <el-button link @click="router.push('/admin/login')">管理员入口</el-button>

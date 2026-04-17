@@ -115,7 +115,7 @@ onMounted(() => {
       <template v-if="user">
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">USER {{ user.userId }}</p>
+            <p class="section-kicker">用户 #{{ user.userId }}</p>
             <h2>{{ user.nickname }}</h2>
           </div>
           <StatusTag :value="user.status" :text="formatUserStatus(user.status)" />

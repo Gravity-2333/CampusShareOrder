@@ -34,7 +34,7 @@ export const validateNickname = (value) => {
   const trimmed = String(value).trim()
 
   if (trimmed.length < 2 || trimmed.length > 20) {
-    return '昵称长度需为 2 到 20 个字符'
+    return '昵称长度需在 2 到 20 个字符之间'
   }
 
   return ''

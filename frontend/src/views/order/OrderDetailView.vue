@@ -33,6 +33,8 @@ const joinStatusTextMap = {
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
+const normalizedOrderId = computed(() => Number(currentOrderId.value || 0))
+const isValidOrderId = computed(() => Number.isInteger(normalizedOrderId.value) && normalizedOrderId.value > 0)
 const hasActualAmount = computed(
   () => detail.value?.paymentSummary?.actualTotalAmount !== null && detail.value?.paymentSummary?.actualTotalAmount !== undefined,
 )
@@ -92,6 +94,13 @@ const paymentDeltaText = computed(() => {
   const delta = estimated - actual
 
   return formatCurrency(delta)
+})
+const detailErrorText = computed(() => {
+  if (!isValidOrderId.value) {
+    return '当前路由里的订单 ID 无效，请返回大厅重新进入详情页。'
+  }
+
+  return orderStore.detailError || '当前未加载到订单详情数据，可以返回大厅重新进入，或手动刷新当前页面。'
 })
 const primaryAction = computed(() => {
   if (!detail.value) {
@@ -232,7 +241,9 @@ const actionSummary = computed(() => {
 })
 
 const loadDetail = async (orderId = currentOrderId.value) => {
-  if (!orderId) {
+  if (!isValidOrderId.value) {
+    orderStore.detail = null
+    orderStore.detailError = '当前路由里的订单 ID 无效，请返回大厅重新进入详情页。'
     return
   }
 
@@ -676,11 +687,11 @@ onMounted(() => {
       <EmptyState
         v-else-if="!orderStore.detailLoading"
         title="订单详情不可用"
-        description="当前未加载到订单详情数据，可以返回大厅重新进入，或手动刷新当前页面。"
+        :description="detailErrorText"
       >
         <div class="page-actions">
           <el-button @click="router.push('/orders')">返回大厅</el-button>
-          <el-button type="primary" plain @click="loadDetail()">重新加载</el-button>
+          <el-button type="primary" plain :disabled="!isValidOrderId" @click="loadDetail()">重新加载</el-button>
         </div>
       </EmptyState>
     </PageSection>

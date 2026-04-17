@@ -24,6 +24,7 @@ const defaultPageData = () => ({
 export const useOrderStore = defineStore('order', {
   state: () => ({
     detail: null,
+    detailError: '',
     detailLoading: false,
     hallFilters: {
       keyword: '',
@@ -80,10 +81,15 @@ export const useOrderStore = defineStore('order', {
     },
     async loadOrderDetail(orderId) {
       this.detailLoading = true
+      this.detailError = ''
+      this.detail = null
 
       try {
         this.detail = await getOrderDetail(orderId)
         return this.detail
+      } catch (error) {
+        this.detailError = error.message || '订单详情加载失败'
+        throw error
       } finally {
         this.detailLoading = false
       }

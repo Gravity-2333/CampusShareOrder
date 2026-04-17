@@ -1,23 +1,40 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useUserStore } from '../../stores/user'
+import { formatDateTime, formatSignedNumber } from '../../utils/format'
 
+const router = useRouter()
 const userStore = useUserStore()
-const loading = ref(false)
+
+const stats = computed(() => [
+  {
+    label: '当前信用分',
+    value: userStore.credit.creditScore,
+    hint: '用于后续投诉处理与风控场景',
+  },
+  {
+    label: '信用等级',
+    value: userStore.creditLevel,
+    hint: '只做展示，不参与页面权限判断',
+  },
+  {
+    label: '变更记录',
+    value: userStore.credit.records.length,
+    hint: '来自 UserCreditVO.records',
+  },
+])
 
 const loadCredit = async () => {
-  loading.value = true
-
   try {
-    await userStore.loadCredit()
+    await Promise.all([userStore.loadCredit(), userStore.ensureProfileLoaded()])
   } catch (error) {
     ElMessage.error(error.message)
-  } finally {
-    loading.value = false
   }
 }
 
@@ -27,19 +44,30 @@ onMounted(loadCredit)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard
-        label="当前信用分"
-        :value="userStore.credit.creditScore"
-        hint="用于后续投诉处理与风控场景"
-      />
+      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
     </div>
 
     <PageSection title="信用分记录" description="对应 GET /api/users/credit。">
-      <el-table v-loading="loading" :data="userStore.credit.records" stripe>
-        <el-table-column prop="createdAt" label="时间" />
-        <el-table-column prop="changeReason" label="变更原因" />
-        <el-table-column prop="delta" label="变更值" />
-      </el-table>
+      <div class="page-actions">
+        <el-button @click="router.push('/profile')">返回个人资料</el-button>
+      </div>
+
+      <div v-if="userStore.credit.records.length" class="table-stack">
+        <el-table v-loading="userStore.creditLoading" :data="userStore.credit.records" stripe>
+          <el-table-column label="时间">
+            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column prop="changeReason" label="变更原因" />
+          <el-table-column label="变更值">
+            <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <EmptyState
+        v-else
+        title="暂无信用分记录"
+        description="后续切 live 时仍然只需要替换底层 provider。"
+      />
     </PageSection>
   </div>
 </template>

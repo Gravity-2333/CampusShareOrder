@@ -16,6 +16,16 @@ export const formatCurrency = (value) => {
 
 export const formatDateTime = (value) => value || '--'
 
+export const formatSignedNumber = (value) => {
+  const amount = Number(value || 0)
+
+  if (amount > 0) {
+    return `+${amount}`
+  }
+
+  return `${amount}`
+}
+
 export const maskPhone = (value) =>
   value ? `${value.slice(0, 3)}****${value.slice(-4)}` : '--'
 

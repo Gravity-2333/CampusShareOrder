@@ -215,12 +215,18 @@ export const getCapitalRecords = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
-  return pageResult(getDatabase().records, Number(params.page || 1), Number(params.pageSize || 10))
+  const type = String(params.type || '').trim()
+  const list = getDatabase().records.filter((item) => !type || item.type === type)
+
+  return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }
 
 export const getOperationLogs = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
-  return pageResult(getDatabase().logs, Number(params.page || 1), Number(params.pageSize || 10))
+  const action = String(params.action || '').trim()
+  const list = getDatabase().logs.filter((item) => !action || item.action.includes(action))
+
+  return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }

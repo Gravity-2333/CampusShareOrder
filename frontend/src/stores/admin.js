@@ -39,6 +39,11 @@ export const useAdminStore = defineStore('admin', {
       recentLogs: [],
       recentOrders: [],
     },
+    logsFilters: {
+      action: '',
+      page: 1,
+      pageSize: 10,
+    },
     logsLoading: false,
     logsPage: defaultPageData(),
     metrics: {
@@ -55,6 +60,11 @@ export const useAdminStore = defineStore('admin', {
     },
     ordersLoading: false,
     ordersPage: defaultPageData(),
+    recordsFilters: {
+      page: 1,
+      pageSize: 10,
+      type: '',
+    },
     recordsLoading: false,
     recordsPage: defaultPageData(),
     submitting: false,
@@ -214,7 +224,11 @@ export const useAdminStore = defineStore('admin', {
       this.recordsLoading = true
 
       try {
-        this.recordsPage = await getCapitalRecords(params)
+        this.recordsFilters = {
+          ...this.recordsFilters,
+          ...params,
+        }
+        this.recordsPage = await getCapitalRecords(this.recordsFilters)
         return this.recordsPage
       } finally {
         this.recordsLoading = false
@@ -224,7 +238,11 @@ export const useAdminStore = defineStore('admin', {
       this.logsLoading = true
 
       try {
-        this.logsPage = await getOperationLogs(params)
+        this.logsFilters = {
+          ...this.logsFilters,
+          ...params,
+        }
+        this.logsPage = await getOperationLogs(this.logsFilters)
         return this.logsPage
       } finally {
         this.logsLoading = false

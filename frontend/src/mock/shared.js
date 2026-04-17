@@ -51,6 +51,28 @@ export const maskPhone = (value) =>
 export const maskStudentNo = (value) =>
   value ? `${value.slice(0, 2)}****${value.slice(-2)}` : ''
 
+const toDate = (value) => {
+  if (!value) {
+    return null
+  }
+
+  const normalized = String(value).replace(' ', 'T')
+  const date = new Date(normalized)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+export const addMinutes = (value, minutes) => {
+  const date = toDate(value)
+
+  if (!date) {
+    return ''
+  }
+
+  date.setMinutes(date.getMinutes() + minutes)
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 const compareTimeline = (left, right) => String(left.at).localeCompare(String(right.at))
 
 const buildTimeline = (order, complaints) => {
@@ -246,7 +268,7 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
         }
       : null,
     receiveInfo: {
-      autoConfirmDeadlineAt: order.deliveredAt,
+      autoConfirmDeadlineAt: addMinutes(order.deliveredAt, 30),
       deliveredAt: order.deliveredAt,
       receiveStatusSummary: order.members.map((item) => ({
         nickname: item.nickname,

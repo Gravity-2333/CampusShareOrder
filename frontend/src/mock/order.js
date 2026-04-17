@@ -1,5 +1,5 @@
 import { getDatabase, mutateDatabase, pageResult, timestamp } from './database'
-import { buildOrderDetail, requireUser, sleep } from './shared'
+import { addMinutes, buildOrderDetail, requireUser, sleep } from './shared'
 import { makeFailure } from './database'
 
 export const createOrder = async (payload) => {
@@ -133,9 +133,10 @@ const refreshOrderStatusAfterPayment = (order) => {
     order.currentMemberCount === order.totalMemberCount &&
     order.members.every((member) => member.joinStatus === 'ACTIVE' && member.payStatus === 'PAID')
   ) {
+    const groupedAt = timestamp()
     order.status = 'GROUPED'
-    order.receiptUploadDeadlineAt = timestamp()
-    order.expectedDeliveryEndAt = '2026-04-17 23:00:00'
+    order.receiptUploadDeadlineAt = addMinutes(groupedAt, 30)
+    order.expectedDeliveryEndAt = addMinutes(groupedAt, 90)
   }
 }
 

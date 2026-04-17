@@ -1,0 +1,968 @@
+根据 2026-04-16 的需求文档、系统设计文档和开发规划，下面只补这 5 个冻结部分；从现在开始，接口名、DTO/VO、状态机、定时任务、测试验收都按这份执行。 
+
+## 1. 最终接口命名拍板表
+
+系统设计文档已经把 `/api/auth/me`、`/api/users/profile`、`/api/users/credit` 这类边界分开，开发规划也明确要求先统一接口路径、字段命名和返回格式；下面把所有易混路径一次性拍板。 
+
+| 业务动作    | 最终保留路径                                            | 废弃路径                                                                                                  | 选择理由                                                                    |
+| ------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 普通用户注册  | `POST /api/auth/register`                         | `POST /api/users/register`、`POST /api/register`                                                       | 认证入口统一归 `auth`，注册/登录/当前身份查询都在同一模块，前后端最容易定位。                             |
+| 普通用户登录  | `POST /api/auth/login`                            | `POST /api/login`、`POST /api/users/login`                                                             | 与注册、`/api/auth/me` 同域，鉴权链路清晰。                                           |
+| 管理员登录   | `POST /api/auth/admin/login`                      | `POST /api/admin/login`                                                                               | 管理员仍属于认证行为，不属于后台业务管理资源；与普通用户登录只差角色入口。                                   |
+| 获取当前登录态 | `GET /api/auth/me`                                | `GET /api/users/me`                                                                                   | 这是鉴权恢复接口，不是业务资料接口；普通用户和管理员 token 都能调用。                                  |
+| 获取个人资料  | `GET /api/users/profile`                          | `GET /api/users/me`、`GET /api/auth/profile`                                                           | 这是用户业务资料读取接口，只服务普通用户页面。                                                 |
+| 修改个人资料  | `PUT /api/users/profile`                          | `PATCH /api/users/me`、`PUT /api/auth/me`                                                              | 与读取资料保持同一路径，前端个人中心直调最直接。                                                |
+| 获取我的投诉  | `GET /api/complaints/my`                          | `GET /api/users/my-complaints`                                                                        | 投诉域统一归 `complaints`，前端投诉页和后台投诉管理口径一致。                                   |
+| 提交投诉    | `POST /api/complaints`                            | `POST /api/orders/{orderId}/complaints`                                                               | V1 前端直接传 `orderId` 更简单；投诉仍是独立资源。                                        |
+| 订单支付    | `POST /api/orders/{orderId}/pay`                  | `POST /api/payments/pay`                                                                              | V1 页面从订单详情直接发动作，订单作用域路径最短、最直观；支付仍会落 `capital_record`，但不再暴露单独支付资源。       |
+| 退出拼单    | `POST /api/orders/{orderId}/exit`                 | `POST /api/orders/{orderId}/quit`                                                                     | `exit` 与成员 `joinStatus=EXITED` 一致，前后端状态名更统一。                            |
+| 上传凭证    | `POST /api/orders/{orderId}/upload-receipt`       | `POST /api/orders/{orderId}/receipt`                                                                  | 这是一次明确的上传动作，不是通用 receipt 资源 CRUD；与 `join/pay/exit` 同一动作型风格，前端文件上传直调最清楚。 |
+| 确认送达    | `POST /api/orders/{orderId}/mark-delivered`       | `POST /api/orders/{orderId}/delivered`                                                                | `mark-delivered` 明确表示“发起人点击确认送达”；`delivered` 单独使用容易和状态查询混淆。             |
+| 确认收货    | `POST /api/orders/{orderId}/confirm-received`     | `POST /api/orders/{orderId}/confirm-receive`                                                          | URL 与最终成员状态 `RECEIVED` 保持一致；`confirm-receive` 语义不完整。                    |
+| 管理端用户封禁 | `POST /api/admin/users/{userId}/ban`              | `PATCH /api/admin/users/{userId}/ban`                                                                 | V1 这是明确动作，不做局部资源补丁设计；按钮直调更简单。                                           |
+| 管理端用户解封 | `POST /api/admin/users/{userId}/unban`            | `PATCH /api/admin/users/{userId}/unban`                                                               | 与 `ban` 成对，页面实现最直接。                                                     |
+| 管理端取消订单 | `POST /api/admin/orders/{orderId}/cancel`         | `POST /api/admin/orders/{orderId}/force-cancel`、`POST /api/admin/orders/cancel`                       | 管理动作挂在具体订单资源下，最符合后台列表/抽屉直调。                                             |
+| 管理端处理投诉 | `POST /api/admin/complaints/{complaintId}/handle` | `POST /api/admin/complaints/{complaintId}/process`、`POST /api/admin/complaints/{complaintId}/resolve` | 文档已统一“处理投诉”叫 `handle`，后台按钮也对应“处理”。                                      |
+| 管理端资金记录 | `GET /api/admin/records/capital`                  | `GET /api/admin/capital-records`                                                                      | 后台记录页按“记录中心”统一收口，后面可并排加日志记录。                                            |
+| 管理端操作日志 | `GET /api/admin/records/logs`                     | `GET /api/admin/logs`                                                                                 | 与资金记录形成并行命名，后台实现更整齐。                                                    |
+
+### `/api/auth/me` 与 `/api/users/profile` 并存职责冻结
+
+| 接口                       | 是否保留 | 只允许谁调用         | 返回职责                                                                       |
+| ------------------------ | ---: | -------------- | -------------------------------------------------------------------------- |
+| `GET /api/auth/me`       |   保留 | `USER`、`ADMIN` | 只返回“当前登录身份上下文”：`role`、`status`、`isVerified`、最小展示信息。用于路由守卫、刷新恢复登录态、页面启动时回填。 |
+| `GET /api/users/profile` |   保留 | 仅 `USER`       | 返回“普通用户业务资料”：手机号、昵称、学号、联系方式、信用分、创建时间。用于个人中心页面。                             |
+| `PUT /api/users/profile` |   保留 | 仅 `USER`       | 修改用户可编辑资料，不参与鉴权恢复。                                                         |
+
+### 冲突修正说明
+
+1. URL 统一使用 **短横线动作名**；Java Controller/Service 方法统一使用 **camelCase 方法名**。
+   例：URL 是 `/confirm-received`，方法名是 `confirmReceive()`。
+2. 后台登录入口最终只保留 `POST /api/auth/admin/login`。
+3. 伪支付、伪退款、伪结算只保留数据库流水和服务内部逻辑，不再暴露单独前台调用接口。
+
+---
+
+## 2. 后端 DTO / VO / Entity 对照清单
+
+系统设计文档已经明确后端采用 Controller / Service / Mapper / Scheduler / Entity / DTO / VO 分层，核心实体固定为 `UserAccount`、`AdminAccount`、`GroupOrder`、`GroupOrderMember`、`OrderReceipt`、`Complaint`、`CapitalRecord`、`CreditChangeRecord`、`Notification`、`OperationLog`。 
+
+### 2.0 统一命名规则
+
+| 对象       | 最终规则                                                                                                     |
+| -------- | -------------------------------------------------------------------------------------------------------- |
+| Java 类名  | `UpperCamelCase`                                                                                         |
+| Java 属性名 | `lowerCamelCase`                                                                                         |
+| JSON 字段名 | `lowerCamelCase`                                                                                         |
+| 数据库表名    | `snake_case`                                                                                             |
+| 数据库字段名   | `snake_case`                                                                                             |
+| 枚举值      | `UPPER_SNAKE_CASE`                                                                                       |
+| 布尔字段     | Java/JSON 保留 `isVerified`、`isCreator`、`isRead`；数据库去掉 `is_` 前缀或按表定义落 `is_verified`、`is_creator`、`is_read` |
+| 统一分页类    | `PageResult<T>`                                                                                          |
+| 统一返回类    | `ApiResponse<T>`                                                                                         |
+
+### 2.0.1 通用类
+
+| 类名               | 字段         | 类型        |
+| ---------------- | ---------- | --------- |
+| `ApiResponse<T>` | `code`     | `Integer` |
+|                  | `message`  | `String`  |
+|                  | `data`     | `T`       |
+| `PageResult<T>`  | `list`     | `List<T>` |
+|                  | `page`     | `Integer` |
+|                  | `pageSize` | `Integer` |
+|                  | `total`    | `Long`    |
+|                  | `pages`    | `Integer` |
+| `SimpleResultVO` | `success`  | `Boolean` |
+
+### 2.1 Auth 模块
+
+#### 2.1.1 接口总表
+
+| 接口                           | Request DTO           | Response VO          | Entity                         |
+| ---------------------------- | --------------------- | -------------------- | ------------------------------ |
+| `POST /api/auth/register`    | `UserRegisterRequest` | `RegisterResultVO`   | `UserAccount`                  |
+| `POST /api/auth/login`       | `UserLoginRequest`    | `UserLoginVO`        | `UserAccount`                  |
+| `POST /api/auth/admin/login` | `AdminLoginRequest`   | `AdminLoginVO`       | `AdminAccount`                 |
+| `GET /api/auth/me`           | 无                     | `CurrentLoginInfoVO` | `UserAccount` / `AdminAccount` |
+| `POST /api/auth/logout`      | 无                     | `SimpleResultVO`     | 无持久化变更                         |
+
+#### 2.1.2 Request DTO 字段
+
+| 类名                    | 字段         |       类型 | 必填 |
+| --------------------- | ---------- | -------: | -: |
+| `UserRegisterRequest` | `phone`    | `String` |  是 |
+|                       | `password` | `String` |  是 |
+|                       | `nickname` | `String` |  是 |
+| `UserLoginRequest`    | `phone`    | `String` |  是 |
+|                       | `password` | `String` |  是 |
+| `AdminLoginRequest`   | `username` | `String` |  是 |
+|                       | `password` | `String` |  是 |
+
+#### 2.1.3 Response VO 字段
+
+| 类名                   | 字段            |                 类型 | 说明              |
+| -------------------- | ------------- | -----------------: | --------------- |
+| `RegisterResultVO`   | `userId`      |             `Long` | 新用户 ID          |
+|                      | `phone`       |           `String` | 注册手机号           |
+|                      | `nickname`    |           `String` | 昵称              |
+|                      | `isVerified`  |          `Boolean` | 初始为 `false`     |
+|                      | `status`      |           `String` | `NORMAL`        |
+|                      | `creditScore` |          `Integer` | 初始为 `80`        |
+| `LoginUserInfoVO`    | `userId`      |             `Long` | 用户 ID           |
+|                      | `phone`       |           `String` | 手机号             |
+|                      | `nickname`    |           `String` | 昵称              |
+|                      | `studentNo`   |           `String` | 可为 `null`       |
+|                      | `isVerified`  |          `Boolean` | 是否实名            |
+|                      | `status`      |           `String` | `NORMAL/BANNED` |
+|                      | `creditScore` |          `Integer` | 当前信用分           |
+|                      | `contactInfo` |           `String` | 联系方式，可空         |
+| `UserLoginVO`        | `token`       |           `String` | JWT             |
+|                      | `userInfo`    |  `LoginUserInfoVO` | 登录用户信息          |
+| `LoginAdminInfoVO`   | `adminId`     |             `Long` | 管理员 ID          |
+|                      | `username`    |           `String` | 用户名             |
+|                      | `status`      |           `String` | `NORMAL/BANNED` |
+| `AdminLoginVO`       | `token`       |           `String` | JWT             |
+|                      | `adminInfo`   | `LoginAdminInfoVO` | 管理员信息           |
+| `CurrentLoginInfoVO` | `role`        |           `String` | `USER/ADMIN`    |
+|                      | `userId`      |             `Long` | `USER` 时有值      |
+|                      | `adminId`     |             `Long` | `ADMIN` 时有值     |
+|                      | `phone`       |           `String` | 仅 `USER`        |
+|                      | `nickname`    |           `String` | 仅 `USER`        |
+|                      | `studentNo`   |           `String` | 仅 `USER`        |
+|                      | `isVerified`  |          `Boolean` | 仅 `USER`        |
+|                      | `status`      |           `String` | 必返              |
+|                      | `creditScore` |          `Integer` | 仅 `USER`        |
+|                      | `contactInfo` |           `String` | 仅 `USER`        |
+|                      | `username`    |           `String` | 仅 `ADMIN`       |
+
+---
+
+### 2.2 User 模块
+
+#### 2.2.1 接口总表
+
+| 接口                               | Request DTO                | Response VO                     | Entity                                         |
+| -------------------------------- | -------------------------- | ------------------------------- | ---------------------------------------------- |
+| `POST /api/users/verify-student` | `VerifyStudentRequest`     | `VerifyStudentVO`               | `UserAccount`                                  |
+| `GET /api/users/profile`         | 无                          | `UserProfileVO`                 | `UserAccount`                                  |
+| `PUT /api/users/profile`         | `UpdateUserProfileRequest` | `UpdateUserProfileVO`           | `UserAccount`                                  |
+| `GET /api/users/credit`          | `PageQuery`                | `UserCreditVO`                  | `UserAccount`、`CreditChangeRecord`             |
+| `GET /api/users/my-orders`       | `MyOrdersQuery`            | `PageResult<MyOrderListItemVO>` | `GroupOrder`、`GroupOrderMember`、`OrderReceipt` |
+
+#### 2.2.2 Request DTO 字段
+
+| 类名                         | 字段            |        类型 | 必填 |
+| -------------------------- | ------------- | --------: | -: |
+| `VerifyStudentRequest`     | `studentNo`   |  `String` |  是 |
+| `UpdateUserProfileRequest` | `nickname`    |  `String` |  是 |
+|                            | `contactInfo` |  `String` |  否 |
+| `PageQuery`                | `page`        | `Integer` |  否 |
+|                            | `pageSize`    | `Integer` |  否 |
+| `MyOrdersQuery`            | `role`        |  `String` |  是 |
+|                            | `status`      |  `String` |  否 |
+|                            | `page`        | `Integer` |  否 |
+|                            | `pageSize`    | `Integer` |  否 |
+
+#### 2.2.3 Response VO 字段
+
+| 类名                    | 字段                      |                               类型 | 说明                                              |
+| --------------------- | ----------------------- | -------------------------------: | ----------------------------------------------- |
+| `VerifyStudentVO`     | `userId`                |                           `Long` | 用户 ID                                           |
+|                       | `studentNo`             |                         `String` | 学号                                              |
+|                       | `isVerified`            |                        `Boolean` | 固定为 `true`                                      |
+| `UserProfileVO`       | `userId`                |                           `Long` | 用户 ID                                           |
+|                       | `phone`                 |                         `String` | 手机号                                             |
+|                       | `nickname`              |                         `String` | 昵称                                              |
+|                       | `studentNo`             |                         `String` | 学号                                              |
+|                       | `isVerified`            |                        `Boolean` | 是否实名                                            |
+|                       | `creditScore`           |                        `Integer` | 当前信用分                                           |
+|                       | `status`                |                         `String` | 账号状态                                            |
+|                       | `contactInfo`           |                         `String` | 联系方式                                            |
+|                       | `createdAt`             |                  `LocalDateTime` | 注册时间                                            |
+| `UpdateUserProfileVO` | `userId`                |                           `Long` | 用户 ID                                           |
+|                       | `nickname`              |                         `String` | 新昵称                                             |
+|                       | `contactInfo`           |                         `String` | 新联系方式                                           |
+| `CreditRecordItemVO`  | `recordId`              |                           `Long` | 记录 ID                                           |
+|                       | `changeValue`           |                        `Integer` | 分值变化                                            |
+|                       | `reasonType`            |                         `String` | 原因枚举                                            |
+|                       | `relatedOrderId`        |                           `Long` | 关联订单，可空                                         |
+|                       | `relatedComplaintId`    |                           `Long` | 关联投诉，可空                                         |
+|                       | `remark`                |                         `String` | 说明                                              |
+|                       | `createdAt`             |                  `LocalDateTime` | 发生时间                                            |
+| `UserCreditVO`        | `creditScore`           |                        `Integer` | 当前信用分                                           |
+|                       | `records`               | `PageResult<CreditRecordItemVO>` | 记录分页                                            |
+| `MyOrderListItemVO`   | `orderId`               |                           `Long` | 订单 ID                                           |
+|                       | `orderNo`               |                         `String` | 订单编号                                            |
+|                       | `productName`           |                         `String` | 商品名                                             |
+|                       | `pickupPoint`           |                         `String` | 取货点                                             |
+|                       | `status`                |                         `String` | 主状态                                             |
+|                       | `totalMemberCount`      |                        `Integer` | 总人数                                             |
+|                       | `currentMemberCount`    |                        `Integer` | 当前人数                                            |
+|                       | `estimatedPerAmount`    |                     `BigDecimal` | 预估人均                                            |
+|                       | `actualPerAmount`       |                     `BigDecimal` | 实际人均，可空                                         |
+|                       | `deadlineAt`            |                  `LocalDateTime` | 截止时间                                            |
+|                       | `expectedDeliveryEndAt` |                  `LocalDateTime` | 预计最晚送达，可空                                       |
+|                       | `myRole`                |                         `String` | `CREATOR/PARTICIPANT`                           |
+|                       | `myJoinStatus`          |                         `String` | `ACTIVE/EXITED/CANCELED`                        |
+|                       | `myPayStatus`           |                         `String` | `UNPAID/PAID`                                   |
+|                       | `myReceiveStatus`       |                         `String` | `NOT_READY/WAIT_CONFIRM/RECEIVED/AUTO_RECEIVED` |
+|                       | `refundAmountTotal`     |                     `BigDecimal` | 累计退款                                            |
+|                       | `createdAt`             |                  `LocalDateTime` | 创建时间                                            |
+
+---
+
+### 2.3 Order 模块
+
+#### 2.3.1 接口总表
+
+| 接口                                            | Request DTO            | Response VO                   | Entity                                                                                                  |
+| --------------------------------------------- | ---------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `POST /api/orders`                            | `CreateOrderRequest`   | `CreateOrderVO`               | `GroupOrder`、`GroupOrderMember`                                                                         |
+| `GET /api/orders`                             | `OrderListQuery`       | `PageResult<OrderListItemVO>` | `GroupOrder`、`GroupOrderMember`、`UserAccount`                                                           |
+| `GET /api/orders/{orderId}`                   | 无                      | `OrderDetailVO`               | `GroupOrder`、`GroupOrderMember`、`OrderReceipt`、`Complaint`、`CapitalRecord`、`UserAccount`、`OperationLog` |
+| `POST /api/orders/{orderId}/join`             | `JoinOrderRequest`     | `JoinOrderVO`                 | `GroupOrder`、`GroupOrderMember`                                                                         |
+| `POST /api/orders/{orderId}/pay`              | 无                      | `PayOrderVO`                  | `GroupOrder`、`GroupOrderMember`、`CapitalRecord`                                                         |
+| `POST /api/orders/{orderId}/exit`             | 无                      | `ExitOrderVO`                 | `GroupOrder`、`GroupOrderMember`、`CapitalRecord`                                                         |
+| `POST /api/orders/{orderId}/upload-receipt`   | `UploadReceiptRequest` | `UploadReceiptVO`             | `GroupOrder`、`OrderReceipt`、`GroupOrderMember`、`CapitalRecord`                                          |
+| `POST /api/orders/{orderId}/mark-delivered`   | 无                      | `MarkDeliveredVO`             | `GroupOrder`、`GroupOrderMember`、`Notification`                                                          |
+| `POST /api/orders/{orderId}/confirm-received` | 无                      | `ConfirmReceivedVO`           | `GroupOrder`、`GroupOrderMember`、`CapitalRecord`                                                         |
+
+#### 2.3.2 Request DTO 字段
+
+| 类名                     | 字段                        |              类型 | 必填 |
+| ---------------------- | ------------------------- | --------------: | -: |
+| `CreateOrderRequest`   | `productName`             |        `String` |  是 |
+|                        | `productDesc`             |        `String` |  否 |
+|                        | `totalMemberCount`        |       `Integer` |  是 |
+|                        | `estimatedTotalAmount`    |    `BigDecimal` |  是 |
+|                        | `pickupPoint`             |        `String` |  是 |
+|                        | `deadlineAt`              | `LocalDateTime` |  是 |
+| `OrderListQuery`       | `status`                  |        `String` |  否 |
+|                        | `keyword`                 |        `String` |  否 |
+|                        | `pickupPoint`             |        `String` |  否 |
+|                        | `sort`                    |        `String` |  否 |
+|                        | `page`                    |       `Integer` |  否 |
+|                        | `pageSize`                |       `Integer` |  否 |
+| `JoinOrderRequest`     | `remark`                  |        `String` |  否 |
+| `UploadReceiptRequest` | `receiptFile`             | `MultipartFile` |  是 |
+|                        | `actualTotalAmount`       |    `BigDecimal` |  是 |
+|                        | `expectedDeliveryStartAt` | `LocalDateTime` |  是 |
+|                        | `expectedDeliveryEndAt`   | `LocalDateTime` |  是 |
+
+#### 2.3.3 简单 Response VO 字段
+
+| 类名                         | 字段                      |                         类型 | 说明                    |
+| -------------------------- | ----------------------- | -------------------------: | --------------------- |
+| `CurrentUserMemberBriefVO` | `memberId`              |                     `Long` | 当前用户成员 ID             |
+|                            | `isCreator`             |                  `Boolean` | 是否发起人                 |
+|                            | `joinStatus`            |                   `String` | 加入状态                  |
+|                            | `payStatus`             |                   `String` | 支付状态                  |
+|                            | `receiveStatus`         |                   `String` | 收货状态                  |
+| `CreateOrderVO`            | `orderId`               |                     `Long` | 订单 ID                 |
+|                            | `orderNo`               |                   `String` | 订单编号                  |
+|                            | `status`                |                   `String` | 初始 `OPEN`             |
+|                            | `currentMemberCount`    |                  `Integer` | 初始 `1`                |
+|                            | `estimatedPerAmount`    |               `BigDecimal` | 预估人均                  |
+|                            | `currentUserMember`     | `CurrentUserMemberBriefVO` | 发起人成员信息               |
+| `OrderListItemVO`          | `orderId`               |                     `Long` | 订单 ID                 |
+|                            | `orderNo`               |                   `String` | 订单编号                  |
+|                            | `productName`           |                   `String` | 商品名                   |
+|                            | `productDesc`           |                   `String` | 商品描述                  |
+|                            | `pickupPoint`           |                   `String` | 取货点                   |
+|                            | `totalMemberCount`      |                  `Integer` | 总人数                   |
+|                            | `currentMemberCount`    |                  `Integer` | 当前人数                  |
+|                            | `remainingCount`        |                  `Integer` | 剩余名额                  |
+|                            | `estimatedTotalAmount`  |               `BigDecimal` | 预估总额                  |
+|                            | `estimatedPerAmount`    |               `BigDecimal` | 预估人均                  |
+|                            | `deadlineAt`            |            `LocalDateTime` | 截止时间                  |
+|                            | `status`                |                   `String` | 主状态                   |
+|                            | `creatorUserId`         |                     `Long` | 发起人 ID                |
+|                            | `creatorNickname`       |                   `String` | 发起人昵称                 |
+|                            | `complaintOpened`       |                  `Boolean` | 是否开放逾期投诉              |
+|                            | `currentUserJoined`     |                  `Boolean` | 当前用户是否已加入             |
+|                            | `currentUserPayStatus`  |                   `String` | 当前用户支付状态，可空           |
+|                            | `createdAt`             |            `LocalDateTime` | 创建时间                  |
+| `JoinOrderVO`              | `memberId`              |                     `Long` | 成员 ID                 |
+|                            | `joinStatus`            |                   `String` | 固定 `ACTIVE`           |
+|                            | `payStatus`             |                   `String` | 初始 `UNPAID`           |
+| `PayOrderVO`               | `memberId`              |                     `Long` | 成员 ID                 |
+|                            | `payStatus`             |                   `String` | `PAID`                |
+|                            | `payAmount`             |               `BigDecimal` | 支付金额                  |
+|                            | `paidAt`                |            `LocalDateTime` | 支付时间                  |
+|                            | `orderStatus`           |                   `String` | 支付后主状态                |
+| `ExitOrderVO`              | `memberId`              |                     `Long` | 成员 ID                 |
+|                            | `joinStatus`            |                   `String` | `EXITED`              |
+|                            | `refundAmount`          |               `BigDecimal` | 本次退款金额                |
+|                            | `orderStatus`           |                   `String` | 退出后主状态                |
+|                            | `currentMemberCount`    |                  `Integer` | 更新后人数                 |
+| `UploadReceiptVO`          | `receiptId`             |                     `Long` | 凭证 ID                 |
+|                            | `imageUrl`              |                   `String` | 文件访问地址                |
+|                            | `actualTotalAmount`     |               `BigDecimal` | 实际总额                  |
+|                            | `orderStatus`           |                   `String` | 上传后固定 `WAIT_DELIVERY` |
+| `MarkDeliveredVO`          | `orderStatus`           |                   `String` | 固定 `WAIT_RECEIVE`     |
+|                            | `deliveredAt`           |            `LocalDateTime` | 送达时间                  |
+|                            | `autoConfirmDeadlineAt` |            `LocalDateTime` | `deliveredAt + 30m`   |
+| `ConfirmReceivedVO`        | `memberId`              |                     `Long` | 成员 ID                 |
+|                            | `receiveStatus`         |                   `String` | `RECEIVED`            |
+|                            | `receivedAt`            |            `LocalDateTime` | 收货时间                  |
+|                            | `orderStatus`           |                   `String` | 收货后主状态                |
+
+#### 2.3.4 `OrderDetailVO` 结构与字段来源总表
+
+| 类 / 字段                            |                          类型 | 来源                                  | 说明                                |
+| --------------------------------- | --------------------------: | ----------------------------------- | --------------------------------- |
+| `OrderDetailVO.viewerRoleInOrder` |                    `String` | 聚合计算                                | `CREATOR/PARTICIPANT/GUEST/ADMIN` |
+| `OrderDetailVO.basicInfo`         |          `OrderBasicInfoVO` | 聚合                                  | 基础信息区                             |
+| `OrderDetailVO.initiatorInfo`     |           `InitiatorInfoVO` | `user_account`                      | 发起人区                              |
+| `OrderDetailVO.currentUserMember` |       `CurrentUserMemberVO` | `group_order_member`                | 当前查看人自己的成员行；无则 `null`             |
+| `OrderDetailVO.memberList`        |       `List<OrderMemberVO>` | `group_order_member + user_account` | 成员列表                              |
+| `OrderDetailVO.paymentSummary`    |          `PaymentSummaryVO` | 聚合计算                                | 支付汇总                              |
+| `OrderDetailVO.receiptInfo`       |             `ReceiptInfoVO` | `order_receipt`                     | 凭证信息                              |
+| `OrderDetailVO.receiveInfo`       |             `ReceiveInfoVO` | `group_order + group_order_member`  | 收货信息                              |
+| `OrderDetailVO.timeline`          | `List<OrderTimelineItemVO>` | `operation_log + 聚合事件`              | 时间线                               |
+| `OrderDetailVO.complaintInfo`     |           `ComplaintInfoVO` | `group_order + complaint`           | 投诉信息                              |
+| `OrderDetailVO.actionFlags`       |        `OrderActionFlagsVO` | 聚合计算                                | 前端唯一按钮控制源                         |
+
+##### `OrderBasicInfoVO`
+
+| 字段                        |              类型 | 来源表/字段                                   | 备注                                               |
+| ------------------------- | --------------: | ---------------------------------------- | ------------------------------------------------ |
+| `orderId`                 |          `Long` | `group_order.id`                         | 前端统一用 `orderId`                                  |
+| `orderNo`                 |        `String` | `group_order.order_no`                   | 订单号                                              |
+| `productName`             |        `String` | `group_order.product_name`               | 商品名                                              |
+| `productDesc`             |        `String` | `group_order.product_desc`               | 商品描述                                             |
+| `pickupPoint`             |        `String` | `group_order.pickup_point`               | 取货点                                              |
+| `totalMemberCount`        |       `Integer` | `group_order.total_member_count`         | 总人数                                              |
+| `currentMemberCount`      |       `Integer` | `group_order.current_member_count`       | 当前有效人数                                           |
+| `estimatedTotalAmount`    |    `BigDecimal` | `group_order.estimated_total_amount`     | 预估总额                                             |
+| `estimatedPerAmount`      |    `BigDecimal` | 聚合计算                                     | `estimatedTotalAmount / totalMemberCount`，保留 2 位 |
+| `actualTotalAmount`       |    `BigDecimal` | `group_order.actual_total_amount`        | 实际总额，可空                                          |
+| `actualPerAmount`         |    `BigDecimal` | 聚合计算                                     | `actualTotalAmount / totalMemberCount`，无实际金额则空   |
+| `deadlineAt`              | `LocalDateTime` | `group_order.deadline_at`                | 截止时间                                             |
+| `receiptUploadDeadlineAt` | `LocalDateTime` | `group_order.receipt_upload_deadline_at` | 凭证上传截止                                           |
+| `expectedDeliveryStartAt` | `LocalDateTime` | `group_order.expected_delivery_start_at` | 预计最早送达                                           |
+| `expectedDeliveryEndAt`   | `LocalDateTime` | `group_order.expected_delivery_end_at`   | 预计最晚送达                                           |
+| `deliveredAt`             | `LocalDateTime` | `group_order.delivered_at`               | 实际送达时间                                           |
+| `status`                  |        `String` | `group_order.status`                     | 主状态                                              |
+| `complaintOpened`         |       `Boolean` | `group_order.complaint_opened`           | 是否已由系统开放逾期投诉                                     |
+| `cancelReason`            |        `String` | `group_order.cancel_reason`              | 取消原因，可空                                          |
+| `createdAt`               | `LocalDateTime` | `group_order.created_at`                 | 创建时间                                             |
+| `updatedAt`               | `LocalDateTime` | `group_order.updated_at`                 | 更新时间                                             |
+
+##### `InitiatorInfoVO`
+
+| 字段                |        类型 | 来源表/字段                      | 备注                |
+| ----------------- | --------: | --------------------------- | ----------------- |
+| `userId`          |    `Long` | `user_account.id`           | 发起人 ID            |
+| `nickname`        |  `String` | `user_account.nickname`     | 昵称                |
+| `phoneMasked`     |  `String` | 聚合计算                        | 对 `phone` 脱敏      |
+| `studentNoMasked` |  `String` | 聚合计算                        | 对 `student_no` 脱敏 |
+| `creditScore`     | `Integer` | `user_account.credit_score` | 当前分数              |
+| `userStatus`      |  `String` | `user_account.status`       | `NORMAL/BANNED`   |
+
+##### `CurrentUserMemberVO` / `OrderMemberVO`
+
+| 字段                  |              类型 | 来源表/字段                                   | 备注    |
+| ------------------- | --------------: | ---------------------------------------- | ----- |
+| `memberId`          |          `Long` | `group_order_member.id`                  | 成员 ID |
+| `userId`            |          `Long` | `group_order_member.user_id`             | 用户 ID |
+| `nickname`          |        `String` | `user_account.nickname`                  | 成员昵称  |
+| `isCreator`         |       `Boolean` | `group_order_member.is_creator`          | 是否发起人 |
+| `remark`            |        `String` | `group_order_member.remark`              | 备注    |
+| `joinStatus`        |        `String` | `group_order_member.join_status`         | 加入状态  |
+| `payStatus`         |        `String` | `group_order_member.pay_status`          | 支付状态  |
+| `payAmount`         |    `BigDecimal` | `group_order_member.pay_amount`          | 已支付金额 |
+| `paidAt`            | `LocalDateTime` | `group_order_member.paid_at`             | 支付时间  |
+| `refundAmountTotal` |    `BigDecimal` | `group_order_member.refund_amount_total` | 累计退款  |
+| `receiveStatus`     |        `String` | `group_order_member.receive_status`      | 收货状态  |
+| `receivedAt`        | `LocalDateTime` | `group_order_member.received_at`         | 收货时间  |
+
+##### `PaymentSummaryVO`
+
+| 字段                      |           类型 | 来源                                   | 备注                                                                        |
+| ----------------------- | -----------: | ------------------------------------ | ------------------------------------------------------------------------- |
+| `totalMemberCount`      |    `Integer` | `group_order.total_member_count`     | 总人数                                                                       |
+| `paidMemberCount`       |    `Integer` | 聚合计算                                 | `ACTIVE && PAID` 计数                                                       |
+| `unpaidMemberCount`     |    `Integer` | 聚合计算                                 | `ACTIVE && UNPAID` 计数                                                     |
+| `estimatedTotalAmount`  | `BigDecimal` | `group_order.estimated_total_amount` | 预估总额                                                                      |
+| `paidTotalAmount`       | `BigDecimal` | 聚合计算                                 | `sum(payAmount)`                                                          |
+| `actualTotalAmount`     | `BigDecimal` | `group_order.actual_total_amount`    | 实际总额                                                                      |
+| `refundDiffTotalAmount` | `BigDecimal` | 聚合计算                                 | `sum(refundAmountTotal)`                                                  |
+| `settleToCreatorAmount` | `BigDecimal` | 聚合计算                                 | `min(actualTotalAmount, estimatedTotalAmount)`；若 `actualTotalAmount` 为空则空 |
+
+##### `ReceiptInfoVO`
+
+| 字段                        |              类型 | 来源表/字段                                     | 备注                   |
+| ------------------------- | --------------: | ------------------------------------------ | -------------------- |
+| `hasReceipt`              |       `Boolean` | 聚合计算                                       | 是否存在 `order_receipt` |
+| `receiptId`               |          `Long` | `order_receipt.id`                         | 可空                   |
+| `imageUrl`                |        `String` | `order_receipt.image_url`                  | 可空                   |
+| `uploaderUserId`          |          `Long` | `order_receipt.uploader_user_id`           | 可空                   |
+| `actualTotalAmount`       |    `BigDecimal` | `order_receipt.actual_total_amount`        | 可空                   |
+| `expectedDeliveryStartAt` | `LocalDateTime` | `order_receipt.expected_delivery_start_at` | 可空                   |
+| `expectedDeliveryEndAt`   | `LocalDateTime` | `order_receipt.expected_delivery_end_at`   | 可空                   |
+| `uploadedAt`              | `LocalDateTime` | `order_receipt.uploaded_at`                | 可空                   |
+
+##### `ReceiveInfoVO`
+
+| 字段                          |              类型 | 来源                         | 备注                                                        |
+| --------------------------- | --------------: | -------------------------- | --------------------------------------------------------- |
+| `pickupPoint`               |        `String` | `group_order.pickup_point` | 取货点                                                       |
+| `deliveredAt`               | `LocalDateTime` | `group_order.delivered_at` | 送达时间                                                      |
+| `autoConfirmDeadlineAt`     | `LocalDateTime` | 聚合计算                       | `deliveredAt + 30m`                                       |
+| `receivedMemberCount`       |       `Integer` | 聚合计算                       | `ACTIVE && receiveStatus in (RECEIVED, AUTO_RECEIVED)`    |
+| `pendingConfirmMemberCount` |       `Integer` | 聚合计算                       | `ACTIVE && isCreator=false && receiveStatus=WAIT_CONFIRM` |
+
+##### `OrderTimelineItemVO`
+
+| 字段             |              类型 | 来源                             | 备注                  |
+| -------------- | --------------: | ------------------------------ | ------------------- |
+| `time`         | `LocalDateTime` | `operation_log.created_at` 或聚合 | 时间点                 |
+| `type`         |        `String` | `operation_log.action` 或系统拼装   | 事件类型                |
+| `title`        |        `String` | 聚合拼装                           | 标题                  |
+| `content`      |        `String` | 聚合拼装                           | 内容                  |
+| `operatorType` |        `String` | `operation_log.operator_type`  | `USER/ADMIN/SYSTEM` |
+
+##### `ComplaintInfoVO`
+
+| 字段                  |        类型 | 来源                             | 备注           |
+| ------------------- | --------: | ------------------------------ | ------------ |
+| `complaintOpened`   | `Boolean` | `group_order.complaint_opened` | 仅表示系统已开放逾期投诉 |
+| `myComplaintId`     |    `Long` | `complaint.id`                 | 当前用户已投诉则返回   |
+| `myComplaintStatus` |  `String` | `complaint.status`             | 当前用户投诉状态     |
+| `complaintCount`    | `Integer` | 聚合计算                           | 当前订单投诉数量     |
+
+##### `OrderActionFlagsVO`
+
+| 字段                   |        类型 | 来源   | 备注         |
+| -------------------- | --------: | ---- | ---------- |
+| `canJoin`            | `Boolean` | 聚合计算 | 是否可加入      |
+| `canPay`             | `Boolean` | 聚合计算 | 是否可支付      |
+| `canExit`            | `Boolean` | 聚合计算 | 是否可退出      |
+| `canUploadReceipt`   | `Boolean` | 聚合计算 | 发起人是否可上传凭证 |
+| `canMarkDelivered`   | `Boolean` | 聚合计算 | 发起人是否可确认送达 |
+| `canConfirmReceived` | `Boolean` | 聚合计算 | 参与者是否可确认收货 |
+| `canCreateComplaint` | `Boolean` | 聚合计算 | 是否可提交投诉    |
+| `canViewReceipt`     | `Boolean` | 聚合计算 | 是否可查看凭证    |
+
+---
+
+### 2.4 Complaint 模块
+
+#### 2.4.1 接口总表
+
+| 接口                       | Request DTO              | Response VO                       | Entity                                 |
+| ------------------------ | ------------------------ | --------------------------------- | -------------------------------------- |
+| `POST /api/complaints`   | `SubmitComplaintRequest` | `SubmitComplaintVO`               | `Complaint`、`GroupOrder`、`UserAccount` |
+| `GET /api/complaints/my` | `ComplaintListQuery`     | `PageResult<ComplaintListItemVO>` | `Complaint`、`GroupOrder`、`UserAccount` |
+
+#### 2.4.2 Request DTO 字段
+
+| 类名                       | 字段         |        类型 | 必填 |
+| ------------------------ | ---------- | --------: | -: |
+| `SubmitComplaintRequest` | `orderId`  |    `Long` |  是 |
+|                          | `type`     |  `String` |  是 |
+|                          | `content`  |  `String` |  是 |
+| `ComplaintListQuery`     | `status`   |  `String` |  否 |
+|                          | `page`     | `Integer` |  否 |
+|                          | `pageSize` | `Integer` |  否 |
+
+#### 2.4.3 Response VO 字段
+
+| 类名                    | 字段                |              类型 | 说明                           |
+| --------------------- | ----------------- | --------------: | ---------------------------- |
+| `SubmitComplaintVO`   | `complaintId`     |          `Long` | 投诉 ID                        |
+|                       | `complaintNo`     |        `String` | 投诉编号                         |
+|                       | `status`          |        `String` | `PENDING`                    |
+|                       | `createdAt`       | `LocalDateTime` | 提交时间                         |
+| `ComplaintListItemVO` | `complaintId`     |          `Long` | 投诉 ID                        |
+|                       | `complaintNo`     |        `String` | 编号                           |
+|                       | `orderId`         |          `Long` | 订单 ID                        |
+|                       | `orderNo`         |        `String` | 订单号                          |
+|                       | `productName`     |        `String` | 商品名                          |
+|                       | `accusedUserId`   |          `Long` | 被投诉用户 ID                     |
+|                       | `accusedNickname` |        `String` | 被投诉昵称                        |
+|                       | `type`            |        `String` | `NOT_PURCHASED/FAKE_RECEIPT` |
+|                       | `content`         |        `String` | 投诉内容                         |
+|                       | `status`          |        `String` | `PENDING/PROCESSED`          |
+|                       | `openedBySystem`  |       `Boolean` | 是否系统开放                       |
+|                       | `handleResult`    |        `String` | 处理结果，可空                      |
+|                       | `createdAt`       | `LocalDateTime` | 创建时间                         |
+|                       | `handledAt`       | `LocalDateTime` | 处理时间，可空                      |
+
+---
+
+### 2.5 Admin 模块
+
+#### 2.5.1 接口总表
+
+| 接口                                                | Request DTO               | Response VO                            | Entity                                                                           |
+| ------------------------------------------------- | ------------------------- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| `GET /api/admin/users`                            | `AdminUserListQuery`      | `PageResult<AdminUserListItemVO>`      | `UserAccount`                                                                    |
+| `POST /api/admin/users/{userId}/ban`              | `BanUserRequest`          | `AdminUserStatusVO`                    | `UserAccount`                                                                    |
+| `POST /api/admin/users/{userId}/unban`            | 无                         | `AdminUserStatusVO`                    | `UserAccount`                                                                    |
+| `GET /api/admin/orders`                           | `AdminOrderListQuery`     | `PageResult<AdminOrderListItemVO>`     | `GroupOrder`、`UserAccount`                                                       |
+| `GET /api/admin/orders/{orderId}`                 | 无                         | `OrderDetailVO`                        | 同用户端详情                                                                           |
+| `POST /api/admin/orders/{orderId}/cancel`         | `AdminCancelOrderRequest` | `AdminCancelOrderVO`                   | `GroupOrder`、`GroupOrderMember`、`CapitalRecord`                                  |
+| `GET /api/admin/complaints`                       | `AdminComplaintListQuery` | `PageResult<AdminComplaintListItemVO>` | `Complaint`、`GroupOrder`、`UserAccount`                                           |
+| `GET /api/admin/complaints/{complaintId}`         | 无                         | `AdminComplaintDetailVO`               | `Complaint`、`GroupOrder`、`UserAccount`                                           |
+| `POST /api/admin/complaints/{complaintId}/handle` | `HandleComplaintRequest`  | `AdminHandleComplaintVO`               | `Complaint`、`GroupOrder`、`GroupOrderMember`、`CapitalRecord`、`CreditChangeRecord` |
+| `GET /api/admin/records/capital`                  | `CapitalRecordQuery`      | `PageResult<CapitalRecordItemVO>`      | `CapitalRecord`、`UserAccount`、`GroupOrder`                                       |
+| `GET /api/admin/records/logs`                     | `OperationLogQuery`       | `PageResult<OperationLogItemVO>`       | `OperationLog`                                                                   |
+
+#### 2.5.2 Request DTO 字段
+
+| 类名                        | 字段               |        类型 | 必填 |
+| ------------------------- | ---------------- | --------: | -: |
+| `AdminUserListQuery`      | `keyword`        |  `String` |  否 |
+|                           | `status`         |  `String` |  否 |
+|                           | `minCredit`      | `Integer` |  否 |
+|                           | `maxCredit`      | `Integer` |  否 |
+|                           | `page`           | `Integer` |  否 |
+|                           | `pageSize`       | `Integer` |  否 |
+| `BanUserRequest`          | `reason`         |  `String` |  是 |
+| `AdminOrderListQuery`     | `status`         |  `String` |  否 |
+|                           | `creatorKeyword` |  `String` |  否 |
+|                           | `page`           | `Integer` |  否 |
+|                           | `pageSize`       | `Integer` |  否 |
+| `AdminCancelOrderRequest` | `reason`         |  `String` |  是 |
+| `AdminComplaintListQuery` | `status`         |  `String` |  否 |
+|                           | `type`           |  `String` |  否 |
+|                           | `page`           | `Integer` |  否 |
+|                           | `pageSize`       | `Integer` |  否 |
+| `HandleComplaintRequest`  | `handleResult`   |  `String` |  是 |
+| `CapitalRecordQuery`      | `type`           |  `String` |  否 |
+|                           | `userKeyword`    |  `String` |  否 |
+|                           | `orderNo`        |  `String` |  否 |
+|                           | `page`           | `Integer` |  否 |
+|                           | `pageSize`       | `Integer` |  否 |
+| `OperationLogQuery`       | `operatorType`   |  `String` |  否 |
+|                           | `bizType`        |  `String` |  否 |
+|                           | `page`           | `Integer` |  否 |
+|                           | `pageSize`       | `Integer` |  否 |
+
+#### 2.5.3 Response VO 字段
+
+| 类名                         | 字段                     |              类型 | 说明                                                |
+| -------------------------- | ---------------------- | --------------: | ------------------------------------------------- |
+| `AdminUserListItemVO`      | `userId`               |          `Long` | 用户 ID                                             |
+|                            | `phone`                |        `String` | 手机号                                               |
+|                            | `nickname`             |        `String` | 昵称                                                |
+|                            | `studentNo`            |        `String` | 学号                                                |
+|                            | `isVerified`           |       `Boolean` | 是否实名                                              |
+|                            | `creditScore`          |       `Integer` | 信用分                                               |
+|                            | `status`               |        `String` | 状态                                                |
+|                            | `contactInfo`          |        `String` | 联系方式                                              |
+|                            | `createdAt`            | `LocalDateTime` | 创建时间                                              |
+| `AdminUserStatusVO`        | `userId`               |          `Long` | 用户 ID                                             |
+|                            | `status`               |        `String` | 更新后状态                                             |
+| `AdminOrderListItemVO`     | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `orderNo`              |        `String` | 订单号                                               |
+|                            | `productName`          |        `String` | 商品名                                               |
+|                            | `creatorNickname`      |        `String` | 发起人昵称                                             |
+|                            | `totalMemberCount`     |       `Integer` | 总人数                                               |
+|                            | `currentMemberCount`   |       `Integer` | 当前人数                                              |
+|                            | `estimatedTotalAmount` |    `BigDecimal` | 预估总额                                              |
+|                            | `actualTotalAmount`    |    `BigDecimal` | 实际总额，可空                                           |
+|                            | `pickupPoint`          |        `String` | 取货点                                               |
+|                            | `status`               |        `String` | 主状态                                               |
+|                            | `complaintOpened`      |       `Boolean` | 是否开放投诉                                            |
+|                            | `createdAt`            | `LocalDateTime` | 创建时间                                              |
+|                            | `deadlineAt`           | `LocalDateTime` | 截止时间                                              |
+| `AdminCancelOrderVO`       | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `status`               |        `String` | `CANCELED`                                        |
+|                            | `cancelReason`         |        `String` | 取消原因                                              |
+| `AdminComplaintListItemVO` | `complaintId`          |          `Long` | 投诉 ID                                             |
+|                            | `complaintNo`          |        `String` | 编号                                                |
+|                            | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `orderNo`              |        `String` | 订单号                                               |
+|                            | `productName`          |        `String` | 商品名                                               |
+|                            | `complainantNickname`  |        `String` | 投诉人                                               |
+|                            | `accusedNickname`      |        `String` | 被投诉人                                              |
+|                            | `type`                 |        `String` | 类型                                                |
+|                            | `status`               |        `String` | 状态                                                |
+|                            | `openedBySystem`       |       `Boolean` | 是否系统开放                                            |
+|                            | `createdAt`            | `LocalDateTime` | 创建时间                                              |
+|                            | `handledAt`            | `LocalDateTime` | 处理时间                                              |
+| `AdminComplaintDetailVO`   | `complaintId`          |          `Long` | 投诉 ID                                             |
+|                            | `complaintNo`          |        `String` | 编号                                                |
+|                            | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `orderNo`              |        `String` | 订单号                                               |
+|                            | `productName`          |        `String` | 商品名                                               |
+|                            | `complainantUserId`    |          `Long` | 投诉人 ID                                            |
+|                            | `complainantNickname`  |        `String` | 投诉人昵称                                             |
+|                            | `accusedUserId`        |          `Long` | 被投诉人 ID                                           |
+|                            | `accusedNickname`      |        `String` | 被投诉人昵称                                            |
+|                            | `type`                 |        `String` | 类型                                                |
+|                            | `content`              |        `String` | 内容                                                |
+|                            | `status`               |        `String` | 状态                                                |
+|                            | `openedBySystem`       |       `Boolean` | 是否系统开放                                            |
+|                            | `handleResult`         |        `String` | 处理结果                                              |
+|                            | `createdAt`            | `LocalDateTime` | 创建时间                                              |
+|                            | `handledAt`            | `LocalDateTime` | 处理时间                                              |
+| `AdminHandleComplaintVO`   | `complaintId`          |          `Long` | 投诉 ID                                             |
+|                            | `status`               |        `String` | `PROCESSED`                                       |
+|                            | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `orderStatus`          |        `String` | `CANCELED`                                        |
+|                            | `refundedMemberCount`  |       `Integer` | 本次退款人数                                            |
+|                            | `creatorCreditDelta`   |       `Integer` | 发起人扣分值，固定 `-10`                                   |
+| `CapitalRecordItemVO`      | `recordId`             |          `Long` | 流水 ID                                             |
+|                            | `bizNo`                |        `String` | 业务单号                                              |
+|                            | `userId`               |          `Long` | 用户 ID                                             |
+|                            | `userNickname`         |        `String` | 用户昵称                                              |
+|                            | `orderId`              |          `Long` | 订单 ID                                             |
+|                            | `orderNo`              |        `String` | 订单号                                               |
+|                            | `type`                 |        `String` | `PAY/REFUND_DIFF/REFUND_CANCEL/SETTLE_TO_CREATOR` |
+|                            | `amount`               |    `BigDecimal` | 金额                                                |
+|                            | `status`               |        `String` | `SUCCESS`                                         |
+|                            | `remark`               |        `String` | 备注                                                |
+|                            | `createdAt`            | `LocalDateTime` | 创建时间                                              |
+|                            | `successAt`            | `LocalDateTime` | 成功时间                                              |
+| `OperationLogItemVO`       | `logId`                |          `Long` | 日志 ID                                             |
+|                            | `operatorType`         |        `String` | `USER/ADMIN/SYSTEM`                               |
+|                            | `operatorId`           |          `Long` | 操作者 ID                                            |
+|                            | `operatorName`         |        `String` | 操作者名称                                             |
+|                            | `bizType`              |        `String` | `ORDER/COMPLAINT/CAPITAL/USER`                    |
+|                            | `bizId`                |          `Long` | 业务 ID                                             |
+|                            | `action`               |        `String` | 动作枚举                                              |
+|                            | `detailJson`           |        `String` | 详情 JSON                                           |
+|                            | `createdAt`            | `LocalDateTime` | 时间                                                |
+
+### 2.6 推荐的 Java 包结构
+
+```text
+com.campusshareorder.backend
+├── common
+│   ├── api
+│   │   ├── ApiResponse.java
+│   │   └── PageResult.java
+│   ├── enums
+│   │   ├── RoleEnum.java
+│   │   ├── UserStatusEnum.java
+│   │   ├── OrderStatusEnum.java
+│   │   ├── JoinStatusEnum.java
+│   │   ├── PayStatusEnum.java
+│   │   ├── ReceiveStatusEnum.java
+│   │   ├── ComplaintTypeEnum.java
+│   │   ├── ComplaintStatusEnum.java
+│   │   ├── CapitalRecordTypeEnum.java
+│   │   ├── CapitalRecordStatusEnum.java
+│   │   ├── NotificationTypeEnum.java
+│   │   ├── OperatorTypeEnum.java
+│   │   └── BizTypeEnum.java
+│   ├── exception
+│   │   ├── BusinessException.java
+│   │   └── GlobalExceptionHandler.java
+│   ├── constants
+│   └── util
+├── security
+│   ├── config
+│   ├── jwt
+│   ├── filter
+│   └── principal
+├── auth
+│   ├── controller
+│   ├── dto
+│   ├── vo
+│   └── service
+├── user
+│   ├── controller
+│   ├── dto
+│   ├── vo
+│   ├── entity
+│   ├── mapper
+│   └── service
+├── order
+│   ├── controller
+│   ├── dto
+│   ├── vo
+│   ├── entity
+│   ├── mapper
+│   └── service
+├── complaint
+│   ├── controller
+│   ├── dto
+│   ├── vo
+│   ├── entity
+│   ├── mapper
+│   └── service
+├── admin
+│   ├── controller
+│   ├── dto
+│   ├── vo
+│   └── service
+├── notification
+│   ├── entity
+│   ├── mapper
+│   └── service
+├── log
+│   ├── entity
+│   ├── mapper
+│   └── service
+└── scheduler
+    └── OrderScheduler.java
+```
+
+### 冲突修正说明
+
+1. `GroupOrder` 实体主键字段固定叫 `id`；对前端返回时统一映射成 `orderId`。
+2. 所有关联表外键统一用 `groupOrderId`，不再在 Java 实体里混用 `orderId/groupOrderId`。
+3. 商品描述最终字段名固定为 `productDesc`，不再使用 `productDescription`。
+4. `ComplaintInfoVO` 不再保留 `canComplain`，按钮控制只看 `actionFlags.canCreateComplaint`，避免双重来源。
+5. `PaymentSummaryVO.settleToCreatorAmount` 固定按 `min(actualTotalAmount, estimatedTotalAmount)` 计算，解决“实际金额高于预估但平台不补款”时的结算冲突。
+
+---
+
+## 3. 状态机与状态流转规则表
+
+状态文档、需求文档和顺序图已经固定了主状态、成员支付状态、成员收货状态，以及 30 分钟 / 60 分钟的自动规则；但旧文档里对“30 分钟未上传凭证是否直接取消”“自动确认是 20 分钟还是 30 分钟”存在冲突，这里一次性拍板。最终以 `30 分钟自动确认收货`、`30 分钟未上传凭证只开放投诉，不直接取消`、`预计最晚送达 + 60 分钟只开放投诉，不直接取消` 为准。 
+
+### 3.0 前置补充：`joinStatus` 不是本节三层状态机，但必须参与判断
+
+| 字段           | 枚举值                              | 作用                                          |
+| ------------ | -------------------------------- | ------------------------------------------- |
+| `joinStatus` | `ACTIVE` / `EXITED` / `CANCELED` | 参与人数计算、成团判断、退款计算、按钮显示、完成判断都只统计 `ACTIVE` 成员。 |
+
+`joinStatus` 转移冻结为：
+
+* `ACTIVE -> EXITED`：用户在 `OPEN` 状态主动退出
+* `ACTIVE -> CANCELED`：订单取消
+* `EXITED`、`CANCELED` 均不再回到 `ACTIVE`
+
+---
+
+### 3.1 拼单主状态定义表
+
+| 状态              | 进入条件                   | 允许动作                                | 退出条件                                                                                                                                | 副作用                                                          |
+| --------------- | ---------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `OPEN`          | 发起人创建拼单成功              | `join`、`pay`、`exit`                 | 1) `currentMemberCount == totalMemberCount` 且全部 `ACTIVE` 成员 `payStatus=PAID` -> `GROUPED`；2) `deadlineAt <= now` 且未成团 -> `CANCELED` | 创建发起人成员行；`currentMemberCount=1`；发起人也必须支付                     |
+| `GROUPED`       | 满员且全部 `ACTIVE` 成员已支付   | 发起人 `upload-receipt`                | 1) 上传凭证成功 -> `WAIT_DELIVERY`；2) 管理员取消 -> `CANCELED`；3) 投诉处理成立 -> `CANCELED`                                                         | 写 `receiptUploadDeadlineAt = groupedAt + 30m`；发送成团通知         |
+| `WAIT_DELIVERY` | 发起人上传凭证成功              | 发起人 `mark-delivered`；参与者可查看凭证并按规则投诉 | 1) 发起人确认送达 -> `WAIT_RECEIVE`；2) 管理员取消 -> `CANCELED`；3) 投诉处理成立 -> `CANCELED`                                                         | 若 `actualTotalAmount < estimatedTotalAmount`，同步差额退款；更新预计送达区间 |
+| `WAIT_RECEIVE`  | 发起人点击确认送达              | 参与者 `confirm-received`              | 所有 `ACTIVE` 成员 `receiveStatus in (RECEIVED, AUTO_RECEIVED)` -> `COMPLETED`；管理员取消 -> `CANCELED`                                      | 写 `deliveredAt`；非发起人成员进入 `WAIT_CONFIRM`；发起人成员直接置 `RECEIVED`  |
+| `COMPLETED`     | 所有 `ACTIVE` 成员已收货      | 无用户动作                               | 终态                                                                                                                                  | 生成结算给发起人的流水；给 `ACTIVE` 成员写完成记录/通知                            |
+| `CANCELED`      | 未成团超时 / 管理员取消 / 投诉处理成立 | 无用户动作                               | 终态                                                                                                                                  | 对 `ACTIVE` 已支付成员做净退款；`ACTIVE -> CANCELED`；写取消原因与日志           |
+
+---
+
+### 3.2 拼单主状态转移边表
+
+| From -> To                       | 触发者                          | 触发点                                                 | 触发条件                                                                      | 副作用                                                                                           |
+| -------------------------------- | ---------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `CREATE -> OPEN`                 | 用户动作                         | `POST /api/orders`                                  | 创建成功                                                                      | 新增 `group_order`；新增发起人成员行 `ACTIVE/UNPAID/NOT_READY`                                           |
+| `OPEN -> GROUPED`                | 用户动作 + Service 同步判断          | `POST /api/orders/{orderId}/pay`                    | `currentMemberCount == totalMemberCount` 且所有 `ACTIVE` 成员 `payStatus=PAID` | `status=GROUPED`；写 `receiptUploadDeadlineAt=now+30m`；通知所有 `ACTIVE` 成员                         |
+| `OPEN -> CANCELED`               | 系统定时任务                       | `OrderScheduler.cancelExpiredOpenOrders()`          | `deadlineAt <= now` 且未成团                                                  | `status=CANCELED`；净退款；日志；通知                                                                   |
+| `GROUPED -> WAIT_DELIVERY`       | 用户动作                         | `POST /api/orders/{orderId}/upload-receipt`         | 发起人本人，且订单当前为 `GROUPED`                                                    | 写 `order_receipt`；同步 `group_order.actualTotalAmount/expectedDelivery*`；若差额为正则生成 `REFUND_DIFF` |
+| `GROUPED -> GROUPED`             | 系统定时任务                       | `OrderScheduler.openReceiptTimeoutComplaints()`     | `receiptUploadDeadlineAt <= now` 且无凭证                                     | 只设置 `complaintOpened=true`；不改主状态                                                              |
+| `GROUPED -> CANCELED`            | 管理员动作                        | `POST /api/admin/orders/{orderId}/cancel`           | 订单未完成未取消                                                                  | 净退款；日志；通知                                                                                     |
+| `GROUPED -> CANCELED`            | 管理员动作                        | `POST /api/admin/complaints/{complaintId}/handle`   | 投诉成立                                                                      | 净退款；发起人扣分；投诉置 `PROCESSED`                                                                     |
+| `WAIT_DELIVERY -> WAIT_RECEIVE`  | 用户动作                         | `POST /api/orders/{orderId}/mark-delivered`         | 发起人本人，且订单为 `WAIT_DELIVERY`                                                | `deliveredAt=now`；非发起人成员 `WAIT_CONFIRM`；发起人成员 `RECEIVED`；通知可取货                                |
+| `WAIT_DELIVERY -> WAIT_DELIVERY` | 系统定时任务                       | `OrderScheduler.openDeliveryTimeoutComplaints()`    | `expectedDeliveryEndAt + 60m <= now` 且 `deliveredAt is null`              | 只设置 `complaintOpened=true`；不改主状态                                                              |
+| `WAIT_DELIVERY -> CANCELED`      | 管理员动作                        | `POST /api/admin/orders/{orderId}/cancel`           | 订单未完成未取消                                                                  | 净退款；日志；通知                                                                                     |
+| `WAIT_DELIVERY -> CANCELED`      | 管理员动作                        | `POST /api/admin/complaints/{complaintId}/handle`   | 投诉成立                                                                      | 净退款；发起人扣分；投诉置 `PROCESSED`                                                                     |
+| `WAIT_RECEIVE -> COMPLETED`      | 用户动作 / 系统定时任务 / Service 同步判断 | `confirm-received` 或 `autoConfirmReceivedMembers()` | 所有 `ACTIVE` 成员已收货                                                         | `status=COMPLETED`；结算给发起人；完成通知                                                                |
+| `WAIT_RECEIVE -> CANCELED`       | 管理员动作                        | `POST /api/admin/orders/{orderId}/cancel`           | 订单未完成未取消                                                                  | 净退款；日志；通知                                                                                     |
+
+---
+
+### 3.3 成员支付状态定义表
+
+| 状态       | 进入条件                                | 允许动作                         | 退出条件           | 副作用                             |
+| -------- | ----------------------------------- | ---------------------------- | -------------- | ------------------------------- |
+| `UNPAID` | 创建拼单时自动加入；用户加入后未支付                  | `pay`                        | 支付成功 -> `PAID` | 无                               |
+| `PAID`   | `POST /api/orders/{orderId}/pay` 成功 | `exit` 仅限 `OPEN` 时；其余仅等待流程推进 | 不回退为 `UNPAID`  | 写 `paidAt`、`payAmount`、`PAY` 流水 |
+
+#### 支付状态转移边
+
+| From -> To       | 触发者  | 触发点                              | 条件                               | 副作用                                                                                      |
+| ---------------- | ---- | -------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `UNPAID -> PAID` | 用户动作 | `POST /api/orders/{orderId}/pay` | 当前成员 `joinStatus=ACTIVE` 且订单允许支付 | 写 `group_order_member.payStatus=PAID`、`paidAt`、`payAmount`；新增 `capital_record(type=PAY)` |
+
+**冻结规则**
+
+1. 发起人自己也必须有一条成员记录，并且必须支付。
+2. `PAID` 状态不因退款而回退；退款一律只累计到 `refundAmountTotal`。
+3. 取消退款金额公式固定为：
+   `refundCancelAmount = max(payAmount - refundAmountTotal, 0)`
+
+---
+
+### 3.4 成员收货状态定义表
+
+| 状态              | 进入条件                        | 允许动作               | 退出条件                                                          | 副作用            |
+| --------------- | --------------------------- | ------------------ | ------------------------------------------------------------- | -------------- |
+| `NOT_READY`     | 创建/加入后默认；尚未进入收货环节           | 无                  | 发起人确认送达后：发起人 -> `RECEIVED`；非发起人 `ACTIVE` 成员 -> `WAIT_CONFIRM` | 无              |
+| `WAIT_CONFIRM`  | 发起人确认送达后，非发起人 `ACTIVE` 成员进入 | `confirm-received` | 1) 用户主动确认 -> `RECEIVED`；2) 超过 30 分钟 -> `AUTO_RECEIVED`        | 写 `receivedAt` |
+| `RECEIVED`      | 用户主动确认；或发起人确认送达时自己的状态直接置入   | 无                  | 终态                                                            | 无              |
+| `AUTO_RECEIVED` | 系统超时自动确认                    | 无                  | 终态                                                            | 无              |
+
+#### 收货状态转移边
+
+| From -> To                      | 触发者           | 触发点                                           | 条件                               | 副作用                     |
+| ------------------------------- | ------------- | --------------------------------------------- | -------------------------------- | ----------------------- |
+| `NOT_READY -> WAIT_CONFIRM`     | 用户动作（发起人确认送达） | `POST /api/orders/{orderId}/mark-delivered`   | 当前成员 `ACTIVE && isCreator=false` | 写待确认状态                  |
+| `NOT_READY -> RECEIVED`         | 用户动作（发起人确认送达） | `POST /api/orders/{orderId}/mark-delivered`   | 当前成员 `isCreator=true`            | 发起人不显示确认收货按钮，送达时直接视为已收货 |
+| `WAIT_CONFIRM -> RECEIVED`      | 用户动作          | `POST /api/orders/{orderId}/confirm-received` | 当前成员本人，且未确认                      | `receivedAt=now`        |
+| `WAIT_CONFIRM -> AUTO_RECEIVED` | 系统定时任务        | `OrderScheduler.autoConfirmReceivedMembers()` | `deliveredAt + 30m <= now`       | `receivedAt=now`        |
+
+---
+
+### 3.5 最终硬规则拍板
+
+| 规则            | 最终版                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| 发起人是否也必须支付    | 必须。发起人创建拼单后自动加入成员表，状态初始 `UNPAID`，必须调用 `/pay`。                                                          |
+| 什么时候算成团       | `currentMemberCount == totalMemberCount` 且所有 `ACTIVE` 成员 `payStatus=PAID`。                             |
+| 差额退款发生在什么阶段   | 发生在 `GROUPED -> WAIT_DELIVERY` 的上传凭证事务里；仅当 `actualTotalAmount < estimatedTotalAmount`。                 |
+| 差额退款是否改变主状态   | 不改变。上传凭证成功后主状态仍然进入 `WAIT_DELIVERY`。                                                                    |
+| 投诉成立后订单进入什么状态 | 一律进入 `CANCELED`。                                                                                       |
+| 自动确认收货后如何完成   | 成员 `WAIT_CONFIRM -> AUTO_RECEIVED` 后，Service 立即检查是否所有 `ACTIVE` 成员都已收货；满足即 `WAIT_RECEIVE -> COMPLETED`。 |
+| 完成后给发起人结算多少   | `settleToCreatorAmount = min(actualTotalAmount, estimatedTotalAmount)`。实际超出部分平台不补款，发起人线下承担或线下补收。       |
+
+---
+
+### 3.6 前端按钮显示最终依赖字段总结
+
+前端按钮最终只依赖以下字段，不再自己推断业务：
+
+| 按钮控制来源     | 字段                                |
+| ---------- | --------------------------------- |
+| 订单主状态      | `basicInfo.status`                |
+| 当前用户是否是成员  | `currentUserMember != null`       |
+| 当前用户是否是发起人 | `currentUserMember.isCreator`     |
+| 当前用户加入状态   | `currentUserMember.joinStatus`    |
+| 当前用户支付状态   | `currentUserMember.payStatus`     |
+| 当前用户收货状态   | `currentUserMember.receiveStatus` |
+| 是否有凭证      | `receiptInfo.hasReceipt`          |
+| 当前用户是否已投诉  | `complaintInfo.myComplaintId`     |
+| 最终按钮开关     | `actionFlags.*`                   |
+
+**冻结要求**：前端渲染按钮时，`actionFlags` 是唯一准入源；其它状态字段只做文案展示和 UI 辅助。
+
+### 冲突修正说明
+
+1. `30 分钟未上传凭证` 和 `预计最晚送达 + 60 分钟未送达` 都只 **开放投诉**，不直接把订单置为 `CANCELED`。
+2. 自动确认收货时间最终统一为 **30 分钟**。
+3. 发起人不进入 `WAIT_CONFIRM`，在确认送达时自己的 `receiveStatus` 直接置为 `RECEIVED`。
+4. `COMPLETED` 的结算金额不是无脑 `actualTotalAmount`，而是 `min(actualTotalAmount, estimatedTotalAmount)`。
+
+---
+
+## 4. 定时任务与自动规则实现清单
+
+系统设计文档和开发规划已经把自动取消、开放投诉、自动确认收货、自动完成拼单这些逻辑明确归到 `Scheduler / OrderScheduler`；课程项目第一版不引入 MQ，统一使用 `@Scheduled + Service 事务`。 
+
+### 4.1 最终自动任务 / 自动规则表
+
+| 规则名             | 执行位置                            | 扫描对象 / 触发点                                                                     | 条件                                                                                                                                                             | 频率            | 修改表与字段                                                                                                                                     | 生成资金流水                                                                                          | 生成日志                                        | 发送通知                                    |
+| --------------- | ------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------- |
+| 未成团超时取消         | `@Scheduled` + `@Transactional` | 扫描 `group_order`                                                               | `status=OPEN and deadline_at <= now`                                                                                                                           | 每 1 分钟        | `group_order.status=CANCELED`、`cancel_reason=DEADLINE_NOT_GROUPED`、`updated_at`；`group_order_member.join_status ACTIVE->CANCELED`          | 对 `ACTIVE && PAID` 成员生成 `REFUND_CANCEL`，金额=`payAmount - refundAmountTotal`                      | `ORDER_AUTO_CANCELED`                       | `ORDER_CANCELED` 给发起人和 `ACTIVE` 成员      |
+| 成团后超时未上传凭证      | `@Scheduled` + `@Transactional` | 扫描 `group_order`                                                               | `status=GROUPED and complaint_opened=false and receipt_upload_deadline_at <= now and no order_receipt`                                                         | 每 1 分钟        | `group_order.complaint_opened=true`、`updated_at`                                                                                           | 无                                                                                               | `COMPLAINT_CHANNEL_OPENED_RECEIPT_TIMEOUT`  | `COMPLAINT_AVAILABLE` 给非发起人 `ACTIVE` 成员 |
+| 超过预计送达最晚时间后开放投诉 | `@Scheduled` + `@Transactional` | 扫描 `group_order`                                                               | `status=WAIT_DELIVERY and complaint_opened=false and delivered_at is null and expected_delivery_end_at + 60m <= now`                                           | 每 1 分钟        | `group_order.complaint_opened=true`、`updated_at`                                                                                           | 无                                                                                               | `COMPLAINT_CHANNEL_OPENED_DELIVERY_TIMEOUT` | `COMPLAINT_AVAILABLE` 给非发起人 `ACTIVE` 成员 |
+| 自动确认收货          | `@Scheduled` + `@Transactional` | 扫描 `group_order_member` 联表 `group_order`                                       | `group_order.status=WAIT_RECEIVE and group_order_member.join_status=ACTIVE and is_creator=false and receive_status=WAIT_CONFIRM and delivered_at + 30m <= now` | 每 1 分钟        | `group_order_member.receive_status=AUTO_RECEIVED`、`received_at=now`、`updated_at`                                                           | 无                                                                                               | `MEMBER_AUTO_RECEIVED`                      | 可选写 `ORDER_AUTO_RECEIVED` 给发起人          |
+| 全员收货后自动完成       | Service 同步检查 + 定时兜底             | 触发点：`confirm-received` 后 / `autoConfirmReceivedMembers()` 后；兜底扫描 `group_order` | `status=WAIT_RECEIVE` 且所有 `ACTIVE` 成员 `receive_status in (RECEIVED,AUTO_RECEIVED)`                                                                             | 同步检查；兜底每 1 分钟 | `group_order.status=COMPLETED`、`updated_at`                                                                                                | 无                                                                                               | `ORDER_COMPLETED`                           | `ORDER_COMPLETED` 给所有 `ACTIVE` 成员       |
+| 完成后给发起人结算       | Service 事务内                     | `tryCompleteOrder(orderId)` 内部                                                 | 订单刚转 `COMPLETED` 且尚未生成结算流水                                                                                                                                     | 同步触发          | 无额外主表修改；必要时写 `group_order.updated_at`                                                                                                      | 生成一条 `SETTLE_TO_CREATOR`，金额=`min(actualTotalAmount, estimatedTotalAmount)`，对象为发起人               | `ORDER_SETTLED`                             | `ORDER_COMPLETED` 已覆盖，无额外通知             |
+| 上传凭证后差额退款       | Service 事务内                     | `POST /api/orders/{orderId}/upload-receipt`                                    | `actualTotalAmount < estimatedTotalAmount`                                                                                                                     | 同步触发          | `group_order.actual_total_amount`、`expected_delivery_*`、`status=WAIT_DELIVERY`；`group_order_member.refund_amount_total += perRefundAmount` | 每个 `ACTIVE` 成员一条 `REFUND_DIFF`，金额=`(estimatedTotalAmount - actualTotalAmount)/totalMemberCount` | `ORDER_REFUND_DIFF`                         | `ORDER_REFUND_DIFF` 给所有 `ACTIVE` 成员     |
+
+---
+
+### 4.2 各任务的实现方式最终拍板
+
+| 自动逻辑                                    | 最终放置位置                        | 原因                         |
+| --------------------------------------- | ----------------------------- | -------------------------- |
+| `tryGroupAfterPay(orderId)`             | Service 层事务                   | 支付成功后需要立即成团，不适合等下一次扫描。     |
+| `refundDiffAfterUploadReceipt(orderId)` | Service 层事务                   | 和上传凭证是一笔原子业务，必须同事务成功或失败。   |
+| `tryCompleteOrder(orderId)`             | Service 层事务 + `@Scheduled` 兜底 | 用户主动确认收货后要立刻完成；同时保留兜底防止漏单。 |
+| `cancelExpiredOpenOrders()`             | `@Scheduled`                  | 纯时间驱动。                     |
+| `openReceiptTimeoutComplaints()`        | `@Scheduled`                  | 纯时间驱动。                     |
+| `openDeliveryTimeoutComplaints()`       | `@Scheduled`                  | 纯时间驱动。                     |
+| `autoConfirmReceivedMembers()`          | `@Scheduled`                  | 纯时间驱动。                     |
+| `adminCancelOrder(orderId)`             | Service 层事务                   | 后台按钮直调，不能交给定时任务。           |
+| `handleComplaint(complaintId)`          | Service 层事务                   | 投诉处理要同时改投诉、订单、退款、信用分。      |
+
+---
+
+### 4.3 最小可落地版本
+
+| 项目     | 最终实现                                                                   |
+| ------ | ---------------------------------------------------------------------- |
+| 定时实现方式 | `@Scheduled(cron = "0 */1 * * * ?")`                                   |
+| 事务实现方式 | 每个订单/投诉在 Service 中单独 `@Transactional` 处理                               |
+| 消息机制   | 不引入 MQ；通知直接落 `notification` 表                                          |
+| 文件存储   | 本地文件系统，数据库只存 `imageUrl`                                                |
+| 幂等控制   | 退款、结算前先查 `capital_record` 是否已有同类型记录                                    |
+| 退款公式   | `refundCancelAmount = max(payAmount - refundAmountTotal, 0)`           |
+| 结算公式   | `settleToCreatorAmount = min(actualTotalAmount, estimatedTotalAmount)` |
+| 兜底扫描   | `recoverCompleteOrders()` 每 1 分钟扫描 `WAIT_RECEIVE` 订单做完成兜底              |
+
+---
+
+### 4.4 推荐的 `OrderScheduler` 方法名冻结
+
+| 方法名                               | 职责             |
+| --------------------------------- | -------------- |
+| `cancelExpiredOpenOrders()`       | 未成团超时取消        |
+| `openReceiptTimeoutComplaints()`  | 成团后超时未上传凭证开放投诉 |
+| `openDeliveryTimeoutComplaints()` | 送达超时开放投诉       |
+| `autoConfirmReceivedMembers()`    | 自动确认收货         |
+| `recoverCompleteOrders()`         | 全员收货完成兜底       |
+
+### 冲突修正说明
+
+1. 差额退款不是定时任务，固定放在 `upload-receipt` 事务里。
+2. 自动完成不是只靠定时器；`confirm-received` 与 `autoConfirmReceivedMembers()` 结束后都要立刻调用 `tryCompleteOrder(orderId)`。
+3. 取消退款与投诉退款都按 **净退款** 算，不允许重复退：
+   `payAmount - refundAmountTotal <= 0` 时不再生成 `REFUND_CANCEL`。
+4. V1 不引入消息队列，不做事件总线；所有自动规则都用 `@Scheduled + Service` 完成。
+
+---
+
+## 5. 最小测试与验收用例清单
+
+这些用例覆盖了主链路、自动规则、投诉处理、管理员干预和权限限制，足够支撑联调与课程验收。
+
+### 5.1 完整测试用例表
+
+| 用例编号              | 前置条件                                                          | 操作步骤                                                                         | 预期接口返回                                                | 预期数据库变化                                                                                                                                                                                     | 预期前端页面表现                               |
+| ----------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| `TC-01` 注册登录      | 无                                                             | 1. `POST /api/auth/register` 2. `POST /api/auth/login` 3. `GET /api/auth/me` | 三次都 `code=0`；登录返回 `token`；`/auth/me` 返回 `role=USER`   | `user_account` 新增一行；`credit_score=80`；`is_verified=false`                                                                                                                                   | 注册成功跳登录；登录成功进入用户端；刷新后仍可恢复登录态           |
+| `TC-02` 实名认证      | 已登录普通用户，`isVerified=false`                                    | `POST /api/users/verify-student`                                             | `code=0`，返回 `isVerified=true`                         | `user_account.student_no` 写入；`is_verified=true`                                                                                                                                             | 认证页提示成功并跳转列表页                          |
+| `TC-03` 创建拼单      | 已实名普通用户                                                       | `POST /api/orders`                                                           | `code=0`，返回 `orderId`、`status=OPEN`                   | `group_order` 新增；`status=OPEN`；`current_member_count=1`；`group_order_member` 新增发起人成员，`ACTIVE/UNPAID/NOT_READY`                                                                              | 创建成功跳详情页；详情页显示“支付预估金额”                 |
+| `TC-04` 发起人支付     | 已创建订单，发起人成员 `UNPAID`                                          | `POST /api/orders/{orderId}/pay`                                             | `code=0`，`payStatus=PAID`                             | `group_order_member.pay_status=PAID`；`paid_at` 写入；`capital_record(type=PAY)` 新增                                                                                                             | 支付按钮消失；显示“已支付”                         |
+| `TC-05` 加入拼单      | 另一个已实名用户，订单 `OPEN` 且未满员                                       | `POST /api/orders/{orderId}/join`                                            | `code=0`，返回 `memberId`                                | `group_order_member` 新增一行，`ACTIVE/UNPAID/NOT_READY`；`group_order.current_member_count +1`                                                                                                   | 列表人数增加；详情页显示当前用户可支付                    |
+| `TC-06` 支付并自动成团   | 订单已满员只差最后一人支付                                                 | 最后一名成员 `POST /api/orders/{orderId}/pay`                                      | `code=0`，`orderStatus=GROUPED`                        | 最后一名成员 `pay_status=PAID`；新增 `PAY` 流水；`group_order.status=GROUPED`；`receipt_upload_deadline_at=now+30m`                                                                                      | 详情页状态切为“已成团”；发起人看到“上传凭证”按钮             |
+| `TC-07` 未成团超时取消   | `OPEN` 订单已过 `deadlineAt`，存在已支付成员                              | 等待调度或手动触发 `cancelExpiredOpenOrders()`                                        | 无前台请求；后续查询详情返回 `status=CANCELED`                      | `group_order.status=CANCELED`；`cancel_reason=DEADLINE_NOT_GROUPED`；`ACTIVE->CANCELED`；对 `ACTIVE && PAID` 成员新增 `REFUND_CANCEL`                                                               | 列表/详情显示“已取消”；支付按钮消失；显示退款结果             |
+| `TC-08` 上传凭证      | 订单 `GROUPED`，发起人本人                                            | `POST /api/orders/{orderId}/upload-receipt`，上传文件和实际金额                        | `code=0`，`orderStatus=WAIT_DELIVERY`                  | `order_receipt` 新增；`group_order.actual_total_amount`、`expected_delivery_*` 写入；`status=WAIT_DELIVERY`                                                                                        | 详情页显示凭证区、预计送达时间、待送达状态                  |
+| `TC-09` 差额退款      | `GROUPED` 订单上传凭证时 `actualTotalAmount < estimatedTotalAmount`  | 执行 `upload-receipt`                                                          | `code=0`                                              | 每个 `ACTIVE` 成员新增 `REFUND_DIFF` 流水；`group_order_member.refund_amount_total` 累加；订单主状态仍 `WAIT_DELIVERY`                                                                                        | 页面显示实际人均与退款信息；状态不跳到取消                  |
+| `TC-10` 确认送达      | 订单 `WAIT_DELIVERY`，发起人本人                                      | `POST /api/orders/{orderId}/mark-delivered`                                  | `code=0`，`orderStatus=WAIT_RECEIVE`                   | `group_order.status=WAIT_RECEIVE`；`delivered_at=now`；非发起人成员 `receive_status=WAIT_CONFIRM`；发起人成员 `receive_status=RECEIVED`                                                                   | 参与者看到“确认收货”按钮；发起人看到“等待成员确认”            |
+| `TC-11` 用户确认收货    | 订单 `WAIT_RECEIVE`，参与者 `WAIT_CONFIRM`                          | `POST /api/orders/{orderId}/confirm-received`                                | `code=0`，`receiveStatus=RECEIVED`                     | `group_order_member.receive_status=RECEIVED`；`received_at=now`；若是最后一个成员则订单完成并结算                                                                                                             | 当前用户按钮消失；若全员完成则页面显示“已完成”               |
+| `TC-12` 自动确认收货    | 订单 `WAIT_RECEIVE`，某参与者 `WAIT_CONFIRM`，`deliveredAt` 已超过 30 分钟 | 等待调度或手动触发 `autoConfirmReceivedMembers()`                                     | 无前台请求；后续详情看到成员状态变化                                    | 成员 `receive_status=AUTO_RECEIVED`；若全员已收货则 `group_order.status=COMPLETED` 并新增 `SETTLE_TO_CREATOR`                                                                                            | 页面展示“系统已自动确认”；若全部完成则显示已完成              |
+| `TC-13` 提交投诉      | 当前用户是非发起人 `ACTIVE` 成员，满足投诉开放条件，且无本人投诉                         | `POST /api/complaints`                                                       | `code=0`，返回 `complaintId`、`status=PENDING`            | `complaint` 新增一行；`status=PENDING`                                                                                                                                                           | 详情页投诉按钮禁用或隐藏；我的投诉页出现新记录                |
+| `TC-14` 重复投诉拦截    | 同一用户对同一订单已有投诉记录                                               | 再次 `POST /api/complaints`                                                    | `code=40913`                                          | `complaint` 不新增                                                                                                                                                                             | 页面提示“重复投诉”，投诉列表不变                      |
+| `TC-15` 管理员处理投诉   | 管理员已登录；存在 `PENDING` 投诉；订单未完成未取消                               | `POST /api/admin/complaints/{complaintId}/handle`                            | `code=0`，返回 `status=PROCESSED`、`orderStatus=CANCELED` | `complaint.status=PROCESSED`；`handled_by_admin_id`、`handled_at`、`handle_result` 写入；`group_order.status=CANCELED`；对 `ACTIVE && PAID` 成员新增净额 `REFUND_CANCEL`；发起人新增 `credit_change_record=-10` | 后台投诉列表刷新为“已处理”；用户详情页显示“已取消”            |
+| `TC-16` 被封禁用户访问受限 | 用户状态已改成 `BANNED`                                              | 1. 带旧 token 访问受保护接口 2. 再尝试登录                                                 | 返回 `40302`                                            | 数据库无新增；若后台先封禁，则只改 `user_account.status=BANNED`                                                                                                                                              | 前端清 token，跳 `/login`，提示“账号已被封禁，请联系管理员” |
+| `TC-17` 管理员强制取消订单 | 管理员已登录；订单状态为 `OPEN/GROUPED/WAIT_DELIVERY/WAIT_RECEIVE` 之一     | `POST /api/admin/orders/{orderId}/cancel`                                    | `code=0`，返回 `status=CANCELED`                         | `group_order.status=CANCELED`；`cancel_reason` 写入；`ACTIVE->CANCELED`；对 `ACTIVE && PAID` 成员新增净额 `REFUND_CANCEL`；写 `operation_log`                                                             | 后台订单页显示“已取消”；用户详情页同步变更                 |
+
+---
+
+### 5.2 P0 必测用例最小集合
+
+明天优先只跑这一批，先把“登录 -> 列表 -> 详情 -> 创建 -> 加入/支付 -> 成团/取消”闭环打通。
+
+| 优先级  | 用例编号                                               | 目的                |
+| ---- | -------------------------------------------------- | ----------------- |
+| P0-1 | `TC-01`                                            | 注册、登录、恢复登录态       |
+| P0-2 | `TC-02`                                            | 实名认证门槛            |
+| P0-3 | `TC-03`                                            | 创建拼单              |
+| P0-4 | `TC-04`                                            | 发起人支付             |
+| P0-5 | `TC-05`                                            | 加入拼单              |
+| P0-6 | `TC-06`                                            | 支付并自动成团           |
+| P0-7 | `TC-07`                                            | 未成团超时取消           |
+| P0-8 | `GET /api/orders` + `GET /api/orders/{orderId}` 联调 | 列表页和详情页渲染所需数据结构正确 |
+
+### 冲突修正说明
+
+1. 验收测试里所有“取消后退款”都按 **净退款** 验证，不再按“全额退款”验。
+2. “投诉成立后订单取消” 的测试只允许发生在 `COMPLETED` 之前；V1 不测“已结算后再撤销”的复杂逆向流程。
+3. 自动确认收货测试统一按 **30 分钟** 验证。
+4. `GET /api/auth/me` 必须纳入联调，不再只测登录接口本身。

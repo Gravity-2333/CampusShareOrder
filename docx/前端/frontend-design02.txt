@@ -1,0 +1,1626 @@
+According to a document from 2026-04-16，下面是**冻结版前后端开发契约文档**。从现在开始，前后端都按这份实现，不再沿用旧口径。当前技术栈、现有仓库状态、统一状态名、管理员与普通用户分离登录、投诉类型、统一返回体、用户端与管理端接口边界，都以系统设计文档、需求文档和开发规划文档为底稿；其中文档未冻结或互相冲突的项，已在第 8 节拍板。   
+
+### 统一约定
+
+| 项目     | 最终版                                                                              |
+| ------ | -------------------------------------------------------------------------------- |
+| 前端请求库  | `axios`                                                                          |
+| 接口前缀   | `/api`                                                                           |
+| 鉴权头    | `Authorization: Bearer <token>`                                                  |
+| 成功返回   | `{ "code": 0, "message": "success", "data": ... }`                               |
+| 失败返回   | `{ "code": 非0, "message": "错误信息", "data": null }`                                |
+| 默认时间格式 | `yyyy-MM-dd HH:mm:ss`                                                            |
+| 金额字段   | JSON `number`，后端 `BigDecimal(10,2)`                                              |
+| 分页结构   | `{ "list": [], "page": 1, "pageSize": 10, "total": 0, "pages": 0 }`              |
+| 角色枚举   | `USER` / `ADMIN`                                                                 |
+| 用户状态   | `NORMAL` / `BANNED`                                                              |
+| 订单主状态  | `OPEN` / `GROUPED` / `WAIT_DELIVERY` / `WAIT_RECEIVE` / `COMPLETED` / `CANCELED` |
+| 成员加入状态 | `ACTIVE` / `EXITED` / `CANCELED`                                                 |
+| 成员支付状态 | `UNPAID` / `PAID`                                                                |
+| 成员收货状态 | `NOT_READY` / `WAIT_CONFIRM` / `RECEIVED` / `AUTO_RECEIVED`                      |
+| 投诉类型   | `NOT_PURCHASED` / `FAKE_RECEIPT`                                                 |
+| 投诉状态   | `PENDING` / `PROCESSED`                                                          |
+
+## 1. P0 先开发的页面清单
+
+P0 以“登录 -> 列表 -> 详情 -> 创建 -> 加入/支付”闭环为准，同时保留实名认证和信用分基础页。这个优先级与迭代一开发计划和开发规划文档一致。 
+
+| 页面    | 路由                 | 需要登录 | 需要实名认证 | 角色   | Layout        | 依赖接口                                                                                                                                                                                                                                                                                          |
+| ----- | ------------------ | ---: | -----: | ---- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 登录页   | `/login`           |    否 |      否 | USER | `BlankLayout` | `POST /api/auth/login` `GET /api/auth/me`                                                                                                                                                                                                                                                     |
+| 注册页   | `/register`        |    否 |      否 | USER | `BlankLayout` | `POST /api/auth/register`                                                                                                                                                                                                                                                                     |
+| 实名认证页 | `/verify-student`  |    是 |      否 | USER | `BlankLayout` | `POST /api/users/verify-student` `GET /api/auth/me`                                                                                                                                                                                                                                           |
+| 拼单列表页 | `/orders`          |    是 |      是 | USER | `UserLayout`  | `GET /api/orders`                                                                                                                                                                                                                                                                             |
+| 拼单详情页 | `/orders/:orderId` |    是 |      是 | USER | `UserLayout`  | `GET /api/orders/{orderId}` `POST /api/orders/{orderId}/join` `POST /api/orders/{orderId}/pay` `POST /api/orders/{orderId}/exit` `POST /api/orders/{orderId}/upload-receipt` `POST /api/orders/{orderId}/mark-delivered` `POST /api/orders/{orderId}/confirm-received` `POST /api/complaints` |
+| 发起拼单页 | `/orders/create`   |    是 |      是 | USER | `UserLayout`  | `POST /api/orders`                                                                                                                                                                                                                                                                            |
+| 我的拼单页 | `/my/orders`       |    是 |      是 | USER | `UserLayout`  | `GET /api/users/my-orders`                                                                                                                                                                                                                                                                    |
+| 信用分页  | `/credit`          |    是 |      是 | USER | `UserLayout`  | `GET /api/users/credit`                                                                                                                                                                                                                                                                       |
+
+## 2. 路由守卫真值表
+
+页面分组固定如下：
+
+* 用户公开页：`/login` `/register`
+* 用户认证页：`/verify-student`
+* 用户业务页：`/orders` `/orders/:orderId` `/orders/create` `/my/orders` `/profile` `/credit` `/complaints/create` `/complaints/my`
+* 管理员公开页：`/admin/login`
+* 管理员业务页：`/admin/users` `/admin/orders` `/admin/complaints` `/admin/logs`
+
+| 身份               | 用户公开页              | 用户认证页 | 用户业务页 | 管理员公开页             | 管理员业务页 | 跳转目标                                                                                  | 提示文案                  |
+| ---------------- | ------------------ | ----- | ----- | ------------------ | ------ | ------------------------------------------------------------------------------------- | --------------------- |
+| 未登录              | 允许                 | 拒绝    | 拒绝    | 允许                 | 拒绝     | 访问用户侧受限页时跳 `/login`；访问管理侧受限页时跳 `/admin/login`                                         | `请先登录` / `请先以管理员身份登录` |
+| 普通用户（已实名、NORMAL） | 拒绝                 | 拒绝    | 允许    | 允许但提交登录会失败         | 拒绝     | 访问 `/login` `/register` 跳 `/orders`；访问 `/verify-student` 跳 `/orders`；访问管理页跳 `/orders` | `已登录` / `无管理员权限`      |
+| 普通用户（未实名、NORMAL） | 拒绝                 | 允许    | 拒绝    | 允许但提交登录会失败         | 拒绝     | 登录后统一落 `/verify-student`；访问用户业务页也跳 `/verify-student`                                  | `请先完成实名认证`            |
+| 管理员（NORMAL）      | 拒绝                 | 拒绝    | 拒绝    | 拒绝                 | 允许     | 访问用户侧任何页跳 `/admin/users`；访问 `/admin/login` 也跳 `/admin/users`                          | `管理员账号不进入用户端` / `已登录` |
+| 被封禁用户（BANNED）    | 若本地已有 token，进入前即拦截 | 拦截    | 拦截    | 若本地已有 token，进入前即拦截 | 拦截     | 清空 token；若 `role=USER` 跳 `/login`；若 `role=ADMIN` 跳 `/admin/login`                     | `账号已被封禁，请联系管理员`       |
+
+路由守卫执行顺序固定：
+
+1. 先判 token 是否存在
+2. 再调 `GET /api/auth/me` 恢复身份
+3. 再判 `status`
+4. 再判 `role`
+5. 最后判 `isVerified`
+
+## 3. 页面级接口契约
+
+下列 JSON **全部只写 `data` 结构**。真实响应外层统一为：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {}
+}
+```
+
+分页 `data` 统一为：
+
+```json
+{
+  "list": [],
+  "page": 1,
+  "pageSize": 10,
+  "total": 0,
+  "pages": 0
+}
+```
+
+系统设计文档已固定统一返回体、认证模块、用户模块、拼单模块、投诉模块、管理模块的接口边界；开发规划文档又补齐了用户页与管理页的页面映射。下面直接按最终版写死。 
+
+### 3.1 登录页 `/login`
+
+**接口：用户登录**
+
+| 项目 | 内容                |
+| -- | ----------------- |
+| 方法 | `POST`            |
+| 路径 | `/api/auth/login` |
+
+**body**
+
+| 字段       | 类型     | 必填 |
+| -------- | ------ | -: |
+| phone    | string |  是 |
+| password | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "token": "user-jwt-token",
+  "userInfo": {
+    "userId": 1,
+    "phone": "13800000000",
+    "nickname": "阿泽",
+    "studentNo": "2300320204",
+    "isVerified": true,
+    "role": "USER",
+    "status": "NORMAL",
+    "creditScore": 80,
+    "contactInfo": "微信: aze123"
+  }
+}
+```
+
+**接口：恢复当前登录态**
+
+| 项目 | 内容             |
+| -- | -------------- |
+| 方法 | `GET`          |
+| 路径 | `/api/auth/me` |
+
+**query/body/path**：无
+
+**成功 `data`（用户 token）**
+
+```json
+{
+  "role": "USER",
+  "userId": 1,
+  "phone": "13800000000",
+  "nickname": "阿泽",
+  "studentNo": "2300320204",
+  "isVerified": true,
+  "status": "NORMAL",
+  "creditScore": 80,
+  "contactInfo": "微信: aze123"
+}
+```
+
+**成功 `data`（管理员 token）**
+
+```json
+{
+  "role": "ADMIN",
+  "adminId": 1,
+  "username": "admin",
+  "status": "NORMAL"
+}
+```
+
+### 3.2 注册页 `/register`
+
+**接口：用户注册**
+
+| 项目 | 内容                   |
+| -- | -------------------- |
+| 方法 | `POST`               |
+| 路径 | `/api/auth/register` |
+
+**body**
+
+| 字段       | 类型     | 必填 |
+| -------- | ------ | -: |
+| phone    | string |  是 |
+| password | string |  是 |
+| nickname | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "phone": "13800000000",
+  "nickname": "阿泽",
+  "role": "USER",
+  "status": "NORMAL",
+  "isVerified": false,
+  "creditScore": 80
+}
+```
+
+注册成功后前端固定跳 `/login`，**不自动登录**。
+
+### 3.3 实名认证页 `/verify-student`
+
+**接口：实名认证**
+
+| 项目 | 内容                          |
+| -- | --------------------------- |
+| 方法 | `POST`                      |
+| 路径 | `/api/users/verify-student` |
+
+**body**
+
+| 字段        | 类型     | 必填 |
+| --------- | ------ | -: |
+| studentNo | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "studentNo": "2300320204",
+  "isVerified": true
+}
+```
+
+成功后前端固定跳 `/orders`。
+
+### 3.4 拼单列表页 `/orders`
+
+**接口：获取拼单列表**
+
+| 项目 | 内容            |
+| -- | ------------- |
+| 方法 | `GET`         |
+| 路径 | `/api/orders` |
+
+**query**
+
+| 字段          | 类型     | 必填 | 说明                                                           |
+| ----------- | ------ | -: | ------------------------------------------------------------ |
+| status      | string |  否 | `OPEN/GROUPED/WAIT_DELIVERY/WAIT_RECEIVE/COMPLETED/CANCELED` |
+| keyword     | string |  否 | 搜商品名/描述                                                      |
+| pickupPoint | string |  否 | 精确筛选取货点                                                      |
+| sort        | string |  否 | `createdAtDesc/deadlineAtAsc/deadlineAtDesc`                 |
+| page        | int    |  否 | 默认 `1`                                                       |
+| pageSize    | int    |  否 | 默认 `10`                                                      |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "productDesc": "可备注糖度和冰量",
+      "pickupPoint": "一食堂门口",
+      "totalMemberCount": 3,
+      "currentMemberCount": 2,
+      "remainingCount": 1,
+      "estimatedTotalAmount": 36.0,
+      "estimatedPerAmount": 12.0,
+      "deadlineAt": "2026-04-16 18:30:00",
+      "status": "OPEN",
+      "creatorUserId": 1,
+      "creatorNickname": "阿泽",
+      "complaintOpened": false,
+      "currentUserJoined": false,
+      "currentUserPayStatus": null,
+      "createdAt": "2026-04-16 17:20:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+### 3.5 拼单详情页 `/orders/:orderId`
+
+**接口：获取拼单详情**
+
+| 项目 | 内容                      |
+| -- | ----------------------- |
+| 方法 | `GET`                   |
+| 路径 | `/api/orders/{orderId}` |
+
+**path**
+
+| 字段      | 类型   | 必填 |
+| ------- | ---- | -: |
+| orderId | long |  是 |
+
+**成功 `data`**
+
+返回 `OrderDetailVO`，结构见第 4 节。
+
+#### 详情页动作接口
+
+| 接口     | 方法     | 路径                                       | 参数                                                                                                                                  | 成功 `data`                                                                                                                             |
+| ------ | ------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 加入拼单   | `POST` | `/api/orders/{orderId}/join`             | body: `remark:string` 选填                                                                                                            | `{ "memberId": 9002, "joinStatus": "ACTIVE", "payStatus": "UNPAID" }`                                                                 |
+| 支付预估金额 | `POST` | `/api/orders/{orderId}/pay`              | 无                                                                                                                                   | `{ "memberId": 9002, "payStatus": "PAID", "payAmount": 12.0, "paidAt": "2026-04-16 17:36:00", "orderStatus": "OPEN" }`                |
+| 退出拼单   | `POST` | `/api/orders/{orderId}/exit`             | 无                                                                                                                                   | `{ "memberId": 9002, "joinStatus": "EXITED", "refundAmount": 12.0, "orderStatus": "OPEN", "currentMemberCount": 2 }`                  |
+| 上传订单凭证 | `POST` | `/api/orders/{orderId}/upload-receipt`   | `multipart/form-data`：`receiptFile:file` `actualTotalAmount:number` `expectedDeliveryStartAt:string` `expectedDeliveryEndAt:string` | `{ "receiptId": 3001, "imageUrl": "/uploads/receipts/20260416-1001.png", "actualTotalAmount": 33.0, "orderStatus": "WAIT_DELIVERY" }` |
+| 商品已送达  | `POST` | `/api/orders/{orderId}/mark-delivered`   | 无                                                                                                                                   | `{ "orderStatus": "WAIT_RECEIVE", "deliveredAt": "2026-04-16 19:35:00", "autoConfirmDeadlineAt": "2026-04-16 20:05:00" }`             |
+| 确认收货   | `POST` | `/api/orders/{orderId}/confirm-received` | 无                                                                                                                                   | `{ "memberId": 9002, "receiveStatus": "RECEIVED", "receivedAt": "2026-04-16 19:40:00", "orderStatus": "WAIT_RECEIVE" }`               |
+
+### 3.6 发起拼单页 `/orders/create`
+
+**接口：创建拼单**
+
+| 项目 | 内容            |
+| -- | ------------- |
+| 方法 | `POST`        |
+| 路径 | `/api/orders` |
+
+**body**
+
+| 字段                   | 类型     | 必填 |
+| -------------------- | ------ | -: |
+| productName          | string |  是 |
+| productDesc          | string |  否 |
+| totalMemberCount     | int    |  是 |
+| estimatedTotalAmount | number |  是 |
+| pickupPoint          | string |  是 |
+| deadlineAt           | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "orderId": 1001,
+  "orderNo": "GO202604160001",
+  "status": "OPEN",
+  "currentMemberCount": 1,
+  "estimatedPerAmount": 12.0,
+  "currentUserMember": {
+    "memberId": 9001,
+    "isCreator": true,
+    "joinStatus": "ACTIVE",
+    "payStatus": "UNPAID",
+    "receiveStatus": "NOT_READY"
+  }
+}
+```
+
+创建成功后前端固定跳 `/orders/1001`。
+
+### 3.7 我的拼单页 `/my/orders`
+
+**接口：获取我的拼单**
+
+| 项目 | 内容                     |
+| -- | ---------------------- |
+| 方法 | `GET`                  |
+| 路径 | `/api/users/my-orders` |
+
+**query**
+
+| 字段       | 类型     | 必填 | 说明                    |
+| -------- | ------ | -: | --------------------- |
+| role     | string |  是 | `creator/participant` |
+| status   | string |  否 | 订单主状态                 |
+| page     | int    |  否 | 默认 `1`                |
+| pageSize | int    |  否 | 默认 `10`               |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "pickupPoint": "一食堂门口",
+      "status": "OPEN",
+      "totalMemberCount": 3,
+      "currentMemberCount": 2,
+      "estimatedPerAmount": 12.0,
+      "actualPerAmount": null,
+      "deadlineAt": "2026-04-16 18:30:00",
+      "expectedDeliveryEndAt": null,
+      "myRole": "CREATOR",
+      "myJoinStatus": "ACTIVE",
+      "myPayStatus": "PAID",
+      "myReceiveStatus": "NOT_READY",
+      "refundAmountTotal": 0.0,
+      "createdAt": "2026-04-16 17:20:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+### 3.8 投诉创建页 `/complaints/create`
+
+**接口：提交投诉**
+
+| 项目 | 内容                |
+| -- | ----------------- |
+| 方法 | `POST`            |
+| 路径 | `/api/complaints` |
+
+**body**
+
+| 字段      | 类型     | 必填 |
+| ------- | ------ | -: |
+| orderId | long   |  是 |
+| type    | string |  是 |
+| content | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "complaintId": 5001,
+  "complaintNo": "CP202604160001",
+  "status": "PENDING",
+  "createdAt": "2026-04-16 20:10:00"
+}
+```
+
+### 3.9 我的投诉页 `/complaints/my`
+
+**接口：获取我的投诉列表**
+
+| 项目 | 内容                   |
+| -- | -------------------- |
+| 方法 | `GET`                |
+| 路径 | `/api/complaints/my` |
+
+**query**
+
+| 字段       | 类型     | 必填 |
+| -------- | ------ | -: |
+| status   | string |  否 |
+| page     | int    |  否 |
+| pageSize | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "complaintId": 5001,
+      "complaintNo": "CP202604160001",
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "accusedUserId": 1,
+      "accusedNickname": "阿泽",
+      "type": "NOT_PURCHASED",
+      "content": "发起人超时未上传凭证",
+      "status": "PENDING",
+      "openedBySystem": true,
+      "handleResult": null,
+      "createdAt": "2026-04-16 20:10:00",
+      "handledAt": null
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+### 3.10 个人中心页 `/profile`
+
+**接口：获取个人资料**
+
+| 项目 | 内容                   |
+| -- | -------------------- |
+| 方法 | `GET`                |
+| 路径 | `/api/users/profile` |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "phone": "13800000000",
+  "nickname": "阿泽",
+  "studentNo": "2300320204",
+  "isVerified": true,
+  "creditScore": 82,
+  "status": "NORMAL",
+  "role": "USER",
+  "contactInfo": "微信: aze123",
+  "createdAt": "2026-04-12 10:00:00"
+}
+```
+
+**接口：修改个人资料**
+
+| 项目 | 内容                   |
+| -- | -------------------- |
+| 方法 | `PUT`                |
+| 路径 | `/api/users/profile` |
+
+**body**
+
+| 字段          | 类型     | 必填 |
+| ----------- | ------ | -: |
+| nickname    | string |  是 |
+| contactInfo | string |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "nickname": "新昵称",
+  "contactInfo": "微信: newwx123"
+}
+```
+
+### 3.11 信用分页 `/credit`
+
+**接口：获取信用分与记录**
+
+| 项目 | 内容                  |
+| -- | ------------------- |
+| 方法 | `GET`               |
+| 路径 | `/api/users/credit` |
+
+**query**
+
+| 字段       | 类型  | 必填 |
+| -------- | --- | -: |
+| page     | int |  否 |
+| pageSize | int |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "creditScore": 82,
+  "records": {
+    "list": [
+      {
+        "recordId": 7001,
+        "changeValue": 2,
+        "reasonType": "ORDER_FINISHED",
+        "relatedOrderId": 1001,
+        "relatedComplaintId": null,
+        "remark": "有效拼单完成",
+        "createdAt": "2026-04-16 20:30:00"
+      }
+    ],
+    "page": 1,
+    "pageSize": 10,
+    "total": 1,
+    "pages": 1
+  }
+}
+```
+
+### 3.12 管理员登录页 `/admin/login`
+
+**接口：管理员登录**
+
+| 项目 | 内容                      |
+| -- | ----------------------- |
+| 方法 | `POST`                  |
+| 路径 | `/api/auth/admin/login` |
+
+**body**
+
+| 字段       | 类型     | 必填 |
+| -------- | ------ | -: |
+| username | string |  是 |
+| password | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "token": "admin-jwt-token",
+  "adminInfo": {
+    "adminId": 1,
+    "username": "admin",
+    "role": "ADMIN",
+    "status": "NORMAL"
+  }
+}
+```
+
+### 3.13 管理员用户页 `/admin/users`
+
+**接口：获取用户列表**
+
+| 项目 | 内容                 |
+| -- | ------------------ |
+| 方法 | `GET`              |
+| 路径 | `/api/admin/users` |
+
+**query**
+
+| 字段        | 类型     | 必填 |
+| --------- | ------ | -: |
+| keyword   | string |  否 |
+| status    | string |  否 |
+| minCredit | int    |  否 |
+| maxCredit | int    |  否 |
+| page      | int    |  否 |
+| pageSize  | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "userId": 1,
+      "phone": "13800000000",
+      "nickname": "阿泽",
+      "studentNo": "2300320204",
+      "isVerified": true,
+      "creditScore": 82,
+      "status": "NORMAL",
+      "contactInfo": "微信: aze123",
+      "createdAt": "2026-04-12 10:00:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+**接口：封禁用户**
+
+| 项目 | 内容                              |
+| -- | ------------------------------- |
+| 方法 | `POST`                          |
+| 路径 | `/api/admin/users/{userId}/ban` |
+
+**path/body**
+
+| 字段     | 类型     | 必填 |
+| ------ | ------ | -: |
+| userId | long   |  是 |
+| reason | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "status": "BANNED"
+}
+```
+
+**接口：解封用户**
+
+| 项目 | 内容                                |
+| -- | --------------------------------- |
+| 方法 | `POST`                            |
+| 路径 | `/api/admin/users/{userId}/unban` |
+
+**成功 `data`**
+
+```json
+{
+  "userId": 1,
+  "status": "NORMAL"
+}
+```
+
+### 3.14 管理员订单页 `/admin/orders`
+
+**接口：获取拼单列表**
+
+| 项目 | 内容                  |
+| -- | ------------------- |
+| 方法 | `GET`               |
+| 路径 | `/api/admin/orders` |
+
+**query**
+
+| 字段             | 类型     | 必填 |
+| -------------- | ------ | -: |
+| status         | string |  否 |
+| creatorKeyword | string |  否 |
+| page           | int    |  否 |
+| pageSize       | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "creatorNickname": "阿泽",
+      "totalMemberCount": 3,
+      "currentMemberCount": 3,
+      "estimatedTotalAmount": 36.0,
+      "actualTotalAmount": 33.0,
+      "pickupPoint": "一食堂门口",
+      "status": "WAIT_RECEIVE",
+      "complaintOpened": false,
+      "createdAt": "2026-04-16 17:20:00",
+      "deadlineAt": "2026-04-16 18:30:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+**接口：获取拼单详情（管理员抽屉）**
+
+| 项目 | 内容                            |
+| -- | ----------------------------- |
+| 方法 | `GET`                         |
+| 路径 | `/api/admin/orders/{orderId}` |
+
+**成功 `data`**
+
+返回结构**与第 4 节 `OrderDetailVO` 完全一致**。
+
+**接口：强制取消拼单**
+
+| 项目 | 内容                                   |
+| -- | ------------------------------------ |
+| 方法 | `POST`                               |
+| 路径 | `/api/admin/orders/{orderId}/cancel` |
+
+**body**
+
+| 字段     | 类型     | 必填 |
+| ------ | ------ | -: |
+| reason | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "orderId": 1001,
+  "status": "CANCELED",
+  "cancelReason": "管理员强制取消"
+}
+```
+
+### 3.15 管理员投诉页 `/admin/complaints`
+
+**接口：获取投诉列表**
+
+| 项目 | 内容                      |
+| -- | ----------------------- |
+| 方法 | `GET`                   |
+| 路径 | `/api/admin/complaints` |
+
+**query**
+
+| 字段       | 类型     | 必填 |
+| -------- | ------ | -: |
+| status   | string |  否 |
+| type     | string |  否 |
+| page     | int    |  否 |
+| pageSize | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "complaintId": 5001,
+      "complaintNo": "CP202604160001",
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "complainantNickname": "小林",
+      "accusedNickname": "阿泽",
+      "type": "NOT_PURCHASED",
+      "status": "PENDING",
+      "openedBySystem": true,
+      "createdAt": "2026-04-16 20:10:00",
+      "handledAt": null
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+**接口：获取投诉详情（管理员抽屉）**
+
+| 项目 | 内容                                    |
+| -- | ------------------------------------- |
+| 方法 | `GET`                                 |
+| 路径 | `/api/admin/complaints/{complaintId}` |
+
+**成功 `data`**
+
+```json
+{
+  "complaintId": 5001,
+  "complaintNo": "CP202604160001",
+  "orderId": 1001,
+  "orderNo": "GO202604160001",
+  "productName": "蜜雪冰城奶茶",
+  "complainantUserId": 2,
+  "complainantNickname": "小林",
+  "accusedUserId": 1,
+  "accusedNickname": "阿泽",
+  "type": "NOT_PURCHASED",
+  "content": "发起人超时未上传凭证",
+  "status": "PENDING",
+  "openedBySystem": true,
+  "handleResult": null,
+  "createdAt": "2026-04-16 20:10:00",
+  "handledAt": null
+}
+```
+
+**接口：处理投诉**
+
+| 项目 | 内容                                           |
+| -- | -------------------------------------------- |
+| 方法 | `POST`                                       |
+| 路径 | `/api/admin/complaints/{complaintId}/handle` |
+
+**body**
+
+| 字段           | 类型     | 必填 |
+| ------------ | ------ | -: |
+| handleResult | string |  是 |
+
+**成功 `data`**
+
+```json
+{
+  "complaintId": 5001,
+  "status": "PROCESSED",
+  "orderId": 1001,
+  "orderStatus": "CANCELED",
+  "refundedMemberCount": 2,
+  "creatorCreditDelta": -10
+}
+```
+
+### 3.16 管理员日志页 `/admin/logs`
+
+**接口：获取资金流水**
+
+| 项目 | 内容                           |
+| -- | ---------------------------- |
+| 方法 | `GET`                        |
+| 路径 | `/api/admin/records/capital` |
+
+**query**
+
+| 字段          | 类型     | 必填 |
+| ----------- | ------ | -: |
+| type        | string |  否 |
+| userKeyword | string |  否 |
+| orderNo     | string |  否 |
+| page        | int    |  否 |
+| pageSize    | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "recordId": 8001,
+      "bizNo": "CAP202604160001",
+      "userId": 2,
+      "userNickname": "小林",
+      "groupOrderId": 1001,
+      "orderNo": "GO202604160001",
+      "type": "PAY",
+      "amount": 12.0,
+      "status": "SUCCESS",
+      "remark": "参与拼单支付",
+      "createdAt": "2026-04-16 17:36:00",
+      "successAt": "2026-04-16 17:36:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+**接口：获取操作日志**
+
+| 项目 | 内容                        |
+| -- | ------------------------- |
+| 方法 | `GET`                     |
+| 路径 | `/api/admin/records/logs` |
+
+**query**
+
+| 字段           | 类型     | 必填 |
+| ------------ | ------ | -: |
+| operatorType | string |  否 |
+| bizType      | string |  否 |
+| page         | int    |  否 |
+| pageSize     | int    |  否 |
+
+**成功 `data`**
+
+```json
+{
+  "list": [
+    {
+      "logId": 9001,
+      "operatorType": "USER",
+      "operatorId": 2,
+      "operatorName": "小林",
+      "bizType": "ORDER",
+      "bizId": 1001,
+      "action": "ORDER_PAY",
+      "detailJson": "{\"amount\":12.0}",
+      "createdAt": "2026-04-16 17:36:00"
+    }
+  ],
+  "page": 1,
+  "pageSize": 10,
+  "total": 1,
+  "pages": 1
+}
+```
+
+## 4. 订单详情页最终 VO 结构
+
+订单详情一次返回全部渲染所需模块，后端不再拆成多次请求。主状态、成员状态、投诉类型、日志与凭证结构，均来自已冻结的系统设计与开发规划。  
+
+| 模块 key              | 必返 | 字段                                                                                                                                                                                                                                                                                                                                           |
+| ------------------- | -: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `basicInfo`         |  是 | `orderId, orderNo, productName, productDesc, pickupPoint, totalMemberCount, currentMemberCount, estimatedTotalAmount, estimatedPerAmount, actualTotalAmount, actualPerAmount, deadlineAt, receiptUploadDeadlineAt, expectedDeliveryStartAt, expectedDeliveryEndAt, deliveredAt, status, cancelReason, complaintOpened, createdAt, updatedAt` |
+| `initiatorInfo`     |  是 | `userId, nickname, phoneMasked, studentNoMasked, creditScore, userStatus`                                                                                                                                                                                                                                                                    |
+| `currentUserMember` |  否 | `memberId, isCreator, remark, joinStatus, payStatus, payAmount, paidAt, refundAmountTotal, receiveStatus, receivedAt`                                                                                                                                                                                                                        |
+| `memberList`        |  是 | 每项：`memberId, userId, nickname, isCreator, remark, joinStatus, payStatus, payAmount, paidAt, refundAmountTotal, receiveStatus, receivedAt`                                                                                                                                                                                                   |
+| `paymentSummary`    |  是 | `totalMemberCount, paidMemberCount, unpaidMemberCount, estimatedTotalAmount, paidTotalAmount, actualTotalAmount, refundDiffTotalAmount, settleToCreatorAmount`                                                                                                                                                                               |
+| `receiptInfo`       |  是 | `hasReceipt, receiptId, imageUrl, uploaderUserId, actualTotalAmount, expectedDeliveryStartAt, expectedDeliveryEndAt, uploadedAt`                                                                                                                                                                                                             |
+| `receiveInfo`       |  是 | `pickupPoint, deliveredAt, autoConfirmDeadlineAt, receivedMemberCount, pendingConfirmMemberCount`                                                                                                                                                                                                                                            |
+| `timeline`          |  是 | 每项：`time, type, title, content, operatorType`                                                                                                                                                                                                                                                                                                |
+| `complaintInfo`     |  是 | `complaintOpened, canComplain, myComplaintId, myComplaintStatus, complaintCount`                                                                                                                                                                                                                                                             |
+| `actionFlags`       |  是 | `canJoin, canPay, canExit, canUploadReceipt, canMarkDelivered, canConfirmReceived, canCreateComplaint, canViewReceipt`                                                                                                                                                                                                                       |
+
+**完整 JSON 示例**
+
+```json
+{
+  "viewerRoleInOrder": "PARTICIPANT",
+  "basicInfo": {
+    "orderId": 1001,
+    "orderNo": "GO202604160001",
+    "productName": "蜜雪冰城奶茶",
+    "productDesc": "可备注糖度和冰量",
+    "pickupPoint": "一食堂门口",
+    "totalMemberCount": 3,
+    "currentMemberCount": 3,
+    "estimatedTotalAmount": 36.0,
+    "estimatedPerAmount": 12.0,
+    "actualTotalAmount": 33.0,
+    "actualPerAmount": 11.0,
+    "deadlineAt": "2026-04-16 18:30:00",
+    "receiptUploadDeadlineAt": "2026-04-16 19:00:00",
+    "expectedDeliveryStartAt": "2026-04-16 19:20:00",
+    "expectedDeliveryEndAt": "2026-04-16 19:40:00",
+    "deliveredAt": "2026-04-16 19:35:00",
+    "status": "WAIT_RECEIVE",
+    "cancelReason": null,
+    "complaintOpened": false,
+    "createdAt": "2026-04-16 17:20:00",
+    "updatedAt": "2026-04-16 19:35:00"
+  },
+  "initiatorInfo": {
+    "userId": 1,
+    "nickname": "阿泽",
+    "phoneMasked": "138****5678",
+    "studentNoMasked": "2300****04",
+    "creditScore": 86,
+    "userStatus": "NORMAL"
+  },
+  "currentUserMember": {
+    "memberId": 9002,
+    "isCreator": false,
+    "remark": "七分糖，少冰",
+    "joinStatus": "ACTIVE",
+    "payStatus": "PAID",
+    "payAmount": 12.0,
+    "paidAt": "2026-04-16 17:36:00",
+    "refundAmountTotal": 1.0,
+    "receiveStatus": "WAIT_CONFIRM",
+    "receivedAt": null
+  },
+  "memberList": [
+    {
+      "memberId": 9001,
+      "userId": 1,
+      "nickname": "阿泽",
+      "isCreator": true,
+      "remark": "",
+      "joinStatus": "ACTIVE",
+      "payStatus": "PAID",
+      "payAmount": 12.0,
+      "paidAt": "2026-04-16 17:25:00",
+      "refundAmountTotal": 1.0,
+      "receiveStatus": "RECEIVED",
+      "receivedAt": "2026-04-16 19:35:00"
+    },
+    {
+      "memberId": 9002,
+      "userId": 2,
+      "nickname": "小林",
+      "isCreator": false,
+      "remark": "七分糖，少冰",
+      "joinStatus": "ACTIVE",
+      "payStatus": "PAID",
+      "payAmount": 12.0,
+      "paidAt": "2026-04-16 17:36:00",
+      "refundAmountTotal": 1.0,
+      "receiveStatus": "WAIT_CONFIRM",
+      "receivedAt": null
+    },
+    {
+      "memberId": 9003,
+      "userId": 3,
+      "nickname": "小周",
+      "isCreator": false,
+      "remark": "正常糖，去冰",
+      "joinStatus": "ACTIVE",
+      "payStatus": "PAID",
+      "payAmount": 12.0,
+      "paidAt": "2026-04-16 17:40:00",
+      "refundAmountTotal": 1.0,
+      "receiveStatus": "RECEIVED",
+      "receivedAt": "2026-04-16 19:38:00"
+    }
+  ],
+  "paymentSummary": {
+    "totalMemberCount": 3,
+    "paidMemberCount": 3,
+    "unpaidMemberCount": 0,
+    "estimatedTotalAmount": 36.0,
+    "paidTotalAmount": 36.0,
+    "actualTotalAmount": 33.0,
+    "refundDiffTotalAmount": 3.0,
+    "settleToCreatorAmount": 33.0
+  },
+  "receiptInfo": {
+    "hasReceipt": true,
+    "receiptId": 3001,
+    "imageUrl": "/uploads/receipts/20260416-1001.png",
+    "uploaderUserId": 1,
+    "actualTotalAmount": 33.0,
+    "expectedDeliveryStartAt": "2026-04-16 19:20:00",
+    "expectedDeliveryEndAt": "2026-04-16 19:40:00",
+    "uploadedAt": "2026-04-16 19:00:00"
+  },
+  "receiveInfo": {
+    "pickupPoint": "一食堂门口",
+    "deliveredAt": "2026-04-16 19:35:00",
+    "autoConfirmDeadlineAt": "2026-04-16 20:05:00",
+    "receivedMemberCount": 2,
+    "pendingConfirmMemberCount": 1
+  },
+  "timeline": [
+    {
+      "time": "2026-04-16 17:20:00",
+      "type": "ORDER_CREATED",
+      "title": "拼单已创建",
+      "content": "发起人创建拼单",
+      "operatorType": "USER"
+    },
+    {
+      "time": "2026-04-16 17:40:00",
+      "type": "ORDER_GROUPED",
+      "title": "拼单已成团",
+      "content": "人数满员且全员已支付",
+      "operatorType": "SYSTEM"
+    },
+    {
+      "time": "2026-04-16 19:00:00",
+      "type": "RECEIPT_UPLOADED",
+      "title": "已上传订单凭证",
+      "content": "发起人上传凭证并填写实际金额",
+      "operatorType": "USER"
+    },
+    {
+      "time": "2026-04-16 19:35:00",
+      "type": "ORDER_DELIVERED",
+      "title": "商品已送达",
+      "content": "发起人已确认送达",
+      "operatorType": "USER"
+    }
+  ],
+  "complaintInfo": {
+    "complaintOpened": false,
+    "canComplain": false,
+    "myComplaintId": null,
+    "myComplaintStatus": null,
+    "complaintCount": 0
+  },
+  "actionFlags": {
+    "canJoin": false,
+    "canPay": false,
+    "canExit": false,
+    "canUploadReceipt": false,
+    "canMarkDelivered": false,
+    "canConfirmReceived": true,
+    "canCreateComplaint": false,
+    "canViewReceipt": true
+  }
+}
+```
+
+## 5. 状态与按钮矩阵
+
+前置固定规则：
+
+1. 所有详情页动作成功后，前端**必须**先重拉一次 `GET /api/orders/{orderId}`
+2. 若当前页面来自 `/my/orders`，成功后再额外重拉一次 `GET /api/users/my-orders`
+3. `提交投诉` 成功后，额外重拉一次 `GET /api/complaints/my`
+4. 发起人**不显示**“确认收货”按钮；发起人点击“商品已送达”时，自己的 `receive_status` 直接视为 `RECEIVED`
+
+| 当前用户身份  | 订单主状态                                    | pay_status | receive_status  | 显示按钮              | 禁用条件                               | 接口                                                                   | 成功后刷新                                                  |
+| ------- | ---------------------------------------- | ---------- | --------------- | ----------------- | ---------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------ |
+| 非成员普通用户 | `OPEN`                                   | -          | -               | `加入拼单`            | 满员、已过截止时间、已加入、本人是发起人               | `POST /api/orders/{orderId}/join`                                    | `GET /api/orders/{orderId}`                            |
+| 已加入成员   | `OPEN`                                   | `UNPAID`   | `NOT_READY`     | `支付预估金额`、`退出拼单`   | `canPay=false` / `canExit=false`   | `POST /api/orders/{orderId}/pay` / `POST /api/orders/{orderId}/exit` | `GET /api/orders/{orderId}`                            |
+| 已加入成员   | `OPEN`                                   | `PAID`     | `NOT_READY`     | `退出拼单`            | `canExit=false`                    | `POST /api/orders/{orderId}/exit`                                    | `GET /api/orders/{orderId}`                            |
+| 发起人     | `OPEN`                                   | `UNPAID`   | `NOT_READY`     | `支付预估金额`          | `canPay=false`                     | `POST /api/orders/{orderId}/pay`                                     | `GET /api/orders/{orderId}`                            |
+| 发起人     | `OPEN`                                   | `PAID`     | `NOT_READY`     | 无操作按钮，仅显示“等待满员”   | -                                  | -                                                                    | -                                                      |
+| 发起人     | `GROUPED`                                | `PAID`     | `NOT_READY`     | `上传订单凭证`          | 已有凭证、`canUploadReceipt=false`      | `POST /api/orders/{orderId}/upload-receipt`                          | `GET /api/orders/{orderId}`                            |
+| 普通参与成员  | `GROUPED`                                | `PAID`     | `NOT_READY`     | 无操作按钮             | -                                  | -                                                                    | -                                                      |
+| 普通参与成员  | `GROUPED` 且 `complaintOpened=true`       | `PAID`     | `NOT_READY`     | `提交投诉`            | 已存在本人投诉、`canCreateComplaint=false` | `POST /api/complaints`                                               | `GET /api/orders/{orderId}` + `GET /api/complaints/my` |
+| 普通参与成员  | `GROUPED` 且已投诉                           | `PAID`     | `NOT_READY`     | `已提交投诉`（禁用）       | 固定禁用                               | -                                                                    | -                                                      |
+| 发起人     | `WAIT_DELIVERY`                          | `PAID`     | `RECEIVED`      | `商品已送达`           | `canMarkDelivered=false`           | `POST /api/orders/{orderId}/mark-delivered`                          | `GET /api/orders/{orderId}`                            |
+| 普通参与成员  | `WAIT_DELIVERY`                          | `PAID`     | `NOT_READY`     | 无操作按钮             | -                                  | -                                                                    | -                                                      |
+| 普通参与成员  | `WAIT_DELIVERY` 且 `complaintOpened=true` | `PAID`     | `NOT_READY`     | `提交投诉`            | 已存在本人投诉、`canCreateComplaint=false` | `POST /api/complaints`                                               | `GET /api/orders/{orderId}` + `GET /api/complaints/my` |
+| 普通参与成员  | `WAIT_RECEIVE`                           | `PAID`     | `WAIT_CONFIRM`  | `确认收货`            | `canConfirmReceived=false`         | `POST /api/orders/{orderId}/confirm-received`                        | `GET /api/orders/{orderId}`                            |
+| 普通参与成员  | `WAIT_RECEIVE`                           | `PAID`     | `RECEIVED`      | 无按钮，显示“已确认收货”     | -                                  | -                                                                    | -                                                      |
+| 普通参与成员  | `WAIT_RECEIVE`                           | `PAID`     | `AUTO_RECEIVED` | 无按钮，显示“系统已自动确认”   | -                                  | -                                                                    | -                                                      |
+| 发起人     | `WAIT_RECEIVE`                           | `PAID`     | `RECEIVED`      | 无操作按钮，仅显示“等待成员确认” | -                                  | -                                                                    | -                                                      |
+| 任意已登录用户 | `COMPLETED`                              | 任意         | 任意              | 无操作按钮，可看凭证        | -                                  | -                                                                    | -                                                      |
+| 任意已登录用户 | `CANCELED`                               | 任意         | 任意              | 无操作按钮，可看取消原因      | -                                  | -                                                                    | -                                                      |
+
+额外固定显示规则：
+
+| 条件                                       | 显示             |
+| ---------------------------------------- | -------------- |
+| `receiptInfo.hasReceipt=true`            | 显示 `查看凭证`      |
+| `actionFlags.canViewReceipt=false`       | 不显示 `查看凭证`     |
+| `complaintInfo.myComplaintId != null`    | 详情页不再显示 `提交投诉` |
+| `currentUserMember.joinStatus != ACTIVE` | 所有成员动作按钮一律不显示  |
+
+## 6. 表单校验规则
+
+密码规则来自需求文档；实名认证要求绑定学号；发起拼单字段要求来自需求文档的 P0 拼单填写项。
+
+| 字段                                                    | 最终规则                                  | 错误提示文案                          |
+| ----------------------------------------------------- | ------------------------------------- | ------------------------------- |
+| `phone`                                               | 必填；去首尾空格；必须匹配 `^1[3-9]\d{9}$`         | `请输入正确的11位手机号`                  |
+| `password`                                            | 必填；长度 `6-20`；不得含空格；字母/数字/特殊符号至少包含 2 种 | `密码需为6-20位，且至少包含字母、数字、特殊符号中的2种` |
+| `nickname`                                            | 必填；去首尾空格；长度 `2-20`                    | `昵称长度需为2-20个字符`                 |
+| `studentNo`                                           | 必填；必须是 `10` 位数字                       | `学号必须为10位数字`                    |
+| `productName`                                         | 必填；去首尾空格；长度 `2-30`                    | `商品名称长度需为2-30个字符`               |
+| `productDesc`                                         | 选填；去首尾空格；最长 `200`                     | `商品描述不能超过200个字符`                |
+| `memberCount`（对应 `totalMemberCount`）                  | 必填；整数；范围 `2-20`                       | `总人数必须为2-20之间的整数`               |
+| `amount`（对应 `estimatedTotalAmount/actualTotalAmount`） | 必填；大于 `0`；最多两位小数；范围 `(0, 9999.99]`    | `金额必须大于0，且最多保留2位小数`             |
+| `deadlineAt`                                          | 必填；合法时间字符串；必须晚于当前时间                   | `截止时间必须晚于当前时间`                  |
+| `pickupPoint`                                         | 必填；去首尾空格；长度 `2-50`                    | `取货点长度需为2-50个字符`                |
+| `remark`                                              | 选填；去首尾空格；最长 `100`                     | `备注不能超过100个字符`                  |
+| `complaintContent`（对应 `content`）                      | 必填；去首尾空格；长度 `5-200`                   | `投诉说明长度需为5-200个字符`              |
+
+前端校验执行顺序固定：
+
+1. `trim()`
+2. 必填校验
+3. 格式校验
+4. 长度/范围校验
+5. 再发请求
+
+## 7. 错误码与前端处理规则
+
+|    code | 含义           | 前端处理                                          |
+| ------: | ------------ | --------------------------------------------- |
+|     `0` | 成功           | 正常处理                                          |
+| `40001` | 参数不合法        | `ElMessage.error(message)`，停留当前页              |
+| `40002` | 手机号格式错误      | 表单报错，不跳转                                      |
+| `40003` | 密码格式错误       | 表单报错，不跳转                                      |
+| `40004` | 学号格式错误       | 表单报错，不跳转                                      |
+| `40005` | 金额格式错误       | 表单报错，不跳转                                      |
+| `40006` | 截止时间不合法      | 表单报错，不跳转                                      |
+| `40101` | 未登录          | 清 token，跳 `/login` 或 `/admin/login`，提示 `请先登录` |
+| `40102` | token 失效/过期  | 清 token，跳登录页，提示 `登录已过期，请重新登录`                 |
+| `40301` | 无权限          | 保持当前页，提示 `无权限访问`                              |
+| `40302` | 账号已封禁        | 清 token，按角色跳登录页，提示 `账号已被封禁，请联系管理员`            |
+| `40303` | 未实名认证        | 跳 `/verify-student`，提示 `请先完成实名认证`             |
+| `40401` | 拼单不存在        | 若当前在详情页，跳 `/orders`，提示 `拼单不存在或已删除`            |
+| `40402` | 投诉不存在        | 若当前在投诉详情抽屉，关闭抽屉并提示 `投诉不存在`                    |
+| `40403` | 用户不存在        | 提示 `用户不存在`                                    |
+| `40901` | 手机号已注册       | 注册页提示 `手机号已注册`                                |
+| `40902` | 学号已绑定        | 实名页提示 `该学号已绑定其他账号`                            |
+| `40903` | 当前订单状态不允许该操作 | 提示后立刻重拉 `GET /api/orders/{orderId}`           |
+| `40904` | 订单已满员        | 提示后重拉详情和当前列表页                                 |
+| `40905` | 已加入该拼单       | 提示后重拉详情                                       |
+| `40906` | 不是该拼单成员      | 提示后重拉详情                                       |
+| `40907` | 已支付，无需重复支付   | 提示后重拉详情                                       |
+| `40908` | 当前阶段不允许退出    | 提示后重拉详情                                       |
+| `40909` | 凭证已上传        | 提示后重拉详情                                       |
+| `40910` | 当前阶段不允许确认送达  | 提示后重拉详情                                       |
+| `40911` | 已确认收货，无需重复操作 | 提示后重拉详情                                       |
+| `40912` | 当前未开放投诉      | 提示后重拉详情                                       |
+| `40913` | 重复投诉         | 提示后重拉详情和我的投诉列表                                |
+| `40914` | 发起人不能投诉自己    | 提示 `发起人不能对本单发起投诉`                             |
+| `50000` | 系统异常         | `ElMessage.error('系统异常，请稍后再试')`，不跳转           |
+
+错误处理统一执行规则：
+
+1. `40101/40102/40302` 必须清空 Pinia 登录态
+2. `40903-40913` 必须重拉当前详情数据
+3. 表单类错误只做前端提示，不自动跳页
+4. 详情类资源不存在时才跳回列表页
+
+## 8. 冲突项拍板
+
+| 冲突项     | 最终版                                                                     |
+| ------- | ----------------------------------------------------------------------- |
+| 我的投诉接口  | **只保留** `GET /api/complaints/my`                                        |
+| 前端请求方案  | **只保留** `axios`，首批必须把 `axios` 加到 `frontend/package.json`                |
+| 投诉详情展示  | **不做独立路由页面**，并入 `/complaints/my` 的抽屉                                    |
+| 管理端订单详情 | **不做独立页**，并入 `/admin/orders` 的抽屉                                        |
+| 通知模块第一版 | **不做页面**；只保留后端 `notification` 表与业务写入，前端 V1 不出通知中心                       |
+| 用户支付接口  | **只保留** `POST /api/orders/{orderId}/pay`，不再做单独 `/api/payments/pay` 用户接口 |
+| 退出拼单接口  | **只保留** `POST /api/orders/{orderId}/exit`，不再使用 `/quit`                  |
+
+这里的拍板依据是：设计文档已经固定 Axios 为前端接口封装工具；最新开发规划文档已经把“我的投诉页”映射到 `/api/complaints/my`；同时开发规划中已经给出 `/api/orders/{orderId}/pay` 与 `/api/orders/{orderId}/exit` 这一套更适合页面直调的口径。   
+
+## 9. 首批 mock 数据
+
+### 9.1 登录成功
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "token": "user-jwt-token",
+    "userInfo": {
+      "userId": 1,
+      "phone": "13800000000",
+      "nickname": "阿泽",
+      "studentNo": "2300320204",
+      "isVerified": true,
+      "role": "USER",
+      "status": "NORMAL",
+      "creditScore": 80,
+      "contactInfo": "微信: aze123"
+    }
+  }
+}
+```
+
+### 9.2 订单列表
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "orderId": 1001,
+        "orderNo": "GO202604160001",
+        "productName": "蜜雪冰城奶茶",
+        "productDesc": "可备注糖度和冰量",
+        "pickupPoint": "一食堂门口",
+        "totalMemberCount": 3,
+        "currentMemberCount": 2,
+        "remainingCount": 1,
+        "estimatedTotalAmount": 36.0,
+        "estimatedPerAmount": 12.0,
+        "deadlineAt": "2026-04-16 18:30:00",
+        "status": "OPEN",
+        "creatorUserId": 1,
+        "creatorNickname": "阿泽",
+        "complaintOpened": false,
+        "currentUserJoined": false,
+        "currentUserPayStatus": null,
+        "createdAt": "2026-04-16 17:20:00"
+      },
+      {
+        "orderId": 1002,
+        "orderNo": "GO202604160002",
+        "productName": "瑞幸咖啡",
+        "productDesc": "统一到图书馆门口取",
+        "pickupPoint": "图书馆门口",
+        "totalMemberCount": 4,
+        "currentMemberCount": 4,
+        "remainingCount": 0,
+        "estimatedTotalAmount": 64.0,
+        "estimatedPerAmount": 16.0,
+        "deadlineAt": "2026-04-16 18:00:00",
+        "status": "WAIT_DELIVERY",
+        "creatorUserId": 4,
+        "creatorNickname": "小陈",
+        "complaintOpened": false,
+        "currentUserJoined": true,
+        "currentUserPayStatus": "PAID",
+        "createdAt": "2026-04-16 16:30:00"
+      }
+    ],
+    "page": 1,
+    "pageSize": 10,
+    "total": 2,
+    "pages": 1
+  }
+}
+```
+
+### 9.3 订单详情
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "viewerRoleInOrder": "PARTICIPANT",
+    "basicInfo": {
+      "orderId": 1001,
+      "orderNo": "GO202604160001",
+      "productName": "蜜雪冰城奶茶",
+      "productDesc": "可备注糖度和冰量",
+      "pickupPoint": "一食堂门口",
+      "totalMemberCount": 3,
+      "currentMemberCount": 3,
+      "estimatedTotalAmount": 36.0,
+      "estimatedPerAmount": 12.0,
+      "actualTotalAmount": 33.0,
+      "actualPerAmount": 11.0,
+      "deadlineAt": "2026-04-16 18:30:00",
+      "receiptUploadDeadlineAt": "2026-04-16 19:00:00",
+      "expectedDeliveryStartAt": "2026-04-16 19:20:00",
+      "expectedDeliveryEndAt": "2026-04-16 19:40:00",
+      "deliveredAt": "2026-04-16 19:35:00",
+      "status": "WAIT_RECEIVE",
+      "cancelReason": null,
+      "complaintOpened": false,
+      "createdAt": "2026-04-16 17:20:00",
+      "updatedAt": "2026-04-16 19:35:00"
+    },
+    "initiatorInfo": {
+      "userId": 1,
+      "nickname": "阿泽",
+      "phoneMasked": "138****5678",
+      "studentNoMasked": "2300****04",
+      "creditScore": 86,
+      "userStatus": "NORMAL"
+    },
+    "currentUserMember": {
+      "memberId": 9002,
+      "isCreator": false,
+      "remark": "七分糖，少冰",
+      "joinStatus": "ACTIVE",
+      "payStatus": "PAID",
+      "payAmount": 12.0,
+      "paidAt": "2026-04-16 17:36:00",
+      "refundAmountTotal": 1.0,
+      "receiveStatus": "WAIT_CONFIRM",
+      "receivedAt": null
+    },
+    "memberList": [
+      {
+        "memberId": 9001,
+        "userId": 1,
+        "nickname": "阿泽",
+        "isCreator": true,
+        "remark": "",
+        "joinStatus": "ACTIVE",
+        "payStatus": "PAID",
+        "payAmount": 12.0,
+        "paidAt": "2026-04-16 17:25:00",
+        "refundAmountTotal": 1.0,
+        "receiveStatus": "RECEIVED",
+        "receivedAt": "2026-04-16 19:35:00"
+      },
+      {
+        "memberId": 9002,
+        "userId": 2,
+        "nickname": "小林",
+        "isCreator": false,
+        "remark": "七分糖，少冰",
+        "joinStatus": "ACTIVE",
+        "payStatus": "PAID",
+        "payAmount": 12.0,
+        "paidAt": "2026-04-16 17:36:00",
+        "refundAmountTotal": 1.0,
+        "receiveStatus": "WAIT_CONFIRM",
+        "receivedAt": null
+      }
+    ],
+    "paymentSummary": {
+      "totalMemberCount": 3,
+      "paidMemberCount": 3,
+      "unpaidMemberCount": 0,
+      "estimatedTotalAmount": 36.0,
+      "paidTotalAmount": 36.0,
+      "actualTotalAmount": 33.0,
+      "refundDiffTotalAmount": 3.0,
+      "settleToCreatorAmount": 33.0
+    },
+    "receiptInfo": {
+      "hasReceipt": true,
+      "receiptId": 3001,
+      "imageUrl": "/uploads/receipts/20260416-1001.png",
+      "uploaderUserId": 1,
+      "actualTotalAmount": 33.0,
+      "expectedDeliveryStartAt": "2026-04-16 19:20:00",
+      "expectedDeliveryEndAt": "2026-04-16 19:40:00",
+      "uploadedAt": "2026-04-16 19:00:00"
+    },
+    "receiveInfo": {
+      "pickupPoint": "一食堂门口",
+      "deliveredAt": "2026-04-16 19:35:00",
+      "autoConfirmDeadlineAt": "2026-04-16 20:05:00",
+      "receivedMemberCount": 1,
+      "pendingConfirmMemberCount": 1
+    },
+    "timeline": [
+      {
+        "time": "2026-04-16 17:20:00",
+        "type": "ORDER_CREATED",
+        "title": "拼单已创建",
+        "content": "发起人创建拼单",
+        "operatorType": "USER"
+      }
+    ],
+    "complaintInfo": {
+      "complaintOpened": false,
+      "canComplain": false,
+      "myComplaintId": null,
+      "myComplaintStatus": null,
+      "complaintCount": 0
+    },
+    "actionFlags": {
+      "canJoin": false,
+      "canPay": false,
+      "canExit": false,
+      "canUploadReceipt": false,
+      "canMarkDelivered": false,
+      "canConfirmReceived": true,
+      "canCreateComplaint": false,
+      "canViewReceipt": true
+    }
+  }
+}
+```
+
+### 9.4 我的拼单
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "orderId": 1001,
+        "orderNo": "GO202604160001",
+        "productName": "蜜雪冰城奶茶",
+        "pickupPoint": "一食堂门口",
+        "status": "OPEN",
+        "totalMemberCount": 3,
+        "currentMemberCount": 2,
+        "estimatedPerAmount": 12.0,
+        "actualPerAmount": null,
+        "deadlineAt": "2026-04-16 18:30:00",
+        "expectedDeliveryEndAt": null,
+        "myRole": "CREATOR",
+        "myJoinStatus": "ACTIVE",
+        "myPayStatus": "PAID",
+        "myReceiveStatus": "NOT_READY",
+        "refundAmountTotal": 0.0,
+        "createdAt": "2026-04-16 17:20:00"
+      },
+      {
+        "orderId": 1002,
+        "orderNo": "GO202604160002",
+        "productName": "瑞幸咖啡",
+        "pickupPoint": "图书馆门口",
+        "status": "WAIT_RECEIVE",
+        "totalMemberCount": 4,
+        "currentMemberCount": 4,
+        "estimatedPerAmount": 16.0,
+        "actualPerAmount": 15.0,
+        "deadlineAt": "2026-04-16 18:00:00",
+        "expectedDeliveryEndAt": "2026-04-16 19:40:00",
+        "myRole": "PARTICIPANT",
+        "myJoinStatus": "ACTIVE",
+        "myPayStatus": "PAID",
+        "myReceiveStatus": "WAIT_CONFIRM",
+        "refundAmountTotal": 1.0,
+        "createdAt": "2026-04-16 16:30:00"
+      }
+    ],
+    "page": 1,
+    "pageSize": 10,
+    "total": 2,
+    "pages": 1
+  }
+}
+```
+
+### 9.5 信用分
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "creditScore": 82,
+    "records": {
+      "list": [
+        {
+          "recordId": 7001,
+          "changeValue": 2,
+          "reasonType": "ORDER_FINISHED",
+          "relatedOrderId": 1001,
+          "relatedComplaintId": null,
+          "remark": "有效拼单完成",
+          "createdAt": "2026-04-16 20:30:00"
+        },
+        {
+          "recordId": 7002,
+          "changeValue": -10,
+          "reasonType": "COMPLAINT_CONFIRMED",
+          "relatedOrderId": 998,
+          "relatedComplaintId": 488,
+          "remark": "投诉成立",
+          "createdAt": "2026-04-15 18:00:00"
+        }
+      ],
+      "page": 1,
+      "pageSize": 10,
+      "total": 2,
+      "pages": 1
+    }
+  }
+}
+```
+
+### 9.6 投诉列表
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "list": [
+      {
+        "complaintId": 5001,
+        "complaintNo": "CP202604160001",
+        "orderId": 1001,
+        "orderNo": "GO202604160001",
+        "productName": "蜜雪冰城奶茶",
+        "accusedUserId": 1,
+        "accusedNickname": "阿泽",
+        "type": "NOT_PURCHASED",
+        "content": "发起人超时未上传凭证",
+        "status": "PENDING",
+        "openedBySystem": true,
+        "handleResult": null,
+        "createdAt": "2026-04-16 20:10:00",
+        "handledAt": null
+      },
+      {
+        "complaintId": 5002,
+        "complaintNo": "CP202604150003",
+        "orderId": 998,
+        "orderNo": "GO202604150008",
+        "productName": "库迪咖啡",
+        "accusedUserId": 8,
+        "accusedNickname": "小王",
+        "type": "FAKE_RECEIPT",
+        "content": "上传的凭证金额明显不一致",
+        "status": "PROCESSED",
+        "openedBySystem": false,
+        "handleResult": "核实投诉成立，已批量退款并扣分",
+        "createdAt": "2026-04-15 17:20:00",
+        "handledAt": "2026-04-15 18:00:00"
+      }
+    ],
+    "page": 1,
+    "pageSize": 10,
+    "total": 2,
+    "pages": 1
+  }
+}
+```
+
+## 10. 开发顺序
+
+开发规划文档已经明确，当前核心不是继续铺页面，而是先把认证、用户、拼单主流程接口和前端闭环打通；迭代一计划也把“前端请求封装、登录认证、列表、详情、创建、加入/支付、状态流转”放在第一优先级。下面直接给最小并行顺序。 
+
+| 步骤 | 前端                                                                                        | 后端                                                                                                                                 | 完成标志                                                     |
+| -- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 1  | 安装 `axios`；落 `api/request.js`；建 `userStore`；建路由守卫；实现 `BlankLayout/UserLayout/AdminLayout` | 补 `MyBatis-Plus`、`JWT`、`Validation`、`MySQL` 依赖；建统一返回体、统一错误码、统一枚举；保留 `permitAll` 直到登录接口落地                                           | 前端可发真实请求；后端可返回统一 JSON                                    |
+| 2  | 完成 `/login` `/register` `/verify-student` 页面                                              | 完成 `user_account` 表；实现 `POST /api/auth/register` `POST /api/auth/login` `GET /api/auth/me` `POST /api/users/verify-student`        | 用户能注册、登录、刷新后恢复登录态、完成实名认证                                 |
+| 3  | 完成 `/orders` `/orders/create` `/orders/:orderId` 页面静态渲染                                   | 完成 `group_order` `group_order_member` 表；实现 `POST /api/orders` `GET /api/orders` `GET /api/orders/{id}`                             | 可以创建拼单、看到列表、打开详情                                         |
+| 4  | 完成详情页 `加入拼单`、`支付预估金额`、`退出拼单` 按钮与刷新逻辑                                                      | 完成 `capital_record` 表；实现 `POST /api/orders/{id}/join` `POST /api/orders/{id}/pay` `POST /api/orders/{id}/exit`；在 `pay` 成功后同步判断是否成团 | 能跑通“发起人创建并支付 -> 参与者加入并支付 -> 自动成团”                        |
+| 5  | 完成 `/my/orders` 页面；详情页成功动作后统一重拉数据                                                         | 实现 `GET /api/users/my-orders`                                                                                                      | 我的拼单能看到自己发起和参与的数据                                        |
+| 6  | 联调完整 Happy Path                                                                           | 完成 `OPEN -> GROUPED` 同步状态流转；未成团退出退款；必要日志落库                                                                                         | `登录 -> 实名 -> 创建 -> 发起人支付 -> 参与者加入 -> 参与者支付 -> 成团` 全链路可演示 |
+| 7  | 再补 `/credit` `/complaints/my`                                                             | 再补 `credit_change_record` `complaint`；实现信用分和投诉接口                                                                                   | 信任闭环可演示                                                  |
+| 8  | 最后补管理员页面 `/admin/users` `/admin/orders` `/admin/complaints` `/admin/logs`                 | 最后补管理员接口、封禁/解封、强制取消、投诉处理、日志查询                                                                                                      | 管理后台可演示                                                  |
+
+这份就是明天可以直接开写的最终版。

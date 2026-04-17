@@ -587,6 +587,190 @@ const phaseOwnerCards = computed(() => {
   ]
 })
 
+const getBlockedReason = (actionKey) => {
+  if (!detail.value) {
+    return '--'
+  }
+
+  const flags = detail.value.actionFlags
+  const status = detail.value.basicInfo.status
+  const currentMember = detail.value.currentUserMember
+  const viewerRole = detail.value.viewerRoleInOrder
+  const memberCount = detail.value.basicInfo.currentMemberCount
+  const totalMemberCount = detail.value.basicInfo.totalMemberCount
+
+  if (flags[actionKey]) {
+    return '当前可直接执行'
+  }
+
+  if (viewerRole === 'ADMIN') {
+    return '管理员视角仅查看详情，不参与用户侧动作'
+  }
+
+  if (actionKey === 'canJoin') {
+    if (currentMember?.joinStatus === 'ACTIVE') {
+      return '当前账号已经加入该订单'
+    }
+
+    if (currentMember?.joinStatus === 'EXITED') {
+      return '当前账号已退出该订单，不再处于可加入状态'
+    }
+
+    if (status !== 'OPEN') {
+      return '只有招募中的订单才允许加入'
+    }
+
+    if (memberCount >= totalMemberCount) {
+      return '当前订单名额已满'
+    }
+
+    return '当前账号暂不满足加入条件'
+  }
+
+  if (actionKey === 'canPay') {
+    if (!currentMember) {
+      return '需要先加入订单后才能支付'
+    }
+
+    if (currentMember.joinStatus !== 'ACTIVE') {
+      return '只有有效成员才能执行支付'
+    }
+
+    if (currentMember.payStatus === 'PAID') {
+      return '当前账号已经完成支付'
+    }
+
+    return status === 'OPEN' ? '当前账号暂不满足支付条件' : '支付动作只在招募阶段开放'
+  }
+
+  if (actionKey === 'canExit') {
+    if (!currentMember) {
+      return '当前账号尚未加入订单'
+    }
+
+    if (currentMember.myRole === 'INITIATOR') {
+      return '发起人不能直接退出自己的拼单'
+    }
+
+    if (currentMember.joinStatus === 'EXITED') {
+      return '当前账号已经退出过该订单'
+    }
+
+    return status === 'OPEN' ? '当前账号暂不满足退出条件' : '退出动作只在招募阶段开放'
+  }
+
+  if (actionKey === 'canUploadReceipt') {
+    if (detail.value.viewerRoleInOrder !== 'INITIATOR') {
+      return '只有发起人才能上传购买凭证'
+    }
+
+    return status === 'GROUPED' ? '当前账号暂不满足上传条件' : '上传凭证只在已成团阶段开放'
+  }
+
+  if (actionKey === 'canMarkDelivered') {
+    if (detail.value.viewerRoleInOrder !== 'INITIATOR') {
+      return '只有发起人才能确认送达'
+    }
+
+    return status === 'WAIT_DELIVERY' ? '当前账号暂不满足确认条件' : '确认送达只在待送达阶段开放'
+  }
+
+  if (actionKey === 'canConfirmReceived') {
+    if (!currentMember) {
+      return '需要先加入订单后才可能确认收货'
+    }
+
+    if (currentMember.receiveStatus === 'RECEIVED' || currentMember.receiveStatus === 'AUTO_RECEIVED') {
+      return '当前账号已经完成收货'
+    }
+
+    return status === 'WAIT_RECEIVE' ? '当前账号暂不满足收货确认条件' : '确认收货只在待收货阶段开放'
+  }
+
+  if (actionKey === 'canCreateComplaint') {
+    if (detail.value.complaintInfo.myComplaintId) {
+      return '当前账号已经提交过投诉'
+    }
+
+    if (detail.value.viewerRoleInOrder === 'INITIATOR') {
+      return '发起人不能以当前身份对本单发起投诉'
+    }
+
+    return detail.value.complaintInfo.complaintOpened
+      ? '投诉通道虽已开放，但当前账号此时不满足创建条件'
+      : '投诉通道尚未开放'
+  }
+
+  return '当前不满足执行条件'
+}
+
+const viewerPerspectiveCards = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  const enabledActions = actionSummary.value
+    .filter((item) => item.enabled)
+    .map((item) => item.label)
+  const roleText = formatRole(detail.value.viewerRoleInOrder)
+  const currentMember = detail.value.currentUserMember
+
+  let permissionSummary = enabledActions.length
+    ? `当前可执行：${enabledActions.join('、')}`
+    : '当前没有可直接执行的用户侧动作'
+
+  if (detail.value.viewerRoleInOrder === 'ADMIN') {
+    permissionSummary = '当前为管理员视角，仅查看聚合详情，不参与用户侧流程'
+  }
+
+  let blockerSummary = '暂无明显限制'
+
+  if (detail.value.basicInfo.status === 'CANCELED') {
+    blockerSummary = '订单已取消，当前账号不再推进后续流程'
+  } else if (detail.value.basicInfo.status === 'COMPLETED') {
+    blockerSummary = '订单已完成，当前账号无须继续操作'
+  } else if (!enabledActions.length) {
+    blockerSummary = getBlockedReason('canJoin')
+  } else if (detail.value.actionFlags.canPay) {
+    blockerSummary = '当前账号未支付，支付完成后才能继续推进订单'
+  } else if (detail.value.actionFlags.canUploadReceipt) {
+    blockerSummary = '当前轮到发起人上传购买凭证'
+  } else if (detail.value.actionFlags.canMarkDelivered) {
+    blockerSummary = '当前轮到发起人确认送达'
+  } else if (detail.value.actionFlags.canConfirmReceived) {
+    blockerSummary = '当前轮到当前账号确认收货'
+  } else if (detail.value.actionFlags.canCreateComplaint) {
+    blockerSummary = '当前可以针对异常订单发起投诉'
+  } else if (currentMember?.joinStatus === 'EXITED') {
+    blockerSummary = '当前账号已经退出该订单'
+  }
+
+  return [
+    { key: 'identity', label: '当前身份', value: roleText },
+    {
+      key: 'member',
+      label: '成员归属',
+      value: currentMember ? `${formatRole(currentMember.myRole)} / ${formatJoinStatus(currentMember.joinStatus)}` : '尚未加入订单',
+    },
+    { key: 'permission', label: '当前权限', value: permissionSummary },
+    { key: 'blocker', label: '当前限制', value: blockerSummary },
+  ]
+})
+
+const unavailableActionCards = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  return [
+    { key: 'join', label: '为什么现在不能加入', enabled: detail.value.actionFlags.canJoin, reason: getBlockedReason('canJoin') },
+    { key: 'pay', label: '为什么现在不能支付', enabled: detail.value.actionFlags.canPay, reason: getBlockedReason('canPay') },
+    { key: 'upload', label: '为什么现在不能上传凭证', enabled: detail.value.actionFlags.canUploadReceipt, reason: getBlockedReason('canUploadReceipt') },
+    { key: 'receive', label: '为什么现在不能确认收货', enabled: detail.value.actionFlags.canConfirmReceived, reason: getBlockedReason('canConfirmReceived') },
+    { key: 'complaint', label: '为什么现在不能投诉', enabled: detail.value.actionFlags.canCreateComplaint, reason: getBlockedReason('canCreateComplaint') },
+  ].filter((item) => !item.enabled)
+})
+
 const stats = computed(() => {
   if (!detail.value) {
     return []
@@ -893,6 +1077,22 @@ onMounted(() => {
         </div>
 
         <PageSection
+          title="当前账号视角"
+          description="把当前身份、当前权限和当前限制说清楚，减少联调时反复猜测。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in viewerPerspectiveCards"
+              :key="item.key"
+              class="surface-card action-summary-card is-enabled"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
           title="阶段进度"
           description="按业务阶段展示订单当前所处位置，便于快速判断还差哪一步。"
         >
@@ -946,6 +1146,23 @@ onMounted(() => {
             >
               <span>{{ item.label }}</span>
               <strong>{{ item.enabled ? '是' : '否' }}</strong>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
+          v-if="unavailableActionCards.length"
+          title="动作限制说明"
+          description="说明当前为什么做不了某些动作，避免把禁用态误解成前端错误。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in unavailableActionCards"
+              :key="item.key"
+              class="surface-card action-summary-card"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.reason }}</strong>
             </div>
           </div>
         </PageSection>

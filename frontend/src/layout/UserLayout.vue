@@ -36,14 +36,21 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'is-collapsed': appStore.sidebarCollapsed }">
     <aside class="app-sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
       <div class="brand-block">
+        <div class="brand-mark">{{ appStore.sidebarCollapsed ? '拼' : 'CSO' }}</div>
         <span class="brand-kicker">CampusShareOrder</span>
         <h1>校园拼单平台</h1>
       </div>
 
-      <el-menu :default-active="activePath" router class="shell-menu">
+      <el-menu
+        :default-active="activePath"
+        :collapse="appStore.sidebarCollapsed"
+        :collapse-transition="false"
+        router
+        class="shell-menu"
+      >
         <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
           {{ item.label }}
         </el-menu-item>

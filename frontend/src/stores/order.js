@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import {
   confirmReceived,
   createOrder,
+  exitOrder,
   getOrderDetail,
   getOrderList,
   joinOrder,
@@ -91,10 +92,38 @@ export const useOrderStore = defineStore('order', {
         this.submitting = false
       }
     },
+    async joinOrderFromDetail(orderId) {
+      this.submitting = true
+
+      try {
+        await joinOrder(orderId, {})
+        return await this.loadOrderDetail(orderId)
+      } finally {
+        this.submitting = false
+      }
+    },
+    async exitExistingOrder(orderId) {
+      this.submitting = true
+
+      try {
+        await exitOrder(orderId)
+        return await this.loadOrderDetail(orderId)
+      } finally {
+        this.submitting = false
+      }
+    },
     async runDetailAction(orderId, action, payload = {}) {
       this.submitting = true
 
       try {
+        if (action === 'join') {
+          await joinOrder(orderId, {})
+        }
+
+        if (action === 'exit') {
+          await exitOrder(orderId)
+        }
+
         if (action === 'pay') {
           await payOrder(orderId)
         }

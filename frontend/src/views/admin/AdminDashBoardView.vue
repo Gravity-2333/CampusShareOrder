@@ -5,9 +5,11 @@ import { ElMessage } from 'element-plus'
 
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
+import StatusTag from '../../components/common/StatusTag.vue'
 import { useAppStore } from '../../stores/app'
 import { useAdminStore } from '../../stores/admin'
 import { useUserStore } from '../../stores/user'
+import { formatComplaintStatus, formatDateTime, formatOrderStatus } from '../../utils/format'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -27,13 +29,20 @@ const overviewRows = computed(() => [
   { label: '管理员账号', value: userStore.session.username || '--' },
 ])
 
-onMounted(async () => {
+const quickLinks = [
+  { description: '优先处理异常订单与流转问题', label: '订单治理', path: '/admin/orders' },
+  { description: '查看待处理投诉并填写处理结果', label: '投诉处理', path: '/admin/complaints' },
+  { description: '处理封禁、解封和信用风险用户', label: '用户治理', path: '/admin/users' },
+  { description: '查看后台操作与资金变动记录', label: '操作记录', path: '/admin/records/logs' },
+]
+
+const loadDashboard = async () => {
   try {
-    await adminStore.loadDashboardMetrics()
+    await adminStore.loadDashboardOverview()
   } catch (error) {
     ElMessage.error(error.message)
   }
-})
+}
 
 const handleResetMock = async () => {
   try {
@@ -48,6 +57,8 @@ const handleResetMock = async () => {
     ElMessage.error(error.message)
   }
 }
+
+onMounted(loadDashboard)
 </script>
 
 <template>
@@ -63,8 +74,9 @@ const handleResetMock = async () => {
     </div>
 
     <PageSection
+      v-loading="adminStore.dashboardLoading"
       title="管理台概览"
-      description="这里展示当前运行模式、身份信息以及管理端核心计数，方便演示和联调时快速确认上下文。"
+      description="这里集中展示后台上下文、快捷入口与近期动态，便于联调和演示。"
     >
       <div class="detail-grid">
         <div class="surface-card detail-panel">
@@ -74,16 +86,6 @@ const handleResetMock = async () => {
               <span>{{ item.label }}</span>
               <strong>{{ item.value }}</strong>
             </li>
-          </ul>
-        </div>
-
-        <div class="surface-card detail-panel">
-          <h3>当前阶段说明</h3>
-          <ul class="detail-list">
-            <li><span>分支</span><strong>app-shell</strong></li>
-            <li><span>数据源</span><strong>{{ appStore.apiMode }}</strong></li>
-            <li><span>当前目标</span><strong>前端主干与契约展示基座</strong></li>
-            <li><span>下一重点</span><strong>订单详情与动作闭环深化</strong></li>
           </ul>
           <div v-if="appStore.apiMode === 'mock'" class="page-actions">
             <el-button
@@ -96,7 +98,69 @@ const handleResetMock = async () => {
             </el-button>
           </div>
         </div>
+
+        <div class="surface-card detail-panel">
+          <h3>快捷入口</h3>
+          <div class="admin-quick-grid">
+            <button
+              v-for="item in quickLinks"
+              :key="item.path"
+              type="button"
+              class="admin-quick-card"
+              @click="router.push(item.path)"
+            >
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.description }}</span>
+            </button>
+          </div>
+        </div>
       </div>
+    </PageSection>
+
+    <div class="detail-grid">
+      <PageSection title="近期订单" description="帮助后台快速定位当前需要关注的订单流转。">
+        <div v-if="adminStore.dashboardOverview.recentOrders.length" class="table-stack">
+          <el-table :data="adminStore.dashboardOverview.recentOrders" stripe>
+            <el-table-column prop="orderNo" label="订单号" />
+            <el-table-column prop="productName" label="商品" />
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <p v-else class="muted-text">暂无订单数据。</p>
+      </PageSection>
+
+      <PageSection title="近期投诉" description="帮助后台优先处理待响应投诉。">
+        <div v-if="adminStore.dashboardOverview.recentComplaints.length" class="table-stack">
+          <el-table :data="adminStore.dashboardOverview.recentComplaints" stripe>
+            <el-table-column prop="complaintNo" label="投诉单号" />
+            <el-table-column prop="productName" label="商品" />
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <p v-else class="muted-text">暂无投诉数据。</p>
+      </PageSection>
+    </div>
+
+    <PageSection title="近期日志" description="展示后台最近的关键操作，方便回看治理动作。">
+      <div v-if="adminStore.dashboardOverview.recentLogs.length" class="table-stack">
+        <el-table :data="adminStore.dashboardOverview.recentLogs" stripe>
+          <el-table-column prop="action" label="动作" />
+          <el-table-column prop="operatorName" label="操作人" />
+          <el-table-column prop="targetNo" label="目标编号" />
+          <el-table-column label="时间">
+            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <p v-else class="muted-text">暂无日志数据。</p>
     </PageSection>
   </div>
 </template>

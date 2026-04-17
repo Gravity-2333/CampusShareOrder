@@ -33,6 +33,12 @@ export const useAdminStore = defineStore('admin', {
     },
     complaintsLoading: false,
     complaintsPage: defaultPageData(),
+    dashboardLoading: false,
+    dashboardOverview: {
+      recentComplaints: [],
+      recentLogs: [],
+      recentOrders: [],
+    },
     logsLoading: false,
     logsPage: defaultPageData(),
     metrics: {
@@ -238,6 +244,31 @@ export const useAdminStore = defineStore('admin', {
       }
 
       return this.metrics
+    },
+    async loadDashboardOverview() {
+      this.dashboardLoading = true
+
+      try {
+        const [metrics, orders, complaints, logs] = await Promise.all([
+          this.loadDashboardMetrics(),
+          getAdminOrders({ page: 1, pageSize: 5 }),
+          getAdminComplaints({ page: 1, pageSize: 5 }),
+          getOperationLogs({ page: 1, pageSize: 5 }),
+        ])
+
+        this.dashboardOverview = {
+          recentComplaints: complaints.list,
+          recentLogs: logs.list,
+          recentOrders: orders.list,
+        }
+
+        return {
+          metrics,
+          overview: this.dashboardOverview,
+        }
+      } finally {
+        this.dashboardLoading = false
+      }
     },
   },
 })

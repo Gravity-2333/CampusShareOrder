@@ -291,6 +291,35 @@
   color: var(--color-primary);
 }
 
+.admin-quick-grid {
+  display: grid;
+  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.admin-quick-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-medium);
+  color: var(--color-text);
+  cursor: pointer;
+  display: grid;
+  gap: var(--space-2xs);
+  padding: 1rem 1.1rem;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.admin-quick-card:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 42%, transparent);
+  transform: translateY(-1px);
+}
+
+.admin-quick-card span {
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
 .detail-list {
   display: grid;
   gap: 0.65rem;

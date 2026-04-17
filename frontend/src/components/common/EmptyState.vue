@@ -5,7 +5,7 @@ defineProps({
     type: String,
   },
   kicker: {
-    default: '空状态',
+    default: '',
     type: String,
   },
   title: {
@@ -17,7 +17,7 @@ defineProps({
 
 <template>
   <div class="empty-state surface-card">
-    <p class="section-kicker">{{ kicker }}</p>
+    <p v-if="kicker" class="section-kicker">{{ kicker }}</p>
     <h3>{{ title }}</h3>
     <p>{{ description }}</p>
     <slot />

@@ -220,11 +220,17 @@ onMounted(() => {
               <li><span>发起人</span><strong>{{ detail.initiatorInfo.nickname }}</strong></li>
               <li><span>联系方式</span><strong>{{ detail.initiatorInfo.phoneMasked || '--' }}</strong></li>
               <li><span>学号</span><strong>{{ detail.initiatorInfo.studentNoMasked || '--' }}</strong></li>
+              <li><span>查看身份</span><strong>{{ formatRole(detail.viewerRoleInOrder) }}</strong></li>
               <li>
                 <span>成员进度</span>
                 <strong>{{ detail.basicInfo.currentMemberCount }}/{{ detail.basicInfo.totalMemberCount }}</strong>
               </li>
             </ul>
+
+            <div class="detail-note">
+              <span>商品备注</span>
+              <p>{{ detail.basicInfo.productDesc || '暂无备注说明' }}</p>
+            </div>
           </div>
 
           <div class="surface-card detail-panel">
@@ -312,6 +318,10 @@ onMounted(() => {
                 <strong>{{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}</strong>
               </li>
               <li>
+                <span>上传截止</span>
+                <strong>{{ formatDateTime(detail.basicInfo.receiptUploadDeadlineAt) }}</strong>
+              </li>
+              <li>
                 <span>上传时间</span>
                 <strong>{{ detail.receiptInfo ? formatDateTime(detail.receiptInfo.uploadedAt) : '--' }}</strong>
               </li>
@@ -329,6 +339,10 @@ onMounted(() => {
               <li>
                 <span>自动确认时间</span>
                 <strong>{{ formatDateTime(detail.receiveInfo.autoConfirmDeadlineAt) }}</strong>
+              </li>
+              <li>
+                <span>预计送达截止</span>
+                <strong>{{ formatDateTime(detail.basicInfo.expectedDeliveryEndAt) }}</strong>
               </li>
             </ul>
 

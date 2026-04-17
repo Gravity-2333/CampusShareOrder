@@ -1,5 +1,5 @@
 import { getAccessToken } from '../utils/auth'
-import { findUserByToken, getDatabase, makeFailure, timestamp } from './database'
+import { findUserByToken, getDatabase, makeFailure } from './database'
 
 export const sleep = (ms = 180) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -51,6 +51,71 @@ export const maskPhone = (value) =>
 export const maskStudentNo = (value) =>
   value ? `${value.slice(0, 2)}****${value.slice(-2)}` : ''
 
+const compareTimeline = (left, right) => String(left.at).localeCompare(String(right.at))
+
+const buildTimeline = (order, complaints) => {
+  const timeline = [
+    {
+      action: 'ORDER_CREATED',
+      at: order.members[0]?.joinedAt || order.deadlineAt,
+      description: `拼单 ${order.orderNo} 已创建`,
+    },
+  ]
+
+  order.members.forEach((member) => {
+    if (member.joinedAt) {
+      timeline.push({
+        action: member.role === 'INITIATOR' ? 'INITIATOR_JOINED' : 'MEMBER_JOINED',
+        at: member.joinedAt,
+        description:
+          member.role === 'INITIATOR'
+            ? `${member.nickname} 发起了本次拼单`
+            : `${member.nickname} 已加入拼单`,
+      })
+    }
+
+    if (member.joinStatus === 'EXITED') {
+      timeline.push({
+        action: 'MEMBER_EXITED',
+        at: order.deadlineAt,
+        description: `${member.nickname} 已退出拼单`,
+      })
+    }
+  })
+
+  if (order.receiptUploadedAt) {
+    timeline.push({
+      action: 'RECEIPT_UPLOADED',
+      at: order.receiptUploadedAt,
+      description: '发起人已上传购买凭证',
+    })
+  }
+
+  if (order.deliveredAt) {
+    timeline.push({
+      action: 'ORDER_DELIVERED',
+      at: order.deliveredAt,
+      description: '订单已确认送达，等待成员确认收货',
+    })
+  }
+
+  complaints.forEach((complaint) => {
+    timeline.push({
+      action: 'COMPLAINT_CREATED',
+      at: complaint.createdAt,
+      description: `订单已产生投诉 ${complaint.complaintNo}`,
+    })
+  })
+
+  timeline.push({
+    action: 'ORDER_STATUS',
+    at: order.deliveredAt || order.receiptUploadedAt || order.deadlineAt,
+    description: `当前订单状态为 ${order.status}`,
+  })
+
+  return timeline.sort(compareTimeline)
+}
+
 export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
   const database = getDatabase()
   const order = database.orders.find((item) => item.orderId === Number(orderId))
@@ -65,30 +130,38 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
     database.complaints.find(
       (item) => item.orderId === order.orderId && item.complainantUserId === viewerId,
     ) || null
+  const orderComplaints = database.complaints.filter((item) => item.orderId === order.orderId)
   const hasActiveSlot = order.currentMemberCount < order.totalMemberCount
+
   const canJoin =
     !isAdmin &&
     order.status === 'OPEN' &&
     !currentUserMember &&
     hasActiveSlot &&
     Boolean(viewerId)
+
   const canPay =
     !isAdmin &&
     order.status === 'OPEN' &&
     currentUserMember?.joinStatus === 'ACTIVE' &&
     currentUserMember?.payStatus === 'UNPAID'
+
   const canExit =
     !isAdmin &&
     order.status === 'OPEN' &&
     currentUserMember?.role === 'MEMBER' &&
     currentUserMember?.joinStatus === 'ACTIVE'
+
   const canUploadReceipt = !isAdmin && order.status === 'GROUPED' && order.creatorUserId === viewerId
+
   const canMarkDelivered =
     !isAdmin && order.status === 'WAIT_DELIVERY' && order.creatorUserId === viewerId
+
   const canConfirmReceived =
     !isAdmin &&
     order.status === 'WAIT_RECEIVE' &&
     currentUserMember?.receiveStatus === 'WAIT_CONFIRM'
+
   const canCreateComplaint =
     !isAdmin &&
     order.complaintOpened &&
@@ -124,7 +197,7 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
       totalMemberCount: order.totalMemberCount,
     },
     complaintInfo: {
-      complaintCount: database.complaints.filter((item) => item.orderId === order.orderId).length,
+      complaintCount: orderComplaints.length,
       complaintOpened: order.complaintOpened,
       myComplaintId: myComplaint?.complaintId || null,
       myComplaintStatus: myComplaint?.status || null,
@@ -169,7 +242,7 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
       ? {
           actualTotalAmount: order.actualTotalAmount,
           receiptImageUrl: 'https://dummyimage.com/640x480/f3f1ea/2f3c32&text=Order+Receipt',
-          uploadedAt: timestamp(),
+          uploadedAt: order.receiptUploadedAt || order.receiptUploadDeadlineAt || order.deadlineAt,
         }
       : null,
     receiveInfo: {
@@ -180,18 +253,7 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
         receiveStatus: item.receiveStatus,
       })),
     },
-    timeline: [
-      {
-        action: 'ORDER_CREATED',
-        at: order.members[0]?.joinedAt || order.deadlineAt,
-        description: `拼单 ${order.orderNo} 已创建`,
-      },
-      {
-        action: 'ORDER_STATUS',
-        at: timestamp(),
-        description: `当前订单状态为 ${order.status}`,
-      },
-    ],
+    timeline: buildTimeline(order, orderComplaints),
     viewerRoleInOrder: isAdmin ? 'ADMIN' : currentUserMember?.role || 'VISITOR',
   }
 }

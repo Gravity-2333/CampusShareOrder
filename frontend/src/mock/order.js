@@ -41,6 +41,7 @@ export const createOrder = async (payload) => {
       pickupPoint: payload.pickupPoint,
       productDesc: payload.productDesc || '',
       productName: payload.productName,
+      receiptUploadedAt: null,
       receiptUploadDeadlineAt: '',
       status: 'OPEN',
     }
@@ -207,6 +208,7 @@ export const uploadReceipt = async (orderId, payload) => {
     }
 
     order.actualTotalAmount = Number(payload.actualTotalAmount)
+    order.receiptUploadedAt = timestamp()
     order.status = 'WAIT_DELIVERY'
   })
 

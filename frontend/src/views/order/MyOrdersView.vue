@@ -8,7 +8,7 @@ import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
-import { formatOrderStatus } from '../../utils/format'
+import { formatOrderStatus, formatPayStatus, formatReceiveStatus, formatRole } from '../../utils/format'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -42,7 +42,16 @@ onMounted(loadOrders)
       >
         <el-table-column prop="orderNo" label="订单号" />
         <el-table-column prop="productName" label="商品" />
-        <el-table-column prop="myRole" label="我的角色" />
+        <el-table-column label="我的角色">
+          <template #default="{ row }">{{ formatRole(row.myRole) }}</template>
+        </el-table-column>
+        <el-table-column prop="myJoinStatus" label="参与状态" />
+        <el-table-column label="支付状态">
+          <template #default="{ row }">{{ formatPayStatus(row.myPayStatus) }}</template>
+        </el-table-column>
+        <el-table-column label="收货状态">
+          <template #default="{ row }">{{ formatReceiveStatus(row.myReceiveStatus) }}</template>
+        </el-table-column>
         <el-table-column label="订单状态">
           <template #default="{ row }">
             <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />

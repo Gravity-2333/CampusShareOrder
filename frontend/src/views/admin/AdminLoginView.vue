@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useAppStore } from '../../stores/app'
 import { useUserStore } from '../../stores/user'
-import { firstValidationError, validatePassword, requireValue } from '../../utils/validate'
+import { firstValidationError, requireValue, validatePassword } from '../../utils/validate'
 
 const router = useRouter()
 const appStore = useAppStore()

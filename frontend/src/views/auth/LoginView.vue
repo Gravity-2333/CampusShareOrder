@@ -28,10 +28,7 @@ const applyDemoAccount = (phone) => {
 }
 
 const handleSubmit = async () => {
-  const errorMessage = firstValidationError([
-    validatePhone(form.phone),
-    validatePassword(form.password),
-  ])
+  const errorMessage = firstValidationError([validatePhone(form.phone), validatePassword(form.password)])
 
   if (errorMessage) {
     ElMessage.warning(errorMessage)
@@ -59,7 +56,7 @@ const handleSubmit = async () => {
       <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
       <p>
         当前运行模式为 <strong>{{ appStore.apiMode }}</strong
-        >，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
+        >，页面只通过统一 API 方法取数，后续切换到 live 模式时不需要逐页清理假数据。
       </p>
       <div v-if="appStore.apiMode === 'mock'" class="page-actions">
         <el-button

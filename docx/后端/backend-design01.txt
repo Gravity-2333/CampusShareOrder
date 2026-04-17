@@ -1,0 +1,1868 @@
+According to a document from 2026-04-17，下面是**后端冻结版开发契约文档**。这份文档以前端冻结契约为最高对齐基线，同时吸收系统设计文档、需求文档、开发规划文档以及当前 `backend-tree.txt` 的真实目录状态；当前后端仍只有 `SecurityConfig`、`TestController` 和若干占位 package / class，因此以下内容直接作为后端建表、建类、编码、联调和验收的唯一版本。  
+
+---
+
+# 1. 后端最终包结构
+
+后端必须保持**一个 Spring Boot 单体项目**，按业务包分工，不拆 Maven 多模块；当前仓库中的 `common/api.java`、`common/enums.java`、`common/exception.java`、`common/util.java`、`service/impl.java`、`scheduler/` 都属于占位结构，必须替换成下面这套最终结构。  
+
+```text
+backend/src/main/java/com/campusshareorder/backend/
+├─ config
+│  ├─ CorsConfig.java
+│  ├─ JacksonConfig.java
+│  ├─ JwtProperties.java
+│  ├─ MyBatisPlusConfig.java
+│  ├─ ResourceMappingConfig.java
+│  ├─ SecurityConfig.java
+│  └─ StorageProperties.java
+├─ common
+│  ├─ response
+│  │  ├─ ApiResponse.java
+│  │  └─ PageResult.java
+│  ├─ exception
+│  │  ├─ BusinessException.java
+│  │  └─ GlobalExceptionHandler.java
+│  ├─ enums
+│  │  ├─ ErrorCodeEnum.java
+│  │  ├─ RoleEnum.java
+│  │  ├─ UserStatusEnum.java
+│  │  ├─ OrderStatusEnum.java
+│  │  ├─ JoinStatusEnum.java
+│  │  ├─ PayStatusEnum.java
+│  │  ├─ ReceiveStatusEnum.java
+│  │  ├─ ComplaintTypeEnum.java
+│  │  ├─ ComplaintStatusEnum.java
+│  │  ├─ CapitalRecordTypeEnum.java
+│  │  ├─ CapitalRecordStatusEnum.java
+│  │  ├─ CreditReasonTypeEnum.java
+│  │  ├─ NotificationTypeEnum.java
+│  │  ├─ OperatorTypeEnum.java
+│  │  ├─ BizTypeEnum.java
+│  │  └─ ViewerRoleEnum.java
+│  └─ util
+│     ├─ BigDecimalUtil.java
+│     ├─ BizNoGenerator.java
+│     ├─ CurrentLoginUtil.java
+│     ├─ JwtUtil.java
+│     ├─ MaskUtil.java
+│     ├─ OrderNoGenerator.java
+│     ├─ PasswordUtil.java
+│     └─ TimeUtil.java
+├─ controller
+│  ├─ auth
+│  │  └─ AuthController.java
+│  ├─ user
+│  │  └─ UserController.java
+│  ├─ order
+│  │  └─ OrderController.java
+│  ├─ complaint
+│  │  └─ ComplaintController.java
+│  └─ admin
+│     ├─ AdminUserController.java
+│     ├─ AdminOrderController.java
+│     ├─ AdminComplaintController.java
+│     └─ AdminRecordController.java
+├─ dto
+│  ├─ auth
+│  ├─ user
+│  ├─ order
+│  ├─ complaint
+│  └─ admin
+├─ vo
+│  ├─ auth
+│  ├─ user
+│  ├─ order
+│  ├─ complaint
+│  └─ admin
+├─ entity
+├─ mapper
+├─ security
+│  ├─ JwtAuthenticationFilter.java
+│  ├─ LoginIdentity.java
+│  ├─ RestAccessDeniedHandler.java
+│  └─ RestAuthenticationEntryPoint.java
+├─ service
+│  ├─ AuthService.java
+│  ├─ UserService.java
+│  ├─ OrderService.java
+│  ├─ ComplaintService.java
+│  ├─ AdminUserService.java
+│  ├─ AdminOrderService.java
+│  ├─ AdminComplaintService.java
+│  ├─ AdminRecordService.java
+│  ├─ NotificationService.java
+│  ├─ CapitalRecordService.java
+│  ├─ CreditService.java
+│  └─ OperationLogService.java
+├─ service/impl
+│  ├─ AuthServiceImpl.java
+│  ├─ UserServiceImpl.java
+│  ├─ OrderServiceImpl.java
+│  ├─ ComplaintServiceImpl.java
+│  ├─ AdminUserServiceImpl.java
+│  ├─ AdminOrderServiceImpl.java
+│  ├─ AdminComplaintServiceImpl.java
+│  ├─ AdminRecordServiceImpl.java
+│  ├─ NotificationServiceImpl.java
+│  ├─ CapitalRecordServiceImpl.java
+│  ├─ CreditServiceImpl.java
+│  └─ OperationLogServiceImpl.java
+└─ task
+   └─ OrderScheduler.java
+```
+
+## 各层职责
+
+| 层 / 包              | 最终职责                                                  |
+| ------------------ | ----------------------------------------------------- |
+| `config`           | Spring 配置、Jackson 时间格式、MyBatis-Plus、资源映射、JWT/文件存储配置绑定 |
+| `common.response`  | 统一返回体 `ApiResponse<T>`、统一分页体 `PageResult<T>`          |
+| `common.exception` | 统一业务异常、全局异常处理                                         |
+| `common.enums`     | 所有状态、角色、错误码、记录类型枚举                                    |
+| `common.util`      | JWT、编号生成、当前登录人获取、金额处理、时间处理、脱敏工具                       |
+| `controller`       | 只接收请求、校验参数、调用 Service、返回统一 JSON                       |
+| `dto`              | 所有入参对象，字段名与前端 JSON 完全一致                               |
+| `vo`               | 所有出参对象，字段名与前端 JSON 完全一致                               |
+| `entity`           | 与数据库表一一对应的持久化对象                                       |
+| `mapper`           | MyBatis-Plus Mapper，负责数据库 CRUD / 自定义 SQL              |
+| `security`         | JWT 解析、认证注入、未登录/无权限处理                                 |
+| `service`          | 业务接口，定义模块能力                                           |
+| `service.impl`     | 业务实现，所有状态流转、退款、投诉、日志、通知都写在这里                          |
+| `task`             | 只放 `@Scheduled` 任务，不放业务细节；任务内部调用 Service              |
+
+### 冲突修正说明
+
+1. 当前仓库的 `scheduler` 包统一更名为 `task`。
+2. 当前仓库的 `common/api.java` 统一拆为 `common/response/ApiResponse.java`。
+3. 当前仓库的 `service/impl.java` 必须删除，改成真实的 `*ServiceImpl.java`。
+4. 后端保持**一个** Spring Boot 项目，不拆多项目。 
+
+---
+
+# 2. 最终 Entity 设计
+
+系统核心实体固定为 10 个：`UserAccount`、`AdminAccount`、`GroupOrder`、`GroupOrderMember`、`OrderReceipt`、`Complaint`、`CapitalRecord`、`CreditChangeRecord`、`Notification`、`OperationLog`。字段范围、表范围、状态字段拆分、唯一约束、索引方向，全部与系统设计文档、开发规划和前端冻结契约对齐。  
+
+## 2.1 不直接入库、只做聚合返回的字段总表
+
+| 前端字段                                | 来源                                         | 是否数据库直接字段 |
+| ----------------------------------- | ------------------------------------------ | --------- |
+| `viewerRoleInOrder`                 | 当前用户 + 订单创建人 + 成员关系聚合                      | 否         |
+| `creatorNickname`                   | `user_account.nickname` 关联查询               | 否         |
+| `remainingCount`                    | `totalMemberCount - currentMemberCount`    | 否         |
+| `currentUserJoined`                 | 当前用户是否存在 `group_order_member`              | 否         |
+| `currentUserPayStatus`              | 当前用户成员行 `pay_status`                       | 否         |
+| `initiatorInfo.phoneMasked`         | `user_account.phone` 脱敏                    | 否         |
+| `initiatorInfo.studentNoMasked`     | `user_account.student_no` 脱敏               | 否         |
+| `paymentSummary.*` 中统计字段            | `group_order_member` / `capital_record` 聚合 | 否         |
+| `receiveInfo.autoConfirmDeadlineAt` | `deliveredAt + 30 分钟`                      | 否         |
+| `timeline`                          | `operation_log` + 系统拼装                     | 否         |
+| `complaintInfo.myComplaintId`       | 当前用户对当前订单的投诉记录聚合                           | 否         |
+| `complaintInfo.myComplaintStatus`   | 当前用户对当前订单的投诉状态聚合                           | 否         |
+| `complaintInfo.complaintCount`      | 当前订单投诉数聚合                                  | 否         |
+| `actionFlags.*`                     | 状态机 + 身份 + 当前成员状态聚合                        | 否         |
+| `CapitalRecordItemVO.userNickname`  | `user_account.nickname` 关联查询               | 否         |
+| `OperationLogItemVO.operatorName`   | 用户/管理员名或系统常量聚合                             | 否         |
+
+## 2.2 `UserAccount`
+
+| 字段名            | Java 类型         | 数据库字段名          | 可空 | 约束 / 索引                                  | 说明              |
+| -------------- | --------------- | --------------- | -: | ---------------------------------------- | --------------- |
+| `id`           | `Long`          | `id`            |  否 | PK                                       | 用户主键            |
+| `phone`        | `String`        | `phone`         |  否 | UK `uk_user_account_phone`               | 手机号             |
+| `passwordHash` | `String`        | `password_hash` |  否 |                                          | BCrypt 哈希       |
+| `nickname`     | `String`        | `nickname`      |  否 |                                          | 昵称              |
+| `studentNo`    | `String`        | `student_no`    |  是 | UK `uk_user_account_student_no`          | 学号，实名后写入        |
+| `isVerified`   | `Boolean`       | `is_verified`   |  否 |                                          | 是否实名            |
+| `creditScore`  | `Integer`       | `credit_score`  |  否 |                                          | 默认 80           |
+| `status`       | `String`        | `status`        |  否 | IDX `idx_user_account_status_created_at` | `NORMAL/BANNED` |
+| `contactInfo`  | `String`        | `contact_info`  |  是 |                                          | 联系方式            |
+| `createdAt`    | `LocalDateTime` | `created_at`    |  否 | IDX `idx_user_account_status_created_at` | 创建时间            |
+| `updatedAt`    | `LocalDateTime` | `updated_at`    |  否 |                                          | 更新时间            |
+
+## 2.3 `AdminAccount`
+
+| 字段名            | Java 类型         | 数据库字段名          | 可空 | 约束 / 索引                        | 说明              |
+| -------------- | --------------- | --------------- | -: | ------------------------------ | --------------- |
+| `id`           | `Long`          | `id`            |  否 | PK                             | 管理员主键           |
+| `username`     | `String`        | `username`      |  否 | UK `uk_admin_account_username` | 管理员用户名          |
+| `passwordHash` | `String`        | `password_hash` |  否 |                                | BCrypt 哈希       |
+| `status`       | `String`        | `status`        |  否 |                                | `NORMAL/BANNED` |
+| `createdAt`    | `LocalDateTime` | `created_at`    |  否 |                                | 创建时间            |
+| `lastLoginAt`  | `LocalDateTime` | `last_login_at` |  是 |                                | 最近登录时间          |
+
+## 2.4 `GroupOrder`
+
+| 字段名                       | Java 类型         | 数据库字段名                       | 可空 | 约束 / 索引                                                                                                                                     | 说明                                                           |
+| ------------------------- | --------------- | ---------------------------- | -: | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `id`                      | `Long`          | `id`                         |  否 | PK                                                                                                                                          | 订单主键                                                         |
+| `orderNo`                 | `String`        | `order_no`                   |  否 | UK `uk_group_order_order_no`                                                                                                                | 拼单编号                                                         |
+| `creatorUserId`           | `Long`          | `creator_user_id`            |  否 | IDX `idx_group_order_creator_created_at`                                                                                                    | 发起人 ID                                                       |
+| `productName`             | `String`        | `product_name`               |  否 |                                                                                                                                             | 商品名称                                                         |
+| `productDesc`             | `String`        | `product_desc`               |  是 |                                                                                                                                             | 商品描述                                                         |
+| `totalMemberCount`        | `Integer`       | `total_member_count`         |  否 |                                                                                                                                             | 总人数，包含发起人                                                    |
+| `currentMemberCount`      | `Integer`       | `current_member_count`       |  否 |                                                                                                                                             | 当前有效成员人数，只统计 `ACTIVE`                                        |
+| `estimatedTotalAmount`    | `BigDecimal`    | `estimated_total_amount`     |  否 |                                                                                                                                             | 预估总额                                                         |
+| `estimatedPerAmount`      | `BigDecimal`    | `estimated_per_amount`       |  否 |                                                                                                                                             | 预估人均，创建时写入                                                   |
+| `actualTotalAmount`       | `BigDecimal`    | `actual_total_amount`        |  是 |                                                                                                                                             | 实际总额                                                         |
+| `actualPerAmount`         | `BigDecimal`    | `actual_per_amount`          |  是 |                                                                                                                                             | 实际人均，上传凭证时写入                                                 |
+| `pickupPoint`             | `String`        | `pickup_point`               |  否 |                                                                                                                                             | 取货点                                                          |
+| `deadlineAt`              | `LocalDateTime` | `deadline_at`                |  否 | IDX `idx_group_order_status_deadline_at`                                                                                                    | 截止时间                                                         |
+| `receiptUploadDeadlineAt` | `LocalDateTime` | `receipt_upload_deadline_at` |  是 | IDX `idx_group_order_status_receipt_deadline_at`                                                                                            | 成团后上传凭证截止                                                    |
+| `expectedDeliveryStartAt` | `LocalDateTime` | `expected_delivery_start_at` |  是 |                                                                                                                                             | 预计最早送达                                                       |
+| `expectedDeliveryEndAt`   | `LocalDateTime` | `expected_delivery_end_at`   |  是 | IDX `idx_group_order_status_expected_delivery_end_at`                                                                                       | 预计最晚送达                                                       |
+| `deliveredAt`             | `LocalDateTime` | `delivered_at`               |  是 |                                                                                                                                             | 实际送达时间                                                       |
+| `status`                  | `String`        | `status`                     |  否 | IDX `idx_group_order_status_deadline_at` / `idx_group_order_status_receipt_deadline_at` / `idx_group_order_status_expected_delivery_end_at` | `OPEN/GROUPED/WAIT_DELIVERY/WAIT_RECEIVE/COMPLETED/CANCELED` |
+| `cancelReason`            | `String`        | `cancel_reason`              |  是 |                                                                                                                                             | 取消原因                                                         |
+| `complaintOpened`         | `Boolean`       | `complaint_opened`           |  否 |                                                                                                                                             | 是否已开放逾期投诉                                                    |
+| `createdAt`               | `LocalDateTime` | `created_at`                 |  否 | IDX `idx_group_order_creator_created_at`                                                                                                    | 创建时间                                                         |
+| `updatedAt`               | `LocalDateTime` | `updated_at`                 |  否 |                                                                                                                                             | 更新时间                                                         |
+
+## 2.5 `GroupOrderMember`
+
+| 字段名                 | Java 类型         | 数据库字段名                | 可空 | 约束 / 索引                                                                                                              | 说明                                              |
+| ------------------- | --------------- | --------------------- | -: | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `id`                | `Long`          | `id`                  |  否 | PK                                                                                                                   | 成员主键                                            |
+| `groupOrderId`      | `Long`          | `group_order_id`      |  否 | UK `uk_group_order_member_order_user` / IDX `idx_group_order_member_order_join` / `idx_group_order_member_order_pay` | 订单 ID                                           |
+| `userId`            | `Long`          | `user_id`             |  否 | UK `uk_group_order_member_order_user` / IDX `idx_group_order_member_user_created_at`                                 | 用户 ID                                           |
+| `isCreator`         | `Boolean`       | `is_creator`          |  否 |                                                                                                                      | 是否发起人                                           |
+| `remark`            | `String`        | `remark`              |  是 |                                                                                                                      | 备注                                              |
+| `joinStatus`        | `String`        | `join_status`         |  否 | IDX `idx_group_order_member_order_join`                                                                              | `ACTIVE/EXITED/CANCELED`                        |
+| `payStatus`         | `String`        | `pay_status`          |  否 | IDX `idx_group_order_member_order_pay`                                                                               | `UNPAID/PAID`                                   |
+| `payAmount`         | `BigDecimal`    | `pay_amount`          |  否 |                                                                                                                      | 已支付金额                                           |
+| `paidAt`            | `LocalDateTime` | `paid_at`             |  是 |                                                                                                                      | 支付时间                                            |
+| `refundAmountTotal` | `BigDecimal`    | `refund_amount_total` |  否 |                                                                                                                      | 累计退款金额                                          |
+| `receiveStatus`     | `String`        | `receive_status`      |  否 | IDX `idx_group_order_member_order_receive`                                                                           | `NOT_READY/WAIT_CONFIRM/RECEIVED/AUTO_RECEIVED` |
+| `receivedAt`        | `LocalDateTime` | `received_at`         |  是 |                                                                                                                      | 收货时间                                            |
+| `createdAt`         | `LocalDateTime` | `created_at`          |  否 | IDX `idx_group_order_member_user_created_at`                                                                         | 创建时间                                            |
+| `updatedAt`         | `LocalDateTime` | `updated_at`          |  否 |                                                                                                                      | 更新时间                                            |
+
+## 2.6 `OrderReceipt`
+
+| 字段名                       | Java 类型         | 数据库字段名                       | 可空 | 约束 / 索引                                      | 说明        |
+| ------------------------- | --------------- | ---------------------------- | -: | -------------------------------------------- | --------- |
+| `id`                      | `Long`          | `id`                         |  否 | PK                                           | 凭证主键      |
+| `groupOrderId`            | `Long`          | `group_order_id`             |  否 | UK `uk_order_receipt_group_order_id`         | 一单一凭证     |
+| `uploaderUserId`          | `Long`          | `uploader_user_id`           |  否 | IDX `idx_order_receipt_uploader_uploaded_at` | 上传人，固定发起人 |
+| `imageUrl`                | `String`        | `image_url`                  |  否 |                                              | 图片访问路径    |
+| `actualTotalAmount`       | `BigDecimal`    | `actual_total_amount`        |  否 |                                              | 实际总额      |
+| `expectedDeliveryStartAt` | `LocalDateTime` | `expected_delivery_start_at` |  否 |                                              | 预计最早送达    |
+| `expectedDeliveryEndAt`   | `LocalDateTime` | `expected_delivery_end_at`   |  否 |                                              | 预计最晚送达    |
+| `uploadedAt`              | `LocalDateTime` | `uploaded_at`                |  否 | IDX `idx_order_receipt_uploader_uploaded_at` | 上传时间      |
+
+## 2.7 `Complaint`
+
+| 字段名                 | Java 类型         | 数据库字段名                | 可空 | 约束 / 索引                                                                                                        | 说明                           |
+| ------------------- | --------------- | --------------------- | -: | -------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `id`                | `Long`          | `id`                  |  否 | PK                                                                                                             | 投诉主键                         |
+| `complaintNo`       | `String`        | `complaint_no`        |  否 | UK `uk_complaint_complaint_no`                                                                                 | 投诉编号                         |
+| `groupOrderId`      | `Long`          | `group_order_id`      |  否 | UK `uk_complaint_order_complainant` / IDX `idx_complaint_status_created_at` / `idx_complaint_order_created_at` | 订单 ID                        |
+| `complainantUserId` | `Long`          | `complainant_user_id` |  否 | UK `uk_complaint_order_complainant`                                                                            | 投诉人 ID                       |
+| `accusedUserId`     | `Long`          | `accused_user_id`     |  否 | IDX `idx_complaint_accused_status_created_at`                                                                  | 被投诉人 ID，固定发起人                |
+| `type`              | `String`        | `type`                |  否 | IDX `idx_complaint_type_status_created_at`                                                                     | `NOT_PURCHASED/FAKE_RECEIPT` |
+| `content`           | `String`        | `content`             |  否 |                                                                                                                | 投诉内容                         |
+| `status`            | `String`        | `status`              |  否 | IDX `idx_complaint_status_created_at` / `idx_complaint_type_status_created_at`                                 | `PENDING/PROCESSED`          |
+| `openedBySystem`    | `Boolean`       | `opened_by_system`    |  否 |                                                                                                                | 是否由系统开放投诉通道                  |
+| `handledByAdminId`  | `Long`          | `handled_by_admin_id` |  是 |                                                                                                                | 处理管理员 ID                     |
+| `handleResult`      | `String`        | `handle_result`       |  是 |                                                                                                                | 处理结果说明                       |
+| `createdAt`         | `LocalDateTime` | `created_at`          |  否 | IDX `idx_complaint_status_created_at` / `idx_complaint_order_created_at`                                       | 创建时间                         |
+| `handledAt`         | `LocalDateTime` | `handled_at`          |  是 |                                                                                                                | 处理时间                         |
+
+## 2.8 `CapitalRecord`
+
+| 字段名            | Java 类型         | 数据库字段名           | 可空 | 约束 / 索引                                                                               | 说明                                                |
+| -------------- | --------------- | ---------------- | -: | ------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| `id`           | `Long`          | `id`             |  否 | PK                                                                                    | 流水主键                                              |
+| `bizNo`        | `String`        | `biz_no`         |  否 | UK `uk_capital_record_biz_no`                                                         | 业务号                                               |
+| `userId`       | `Long`          | `user_id`        |  否 | IDX `idx_capital_record_user_created_at`                                              | 用户 ID                                             |
+| `groupOrderId` | `Long`          | `group_order_id` |  否 | IDX `idx_capital_record_order_type_created_at`                                        | 订单 ID                                             |
+| `memberId`     | `Long`          | `member_id`      |  是 | IDX `idx_capital_record_member_created_at`                                            | 成员 ID                                             |
+| `type`         | `String`        | `type`           |  否 | IDX `idx_capital_record_order_type_created_at`                                        | `PAY/REFUND_DIFF/REFUND_CANCEL/SETTLE_TO_CREATOR` |
+| `amount`       | `BigDecimal`    | `amount`         |  否 |                                                                                       | 金额                                                |
+| `status`       | `String`        | `status`         |  否 |                                                                                       | V1 固定 `SUCCESS`                                   |
+| `remark`       | `String`        | `remark`         |  是 |                                                                                       | 备注                                                |
+| `createdAt`    | `LocalDateTime` | `created_at`     |  否 | IDX `idx_capital_record_user_created_at` / `idx_capital_record_order_type_created_at` | 创建时间                                              |
+| `successAt`    | `LocalDateTime` | `success_at`     |  否 |                                                                                       | 成功时间                                              |
+
+## 2.9 `CreditChangeRecord`
+
+| 字段名                  | Java 类型         | 数据库字段名                 | 可空 | 约束 / 索引                                                                                       | 说明                                   |
+| -------------------- | --------------- | ---------------------- | -: | --------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `id`                 | `Long`          | `id`                   |  否 | PK                                                                                            | 信用分记录主键                              |
+| `userId`             | `Long`          | `user_id`              |  否 | IDX `idx_credit_change_record_user_created_at`                                                | 用户 ID                                |
+| `changeValue`        | `Integer`       | `change_value`         |  否 |                                                                                               | 变化值                                  |
+| `reasonType`         | `String`        | `reason_type`          |  否 | IDX `idx_credit_change_record_reason_created_at`                                              | `ORDER_FINISHED/COMPLAINT_CONFIRMED` |
+| `relatedOrderId`     | `Long`          | `related_order_id`     |  是 | IDX `idx_credit_change_record_order_id`                                                       | 关联订单                                 |
+| `relatedComplaintId` | `Long`          | `related_complaint_id` |  是 | IDX `idx_credit_change_record_complaint_id`                                                   | 关联投诉                                 |
+| `remark`             | `String`        | `remark`               |  是 |                                                                                               | 备注                                   |
+| `createdAt`          | `LocalDateTime` | `created_at`           |  否 | IDX `idx_credit_change_record_user_created_at` / `idx_credit_change_record_reason_created_at` | 创建时间                                 |
+
+## 2.10 `Notification`
+
+| 字段名                  | Java 类型         | 数据库字段名                 | 可空 | 约束 / 索引                                                                               | 说明    |
+| -------------------- | --------------- | ---------------------- | -: | ------------------------------------------------------------------------------------- | ----- |
+| `id`                 | `Long`          | `id`                   |  否 | PK                                                                                    | 通知主键  |
+| `userId`             | `Long`          | `user_id`              |  否 | IDX `idx_notification_user_read_created_at`                                           | 用户 ID |
+| `type`               | `String`        | `type`                 |  否 | IDX `idx_notification_user_type_created_at`                                           | 通知类型  |
+| `title`              | `String`        | `title`                |  否 |                                                                                       | 标题    |
+| `content`            | `String`        | `content`              |  否 |                                                                                       | 内容    |
+| `isRead`             | `Boolean`       | `is_read`              |  否 | IDX `idx_notification_user_read_created_at`                                           | 是否已读  |
+| `relatedOrderId`     | `Long`          | `related_order_id`     |  是 |                                                                                       | 关联订单  |
+| `relatedComplaintId` | `Long`          | `related_complaint_id` |  是 |                                                                                       | 关联投诉  |
+| `createdAt`          | `LocalDateTime` | `created_at`           |  否 | IDX `idx_notification_user_read_created_at` / `idx_notification_user_type_created_at` | 创建时间  |
+| `readAt`             | `LocalDateTime` | `read_at`              |  是 |                                                                                       | 已读时间  |
+
+## 2.11 `OperationLog`
+
+| 字段名            | Java 类型         | 数据库字段名          | 可空 | 约束 / 索引                                                                                                                  | 说明                             |
+| -------------- | --------------- | --------------- | -: | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| `id`           | `Long`          | `id`            |  否 | PK                                                                                                                       | 日志主键                           |
+| `operatorType` | `String`        | `operator_type` |  否 | IDX `idx_operation_log_operator_created_at`                                                                              | `USER/ADMIN/SYSTEM`            |
+| `operatorId`   | `Long`          | `operator_id`   |  是 | IDX `idx_operation_log_operator_created_at`                                                                              | 操作人 ID，系统日志可空                  |
+| `bizType`      | `String`        | `biz_type`      |  否 | IDX `idx_operation_log_biz_created_at`                                                                                   | `ORDER/COMPLAINT/CAPITAL/USER` |
+| `bizId`        | `Long`          | `biz_id`        |  是 | IDX `idx_operation_log_biz_created_at`                                                                                   | 业务对象 ID                        |
+| `action`       | `String`        | `action`        |  否 | IDX `idx_operation_log_action_created_at`                                                                                | 动作名                            |
+| `detailJson`   | `String`        | `detail_json`   |  是 |                                                                                                                          | JSON 字符串                       |
+| `createdAt`    | `LocalDateTime` | `created_at`    |  否 | IDX `idx_operation_log_operator_created_at` / `idx_operation_log_biz_created_at` / `idx_operation_log_action_created_at` | 创建时间                           |
+
+### 冲突修正说明
+
+1. `UserAccount` **不保留** `role` 字段；普通用户与管理员分表，`role` 只在 JWT 与 `GET /api/auth/me` 中返回。
+2. `GroupOrder.estimatedPerAmount`、`actualPerAmount` **作为数据库字段保留**，由后端在创建订单 / 上传凭证时计算写入；不再把它们视为纯聚合字段。
+3. `Complaint` 增加唯一约束 `group_order_id + complainant_user_id`，V1 冻结为“**同一用户对同一订单只能投诉一次**”。
+4. `CreditChangeRecord.reasonType` V1 只落两类：`ORDER_FINISHED`、`COMPLAINT_CONFIRMED`；不单独落 `NO_RECEIPT_UPLOAD` 额外扣分，避免与“投诉成立扣 10 分”重复扣分。 
+
+---
+
+# 3. DTO / VO 冻结表
+
+DTO / VO 的字段名必须与前端 JSON 名称完全一致，统一使用 `lowerCamelCase`；成功响应统一包装为 `{ code, message, data }`，分页统一包装为 `{ list, page, pageSize, total, pages }`。当前前端已经冻结接口命名、`OrderDetailVO` 模块结构、`actionFlags` 思路、状态名、测试口径，因此后端 DTO / VO 不能再自创字段或改路径。  
+
+## 3.1 Auth 模块
+
+### 3.1.1 接口映射
+
+| 接口路径                    | 方法     | Request DTO           | Response VO          |
+| ----------------------- | ------ | --------------------- | -------------------- |
+| `/api/auth/register`    | `POST` | `UserRegisterRequest` | `RegisterResultVO`   |
+| `/api/auth/login`       | `POST` | `UserLoginRequest`    | `UserLoginVO`        |
+| `/api/auth/admin/login` | `POST` | `AdminLoginRequest`   | `AdminLoginVO`       |
+| `/api/auth/me`          | `GET`  | 无                     | `CurrentLoginInfoVO` |
+| `/api/auth/logout`      | `POST` | 无                     | `SimpleResultVO`     |
+
+### 3.1.2 DTO 字段
+
+| 类名                    | 字段名        | Java 类型  | 必填 | 说明         |
+| --------------------- | ---------- | -------- | -: | ---------- |
+| `UserRegisterRequest` | `phone`    | `String` |  是 | 手机号        |
+|                       | `password` | `String` |  是 | 明文密码，服务端加密 |
+|                       | `nickname` | `String` |  是 | 昵称         |
+| `UserLoginRequest`    | `phone`    | `String` |  是 | 手机号        |
+|                       | `password` | `String` |  是 | 明文密码       |
+| `AdminLoginRequest`   | `username` | `String` |  是 | 管理员用户名     |
+|                       | `password` | `String` |  是 | 明文密码       |
+
+### 3.1.3 VO 字段
+
+| 类名                   | 字段名           | Java 类型            | 来源        | 说明           |
+| -------------------- | ------------- | ------------------ | --------- | ------------ |
+| `RegisterResultVO`   | `userId`      | `Long`             | DB        | 用户 ID        |
+|                      | `phone`       | `String`           | DB        | 手机号          |
+|                      | `nickname`    | `String`           | DB        | 昵称           |
+|                      | `isVerified`  | `Boolean`          | DB        | 初始 `false`   |
+|                      | `status`      | `String`           | DB        | `NORMAL`     |
+|                      | `creditScore` | `Integer`          | DB        | 初始 80        |
+| `LoginUserInfoVO`    | `userId`      | `Long`             | DB        | 用户 ID        |
+|                      | `phone`       | `String`           | DB        | 手机号          |
+|                      | `nickname`    | `String`           | DB        | 昵称           |
+|                      | `studentNo`   | `String`           | DB        | 学号，可空        |
+|                      | `isVerified`  | `Boolean`          | DB        | 是否实名         |
+|                      | `status`      | `String`           | DB        | 账号状态         |
+|                      | `creditScore` | `Integer`          | DB        | 信用分          |
+|                      | `contactInfo` | `String`           | DB        | 联系方式         |
+| `UserLoginVO`        | `token`       | `String`           | Aggregate | JWT          |
+|                      | `userInfo`    | `LoginUserInfoVO`  | Aggregate | 用户登录信息       |
+| `LoginAdminInfoVO`   | `adminId`     | `Long`             | DB        | 管理员 ID       |
+|                      | `username`    | `String`           | DB        | 用户名          |
+|                      | `status`      | `String`           | DB        | 状态           |
+| `AdminLoginVO`       | `token`       | `String`           | Aggregate | JWT          |
+|                      | `adminInfo`   | `LoginAdminInfoVO` | Aggregate | 管理员信息        |
+| `CurrentLoginInfoVO` | `role`        | `String`           | Aggregate | `USER/ADMIN` |
+|                      | `status`      | `String`           | DB        | 账号状态         |
+|                      | `userId`      | `Long`             | DB        | `USER` 时返回   |
+|                      | `adminId`     | `Long`             | DB        | `ADMIN` 时返回  |
+|                      | `phone`       | `String`           | DB        | `USER` 时返回   |
+|                      | `nickname`    | `String`           | DB        | `USER` 时返回   |
+|                      | `studentNo`   | `String`           | DB        | `USER` 时返回   |
+|                      | `isVerified`  | `Boolean`          | DB        | `USER` 时返回   |
+|                      | `creditScore` | `Integer`          | DB        | `USER` 时返回   |
+|                      | `contactInfo` | `String`           | DB        | `USER` 时返回   |
+|                      | `username`    | `String`           | DB        | `ADMIN` 时返回  |
+| `SimpleResultVO`     | `success`     | `Boolean`          | Aggregate | 固定 `true`    |
+
+## 3.2 User 模块
+
+### 3.2.1 接口映射
+
+| 接口路径                        | 方法     | Request DTO                | Response VO                     |
+| --------------------------- | ------ | -------------------------- | ------------------------------- |
+| `/api/users/verify-student` | `POST` | `VerifyStudentRequest`     | `VerifyStudentVO`               |
+| `/api/users/profile`        | `GET`  | 无                          | `UserProfileVO`                 |
+| `/api/users/profile`        | `PUT`  | `UpdateUserProfileRequest` | `UpdateUserProfileVO`           |
+| `/api/users/credit`         | `GET`  | `UserCreditQueryRequest`   | `UserCreditVO`                  |
+| `/api/users/my-orders`      | `GET`  | `MyOrdersQueryRequest`     | `PageResult<MyOrderListItemVO>` |
+
+### 3.2.2 DTO 字段
+
+| 类名                         | 字段名           | Java 类型   | 必填 | 说明                    |
+| -------------------------- | ------------- | --------- | -: | --------------------- |
+| `VerifyStudentRequest`     | `studentNo`   | `String`  |  是 | 学号                    |
+| `UpdateUserProfileRequest` | `nickname`    | `String`  |  是 | 昵称                    |
+|                            | `contactInfo` | `String`  |  否 | 联系方式                  |
+| `UserCreditQueryRequest`   | `page`        | `Integer` |  否 | 页码                    |
+|                            | `pageSize`    | `Integer` |  否 | 页大小                   |
+| `MyOrdersQueryRequest`     | `role`        | `String`  |  是 | `creator/participant` |
+|                            | `status`      | `String`  |  否 | 订单主状态                 |
+|                            | `page`        | `Integer` |  否 | 页码                    |
+|                            | `pageSize`    | `Integer` |  否 | 页大小                   |
+
+### 3.2.3 VO 字段
+
+| 类名                    | 字段名                     | Java 类型                          | 来源        | 说明                    |
+| --------------------- | ----------------------- | -------------------------------- | --------- | --------------------- |
+| `VerifyStudentVO`     | `userId`                | `Long`                           | DB        | 用户 ID                 |
+|                       | `studentNo`             | `String`                         | DB        | 学号                    |
+|                       | `isVerified`            | `Boolean`                        | DB        | `true`                |
+| `UserProfileVO`       | `userId`                | `Long`                           | DB        | 用户 ID                 |
+|                       | `phone`                 | `String`                         | DB        | 手机号                   |
+|                       | `nickname`              | `String`                         | DB        | 昵称                    |
+|                       | `studentNo`             | `String`                         | DB        | 学号                    |
+|                       | `isVerified`            | `Boolean`                        | DB        | 是否实名                  |
+|                       | `creditScore`           | `Integer`                        | DB        | 信用分                   |
+|                       | `status`                | `String`                         | DB        | 账号状态                  |
+|                       | `contactInfo`           | `String`                         | DB        | 联系方式                  |
+|                       | `createdAt`             | `String`                         | DB        | 创建时间                  |
+| `UpdateUserProfileVO` | `userId`                | `Long`                           | DB        | 用户 ID                 |
+|                       | `nickname`              | `String`                         | DB        | 修改后昵称                 |
+|                       | `contactInfo`           | `String`                         | DB        | 修改后联系方式               |
+| `CreditRecordItemVO`  | `recordId`              | `Long`                           | DB        | 记录 ID                 |
+|                       | `changeValue`           | `Integer`                        | DB        | 分值变化                  |
+|                       | `reasonType`            | `String`                         | DB        | 原因类型                  |
+|                       | `relatedOrderId`        | `Long`                           | DB        | 关联订单，可空               |
+|                       | `relatedComplaintId`    | `Long`                           | DB        | 关联投诉，可空               |
+|                       | `remark`                | `String`                         | DB        | 说明                    |
+|                       | `createdAt`             | `String`                         | DB        | 时间                    |
+| `UserCreditVO`        | `creditScore`           | `Integer`                        | DB        | 当前信用分                 |
+|                       | `records`               | `PageResult<CreditRecordItemVO>` | Aggregate | 记录分页                  |
+| `MyOrderListItemVO`   | `orderId`               | `Long`                           | DB        | 订单 ID                 |
+|                       | `orderNo`               | `String`                         | DB        | 订单号                   |
+|                       | `productName`           | `String`                         | DB        | 商品名                   |
+|                       | `pickupPoint`           | `String`                         | DB        | 取货点                   |
+|                       | `status`                | `String`                         | DB        | 主状态                   |
+|                       | `totalMemberCount`      | `Integer`                        | DB        | 总人数                   |
+|                       | `currentMemberCount`    | `Integer`                        | DB        | 当前人数                  |
+|                       | `estimatedPerAmount`    | `BigDecimal`                     | DB        | 预估人均                  |
+|                       | `actualPerAmount`       | `BigDecimal`                     | DB        | 实际人均，可空               |
+|                       | `deadlineAt`            | `String`                         | DB        | 截止时间                  |
+|                       | `expectedDeliveryEndAt` | `String`                         | DB        | 预计最晚送达，可空             |
+|                       | `myRole`                | `String`                         | Aggregate | `CREATOR/PARTICIPANT` |
+|                       | `myJoinStatus`          | `String`                         | DB        | 当前用户加入状态              |
+|                       | `myPayStatus`           | `String`                         | DB        | 当前用户支付状态              |
+|                       | `myReceiveStatus`       | `String`                         | DB        | 当前用户收货状态              |
+|                       | `refundAmountTotal`     | `BigDecimal`                     | DB        | 累计退款                  |
+|                       | `createdAt`             | `String`                         | DB        | 创建时间                  |
+
+## 3.3 Order 模块
+
+### 3.3.1 接口映射
+
+| 接口路径                                     | 方法     | Request DTO             | Response VO                   |
+| ---------------------------------------- | ------ | ----------------------- | ----------------------------- |
+| `/api/orders`                            | `POST` | `CreateOrderRequest`    | `CreateOrderVO`               |
+| `/api/orders`                            | `GET`  | `OrderListQueryRequest` | `PageResult<OrderListItemVO>` |
+| `/api/orders/{orderId}`                  | `GET`  | 无                       | `OrderDetailVO`               |
+| `/api/orders/{orderId}/join`             | `POST` | `JoinOrderRequest`      | `JoinOrderVO`                 |
+| `/api/orders/{orderId}/pay`              | `POST` | 无                       | `PayOrderVO`                  |
+| `/api/orders/{orderId}/exit`             | `POST` | 无                       | `ExitOrderVO`                 |
+| `/api/orders/{orderId}/upload-receipt`   | `POST` | `UploadReceiptRequest`  | `UploadReceiptVO`             |
+| `/api/orders/{orderId}/mark-delivered`   | `POST` | 无                       | `MarkDeliveredVO`             |
+| `/api/orders/{orderId}/confirm-received` | `POST` | 无                       | `ConfirmReceivedVO`           |
+
+### 3.3.2 DTO 字段
+
+| 类名                      | 字段名                       | Java 类型         | 必填 | 说明                                           |
+| ----------------------- | ------------------------- | --------------- | -: | -------------------------------------------- |
+| `CreateOrderRequest`    | `productName`             | `String`        |  是 | 商品名称                                         |
+|                         | `productDesc`             | `String`        |  否 | 商品描述                                         |
+|                         | `totalMemberCount`        | `Integer`       |  是 | 总人数，含发起人                                     |
+|                         | `estimatedTotalAmount`    | `BigDecimal`    |  是 | 预估总额                                         |
+|                         | `pickupPoint`             | `String`        |  是 | 取货点                                          |
+|                         | `deadlineAt`              | `String`        |  是 | 截止时间                                         |
+| `OrderListQueryRequest` | `status`                  | `String`        |  否 | 主状态                                          |
+|                         | `keyword`                 | `String`        |  否 | 商品名/描述关键词                                    |
+|                         | `pickupPoint`             | `String`        |  否 | 取货点                                          |
+|                         | `sort`                    | `String`        |  否 | `createdAtDesc/deadlineAtAsc/deadlineAtDesc` |
+|                         | `page`                    | `Integer`       |  否 | 页码                                           |
+|                         | `pageSize`                | `Integer`       |  否 | 页大小                                          |
+| `JoinOrderRequest`      | `remark`                  | `String`        |  否 | 成员备注                                         |
+| `UploadReceiptRequest`  | `receiptFile`             | `MultipartFile` |  是 | 凭证图片                                         |
+|                         | `actualTotalAmount`       | `BigDecimal`    |  是 | 实际总额                                         |
+|                         | `expectedDeliveryStartAt` | `String`        |  是 | 预计最早送达                                       |
+|                         | `expectedDeliveryEndAt`   | `String`        |  是 | 预计最晚送达                                       |
+
+### 3.3.3 简单 VO 字段
+
+| 类名                         | 字段名                     | Java 类型                    | 来源        | 说明                  |
+| -------------------------- | ----------------------- | -------------------------- | --------- | ------------------- |
+| `CurrentUserMemberBriefVO` | `memberId`              | `Long`                     | DB        | 当前用户成员 ID           |
+|                            | `isCreator`             | `Boolean`                  | DB        | 是否发起人               |
+|                            | `joinStatus`            | `String`                   | DB        | 加入状态                |
+|                            | `payStatus`             | `String`                   | DB        | 支付状态                |
+|                            | `receiveStatus`         | `String`                   | DB        | 收货状态                |
+| `CreateOrderVO`            | `orderId`               | `Long`                     | DB        | 订单 ID               |
+|                            | `orderNo`               | `String`                   | DB        | 订单号                 |
+|                            | `status`                | `String`                   | DB        | `OPEN`              |
+|                            | `currentMemberCount`    | `Integer`                  | DB        | 当前人数                |
+|                            | `estimatedPerAmount`    | `BigDecimal`               | DB        | 预估人均                |
+|                            | `currentUserMember`     | `CurrentUserMemberBriefVO` | Aggregate | 发起人成员简要信息           |
+| `OrderListItemVO`          | `orderId`               | `Long`                     | DB        | 订单 ID               |
+|                            | `orderNo`               | `String`                   | DB        | 订单号                 |
+|                            | `productName`           | `String`                   | DB        | 商品名                 |
+|                            | `productDesc`           | `String`                   | DB        | 商品描述                |
+|                            | `pickupPoint`           | `String`                   | DB        | 取货点                 |
+|                            | `totalMemberCount`      | `Integer`                  | DB        | 总人数                 |
+|                            | `currentMemberCount`    | `Integer`                  | DB        | 当前人数                |
+|                            | `remainingCount`        | `Integer`                  | Aggregate | 剩余人数                |
+|                            | `estimatedTotalAmount`  | `BigDecimal`               | DB        | 预估总额                |
+|                            | `estimatedPerAmount`    | `BigDecimal`               | DB        | 预估人均                |
+|                            | `deadlineAt`            | `String`                   | DB        | 截止时间                |
+|                            | `status`                | `String`                   | DB        | 主状态                 |
+|                            | `creatorUserId`         | `Long`                     | DB        | 发起人 ID              |
+|                            | `creatorNickname`       | `String`                   | Aggregate | 发起人昵称               |
+|                            | `complaintOpened`       | `Boolean`                  | DB        | 是否开放投诉              |
+|                            | `currentUserJoined`     | `Boolean`                  | Aggregate | 当前用户是否已加入           |
+|                            | `currentUserPayStatus`  | `String`                   | Aggregate | 当前用户支付状态，可空         |
+|                            | `createdAt`             | `String`                   | DB        | 创建时间                |
+| `JoinOrderVO`              | `memberId`              | `Long`                     | DB        | 成员 ID               |
+|                            | `joinStatus`            | `String`                   | DB        | `ACTIVE`            |
+|                            | `payStatus`             | `String`                   | DB        | `UNPAID`            |
+| `PayOrderVO`               | `memberId`              | `Long`                     | DB        | 成员 ID               |
+|                            | `payStatus`             | `String`                   | DB        | `PAID`              |
+|                            | `payAmount`             | `BigDecimal`               | DB        | 支付金额                |
+|                            | `paidAt`                | `String`                   | DB        | 支付时间                |
+|                            | `orderStatus`           | `String`                   | Aggregate | 支付后订单主状态            |
+| `ExitOrderVO`              | `memberId`              | `Long`                     | DB        | 成员 ID               |
+|                            | `joinStatus`            | `String`                   | DB        | `EXITED`            |
+|                            | `refundAmount`          | `BigDecimal`               | Aggregate | 本次退款金额              |
+|                            | `orderStatus`           | `String`                   | DB        | 退出后订单状态             |
+|                            | `currentMemberCount`    | `Integer`                  | DB        | 更新后人数               |
+| `UploadReceiptVO`          | `receiptId`             | `Long`                     | DB        | 凭证 ID               |
+|                            | `imageUrl`              | `String`                   | DB        | 图片地址                |
+|                            | `actualTotalAmount`     | `BigDecimal`               | DB        | 实际总额                |
+|                            | `orderStatus`           | `String`                   | DB        | `WAIT_DELIVERY`     |
+| `MarkDeliveredVO`          | `orderStatus`           | `String`                   | DB        | `WAIT_RECEIVE`      |
+|                            | `deliveredAt`           | `String`                   | DB        | 送达时间                |
+|                            | `autoConfirmDeadlineAt` | `String`                   | Aggregate | `deliveredAt + 30m` |
+| `ConfirmReceivedVO`        | `memberId`              | `Long`                     | DB        | 成员 ID               |
+|                            | `receiveStatus`         | `String`                   | DB        | `RECEIVED`          |
+|                            | `receivedAt`            | `String`                   | DB        | 收货时间                |
+|                            | `orderStatus`           | `String`                   | Aggregate | 收货后订单状态             |
+
+### 3.3.4 `OrderDetailVO` 完整展开
+
+#### `OrderDetailVO`
+
+| 字段名                 | Java 类型                     | 来源        | 说明                                |
+| ------------------- | --------------------------- | --------- | --------------------------------- |
+| `viewerRoleInOrder` | `String`                    | Aggregate | `CREATOR/PARTICIPANT/GUEST/ADMIN` |
+| `basicInfo`         | `OrderBasicInfoVO`          | Aggregate | 基础信息模块                            |
+| `initiatorInfo`     | `InitiatorInfoVO`           | Aggregate | 发起人信息模块                           |
+| `currentUserMember` | `CurrentUserMemberVO`       | Aggregate | 当前用户成员信息，无则 `null`                |
+| `memberList`        | `List<OrderMemberVO>`       | Aggregate | 成员列表                              |
+| `paymentSummary`    | `PaymentSummaryVO`          | Aggregate | 支付汇总                              |
+| `receiptInfo`       | `ReceiptInfoVO`             | Aggregate | 凭证信息                              |
+| `receiveInfo`       | `ReceiveInfoVO`             | Aggregate | 收货信息                              |
+| `timeline`          | `List<OrderTimelineItemVO>` | Aggregate | 时间线                               |
+| `complaintInfo`     | `ComplaintInfoVO`           | Aggregate | 投诉信息                              |
+| `actionFlags`       | `OrderActionFlagsVO`        | Aggregate | 按钮控制                              |
+
+#### `OrderBasicInfoVO`
+
+| 字段名                       | Java 类型      | 来源 | 说明                     |
+| ------------------------- | ------------ | -- | ---------------------- |
+| `orderId`                 | `Long`       | DB | `group_order.id`       |
+| `orderNo`                 | `String`     | DB | `group_order.order_no` |
+| `productName`             | `String`     | DB | 商品名                    |
+| `productDesc`             | `String`     | DB | 商品描述                   |
+| `pickupPoint`             | `String`     | DB | 取货点                    |
+| `totalMemberCount`        | `Integer`    | DB | 总人数                    |
+| `currentMemberCount`      | `Integer`    | DB | 当前人数                   |
+| `estimatedTotalAmount`    | `BigDecimal` | DB | 预估总额                   |
+| `estimatedPerAmount`      | `BigDecimal` | DB | 预估人均                   |
+| `actualTotalAmount`       | `BigDecimal` | DB | 实际总额，可空                |
+| `actualPerAmount`         | `BigDecimal` | DB | 实际人均，可空                |
+| `deadlineAt`              | `String`     | DB | 截止时间                   |
+| `receiptUploadDeadlineAt` | `String`     | DB | 上传凭证截止                 |
+| `expectedDeliveryStartAt` | `String`     | DB | 预计最早送达                 |
+| `expectedDeliveryEndAt`   | `String`     | DB | 预计最晚送达                 |
+| `deliveredAt`             | `String`     | DB | 实际送达时间                 |
+| `status`                  | `String`     | DB | 主状态                    |
+| `cancelReason`            | `String`     | DB | 取消原因                   |
+| `complaintOpened`         | `Boolean`    | DB | 是否开放投诉                 |
+| `createdAt`               | `String`     | DB | 创建时间                   |
+| `updatedAt`               | `String`     | DB | 更新时间                   |
+
+#### `InitiatorInfoVO`
+
+| 字段名               | Java 类型   | 来源        | 说明     |
+| ----------------- | --------- | --------- | ------ |
+| `userId`          | `Long`    | DB        | 发起人 ID |
+| `nickname`        | `String`  | DB        | 昵称     |
+| `phoneMasked`     | `String`  | Aggregate | 脱敏手机号  |
+| `studentNoMasked` | `String`  | Aggregate | 脱敏学号   |
+| `creditScore`     | `Integer` | DB        | 信用分    |
+| `userStatus`      | `String`  | DB        | 账号状态   |
+
+#### `CurrentUserMemberVO`
+
+| 字段名                 | Java 类型      | 来源 | 说明    |
+| ------------------- | ------------ | -- | ----- |
+| `memberId`          | `Long`       | DB | 成员 ID |
+| `isCreator`         | `Boolean`    | DB | 是否发起人 |
+| `remark`            | `String`     | DB | 备注    |
+| `joinStatus`        | `String`     | DB | 加入状态  |
+| `payStatus`         | `String`     | DB | 支付状态  |
+| `payAmount`         | `BigDecimal` | DB | 支付金额  |
+| `paidAt`            | `String`     | DB | 支付时间  |
+| `refundAmountTotal` | `BigDecimal` | DB | 累计退款  |
+| `receiveStatus`     | `String`     | DB | 收货状态  |
+| `receivedAt`        | `String`     | DB | 收货时间  |
+
+#### `OrderMemberVO`
+
+| 字段名                 | Java 类型      | 来源        | 说明    |
+| ------------------- | ------------ | --------- | ----- |
+| `memberId`          | `Long`       | DB        | 成员 ID |
+| `userId`            | `Long`       | DB        | 用户 ID |
+| `nickname`          | `String`     | Aggregate | 用户昵称  |
+| `isCreator`         | `Boolean`    | DB        | 是否发起人 |
+| `remark`            | `String`     | DB        | 备注    |
+| `joinStatus`        | `String`     | DB        | 加入状态  |
+| `payStatus`         | `String`     | DB        | 支付状态  |
+| `payAmount`         | `BigDecimal` | DB        | 支付金额  |
+| `paidAt`            | `String`     | DB        | 支付时间  |
+| `refundAmountTotal` | `BigDecimal` | DB        | 累计退款  |
+| `receiveStatus`     | `String`     | DB        | 收货状态  |
+| `receivedAt`        | `String`     | DB        | 收货时间  |
+
+#### `PaymentSummaryVO`
+
+| 字段名                     | Java 类型      | 来源        | 说明                    |
+| ----------------------- | ------------ | --------- | --------------------- |
+| `totalMemberCount`      | `Integer`    | DB        | 总人数                   |
+| `paidMemberCount`       | `Integer`    | Aggregate | `ACTIVE && PAID` 数量   |
+| `unpaidMemberCount`     | `Integer`    | Aggregate | `ACTIVE && UNPAID` 数量 |
+| `estimatedTotalAmount`  | `BigDecimal` | DB        | 预估总额                  |
+| `paidTotalAmount`       | `BigDecimal` | Aggregate | 已支付总额                 |
+| `actualTotalAmount`     | `BigDecimal` | DB        | 实际总额                  |
+| `refundDiffTotalAmount` | `BigDecimal` | Aggregate | 差额退款总额                |
+| `settleToCreatorAmount` | `BigDecimal` | Aggregate | 结算给发起人的金额             |
+
+#### `ReceiptInfoVO`
+
+| 字段名                       | Java 类型      | 来源        | 说明     |
+| ------------------------- | ------------ | --------- | ------ |
+| `hasReceipt`              | `Boolean`    | Aggregate | 是否有凭证  |
+| `receiptId`               | `Long`       | DB        | 凭证 ID  |
+| `imageUrl`                | `String`     | DB        | 图片地址   |
+| `uploaderUserId`          | `Long`       | DB        | 上传人 ID |
+| `actualTotalAmount`       | `BigDecimal` | DB        | 实际总额   |
+| `expectedDeliveryStartAt` | `String`     | DB        | 预计最早送达 |
+| `expectedDeliveryEndAt`   | `String`     | DB        | 预计最晚送达 |
+| `uploadedAt`              | `String`     | DB        | 上传时间   |
+
+#### `ReceiveInfoVO`
+
+| 字段名                         | Java 类型   | 来源        | 说明     |
+| --------------------------- | --------- | --------- | ------ |
+| `pickupPoint`               | `String`  | DB        | 取货点    |
+| `deliveredAt`               | `String`  | DB        | 送达时间   |
+| `autoConfirmDeadlineAt`     | `String`  | Aggregate | 自动确认截止 |
+| `receivedMemberCount`       | `Integer` | Aggregate | 已收货人数  |
+| `pendingConfirmMemberCount` | `Integer` | Aggregate | 待确认人数  |
+
+#### `OrderTimelineItemVO`
+
+| 字段名            | Java 类型  | 来源             | 说明                  |
+| -------------- | -------- | -------------- | ------------------- |
+| `time`         | `String` | DB / Aggregate | 时间                  |
+| `type`         | `String` | DB / Aggregate | 事件类型                |
+| `title`        | `String` | Aggregate      | 标题                  |
+| `content`      | `String` | Aggregate      | 内容                  |
+| `operatorType` | `String` | DB             | `USER/ADMIN/SYSTEM` |
+
+#### `ComplaintInfoVO`
+
+| 字段名                 | Java 类型   | 来源        | 说明        |
+| ------------------- | --------- | --------- | --------- |
+| `complaintOpened`   | `Boolean` | DB        | 是否已开放逾期投诉 |
+| `myComplaintId`     | `Long`    | Aggregate | 当前用户投诉 ID |
+| `myComplaintStatus` | `String`  | Aggregate | 当前用户投诉状态  |
+| `complaintCount`    | `Integer` | Aggregate | 当前订单投诉数   |
+
+#### `OrderActionFlagsVO`
+
+| 字段名                  | Java 类型   | 来源        | 说明      |
+| -------------------- | --------- | --------- | ------- |
+| `canJoin`            | `Boolean` | Aggregate | 是否可加入   |
+| `canPay`             | `Boolean` | Aggregate | 是否可支付   |
+| `canExit`            | `Boolean` | Aggregate | 是否可退出   |
+| `canUploadReceipt`   | `Boolean` | Aggregate | 是否可上传凭证 |
+| `canMarkDelivered`   | `Boolean` | Aggregate | 是否可确认送达 |
+| `canConfirmReceived` | `Boolean` | Aggregate | 是否可确认收货 |
+| `canCreateComplaint` | `Boolean` | Aggregate | 是否可提交投诉 |
+| `canViewReceipt`     | `Boolean` | Aggregate | 是否可查看凭证 |
+
+## 3.4 Complaint 模块
+
+### 3.4.1 接口映射
+
+| 接口路径                            | 方法     | Request DTO                 | Response VO                     |
+| ------------------------------- | ------ | --------------------------- | ------------------------------- |
+| `/api/complaints`               | `POST` | `CreateComplaintRequest`    | `CreateComplaintVO`             |
+| `/api/complaints/my`            | `GET`  | `ComplaintListQueryRequest` | `PageResult<MyComplaintItemVO>` |
+| `/api/complaints/{complaintId}` | `GET`  | 无                           | `ComplaintDetailVO`             |
+
+### 3.4.2 DTO 字段
+
+| 类名                          | 字段名        | Java 类型   | 必填 | 说明                           |
+| --------------------------- | ---------- | --------- | -: | ---------------------------- |
+| `CreateComplaintRequest`    | `orderId`  | `Long`    |  是 | 订单 ID                        |
+|                             | `type`     | `String`  |  是 | `NOT_PURCHASED/FAKE_RECEIPT` |
+|                             | `content`  | `String`  |  是 | 投诉内容                         |
+| `ComplaintListQueryRequest` | `status`   | `String`  |  否 | 投诉状态                         |
+|                             | `page`     | `Integer` |  否 | 页码                           |
+|                             | `pageSize` | `Integer` |  否 | 页大小                          |
+
+### 3.4.3 VO 字段
+
+| 类名                  | 字段名                   | Java 类型   | 来源        | 说明        |
+| ------------------- | --------------------- | --------- | --------- | --------- |
+| `CreateComplaintVO` | `complaintId`         | `Long`    | DB        | 投诉 ID     |
+|                     | `complaintNo`         | `String`  | DB        | 投诉编号      |
+|                     | `status`              | `String`  | DB        | `PENDING` |
+|                     | `createdAt`           | `String`  | DB        | 创建时间      |
+| `MyComplaintItemVO` | `complaintId`         | `Long`    | DB        | 投诉 ID     |
+|                     | `complaintNo`         | `String`  | DB        | 编号        |
+|                     | `orderId`             | `Long`    | DB        | 订单 ID     |
+|                     | `orderNo`             | `String`  | Aggregate | 订单号       |
+|                     | `productName`         | `String`  | Aggregate | 商品名       |
+|                     | `accusedUserId`       | `Long`    | DB        | 被投诉人 ID   |
+|                     | `accusedNickname`     | `String`  | Aggregate | 被投诉人昵称    |
+|                     | `type`                | `String`  | DB        | 类型        |
+|                     | `content`             | `String`  | DB        | 内容        |
+|                     | `status`              | `String`  | DB        | 状态        |
+|                     | `openedBySystem`      | `Boolean` | DB        | 是否系统开放    |
+|                     | `handleResult`        | `String`  | DB        | 处理结果      |
+|                     | `createdAt`           | `String`  | DB        | 创建时间      |
+|                     | `handledAt`           | `String`  | DB        | 处理时间      |
+| `ComplaintDetailVO` | `complaintId`         | `Long`    | DB        | 投诉 ID     |
+|                     | `complaintNo`         | `String`  | DB        | 编号        |
+|                     | `orderId`             | `Long`    | DB        | 订单 ID     |
+|                     | `orderNo`             | `String`  | Aggregate | 订单号       |
+|                     | `productName`         | `String`  | Aggregate | 商品名       |
+|                     | `complainantUserId`   | `Long`    | DB        | 投诉人 ID    |
+|                     | `complainantNickname` | `String`  | Aggregate | 投诉人昵称     |
+|                     | `accusedUserId`       | `Long`    | DB        | 被投诉人 ID   |
+|                     | `accusedNickname`     | `String`  | Aggregate | 被投诉人昵称    |
+|                     | `type`                | `String`  | DB        | 类型        |
+|                     | `content`             | `String`  | DB        | 内容        |
+|                     | `status`              | `String`  | DB        | 状态        |
+|                     | `openedBySystem`      | `Boolean` | DB        | 是否系统开放    |
+|                     | `handleResult`        | `String`  | DB        | 处理结果      |
+|                     | `createdAt`           | `String`  | DB        | 创建时间      |
+|                     | `handledAt`           | `String`  | DB        | 处理时间      |
+
+## 3.5 Admin 模块
+
+### 3.5.1 接口映射
+
+| 接口路径                                         | 方法     | Request DTO                  | Response VO                        |
+| -------------------------------------------- | ------ | ---------------------------- | ---------------------------------- |
+| `/api/admin/users`                           | `GET`  | `AdminUserQueryRequest`      | `PageResult<AdminUserItemVO>`      |
+| `/api/admin/users/{userId}/ban`              | `POST` | `AdminBanUserRequest`        | `AdminBanUserVO`                   |
+| `/api/admin/users/{userId}/unban`            | `POST` | 无                            | `AdminUnbanUserVO`                 |
+| `/api/admin/orders`                          | `GET`  | `AdminOrderQueryRequest`     | `PageResult<AdminOrderItemVO>`     |
+| `/api/admin/orders/{orderId}`                | `GET`  | 无                            | `OrderDetailVO`                    |
+| `/api/admin/orders/{orderId}/cancel`         | `POST` | `AdminCancelOrderRequest`    | `AdminCancelOrderVO`               |
+| `/api/admin/complaints`                      | `GET`  | `AdminComplaintQueryRequest` | `PageResult<AdminComplaintItemVO>` |
+| `/api/admin/complaints/{complaintId}`        | `GET`  | 无                            | `AdminComplaintDetailVO`           |
+| `/api/admin/complaints/{complaintId}/handle` | `POST` | `HandleComplaintRequest`     | `AdminHandleComplaintVO`           |
+| `/api/admin/records/capital`                 | `GET`  | `CapitalRecordQueryRequest`  | `PageResult<CapitalRecordItemVO>`  |
+| `/api/admin/records/logs`                    | `GET`  | `OperationLogQueryRequest`   | `PageResult<OperationLogItemVO>`   |
+
+### 3.5.2 DTO 字段
+
+| 类名                           | 字段名              | Java 类型   | 必填 | 说明     |
+| ---------------------------- | ---------------- | --------- | -: | ------ |
+| `AdminUserQueryRequest`      | `keyword`        | `String`  |  否 | 搜用户    |
+|                              | `status`         | `String`  |  否 | 账号状态   |
+|                              | `minCredit`      | `Integer` |  否 | 最低信用分  |
+|                              | `maxCredit`      | `Integer` |  否 | 最高信用分  |
+|                              | `page`           | `Integer` |  否 | 页码     |
+|                              | `pageSize`       | `Integer` |  否 | 页大小    |
+| `AdminBanUserRequest`        | `reason`         | `String`  |  是 | 封禁原因   |
+| `AdminOrderQueryRequest`     | `status`         | `String`  |  否 | 主状态    |
+|                              | `creatorKeyword` | `String`  |  否 | 发起人筛选  |
+|                              | `page`           | `Integer` |  否 | 页码     |
+|                              | `pageSize`       | `Integer` |  否 | 页大小    |
+| `AdminCancelOrderRequest`    | `reason`         | `String`  |  是 | 取消原因   |
+| `AdminComplaintQueryRequest` | `status`         | `String`  |  否 | 投诉状态   |
+|                              | `type`           | `String`  |  否 | 投诉类型   |
+|                              | `page`           | `Integer` |  否 | 页码     |
+|                              | `pageSize`       | `Integer` |  否 | 页大小    |
+| `HandleComplaintRequest`     | `handleResult`   | `String`  |  是 | 处理结果说明 |
+| `CapitalRecordQueryRequest`  | `type`           | `String`  |  否 | 流水类型   |
+|                              | `userKeyword`    | `String`  |  否 | 用户关键词  |
+|                              | `orderNo`        | `String`  |  否 | 订单号    |
+|                              | `page`           | `Integer` |  否 | 页码     |
+|                              | `pageSize`       | `Integer` |  否 | 页大小    |
+| `OperationLogQueryRequest`   | `operatorType`   | `String`  |  否 | 操作者类型  |
+|                              | `bizType`        | `String`  |  否 | 业务类型   |
+|                              | `page`           | `Integer` |  否 | 页码     |
+|                              | `pageSize`       | `Integer` |  否 | 页大小    |
+
+### 3.5.3 VO 字段
+
+| 类名                       | 字段名                    | Java 类型      | 来源        | 说明          |
+| ------------------------ | ---------------------- | ------------ | --------- | ----------- |
+| `AdminUserItemVO`        | `userId`               | `Long`       | DB        | 用户 ID       |
+|                          | `phone`                | `String`     | DB        | 手机号         |
+|                          | `nickname`             | `String`     | DB        | 昵称          |
+|                          | `studentNo`            | `String`     | DB        | 学号          |
+|                          | `isVerified`           | `Boolean`    | DB        | 是否实名        |
+|                          | `creditScore`          | `Integer`    | DB        | 信用分         |
+|                          | `status`               | `String`     | DB        | 账号状态        |
+|                          | `contactInfo`          | `String`     | DB        | 联系方式        |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+| `AdminBanUserVO`         | `userId`               | `Long`       | DB        | 用户 ID       |
+|                          | `status`               | `String`     | DB        | `BANNED`    |
+| `AdminUnbanUserVO`       | `userId`               | `Long`       | DB        | 用户 ID       |
+|                          | `status`               | `String`     | DB        | `NORMAL`    |
+| `AdminOrderItemVO`       | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `orderNo`              | `String`     | DB        | 订单号         |
+|                          | `productName`          | `String`     | DB        | 商品名         |
+|                          | `creatorNickname`      | `String`     | Aggregate | 发起人昵称       |
+|                          | `totalMemberCount`     | `Integer`    | DB        | 总人数         |
+|                          | `currentMemberCount`   | `Integer`    | DB        | 当前人数        |
+|                          | `estimatedTotalAmount` | `BigDecimal` | DB        | 预估总额        |
+|                          | `actualTotalAmount`    | `BigDecimal` | DB        | 实际总额        |
+|                          | `pickupPoint`          | `String`     | DB        | 取货点         |
+|                          | `status`               | `String`     | DB        | 主状态         |
+|                          | `complaintOpened`      | `Boolean`    | DB        | 是否开放投诉      |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+|                          | `deadlineAt`           | `String`     | DB        | 截止时间        |
+| `AdminCancelOrderVO`     | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `status`               | `String`     | DB        | `CANCELED`  |
+|                          | `cancelReason`         | `String`     | DB        | 取消原因        |
+| `AdminComplaintItemVO`   | `complaintId`          | `Long`       | DB        | 投诉 ID       |
+|                          | `complaintNo`          | `String`     | DB        | 编号          |
+|                          | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `orderNo`              | `String`     | Aggregate | 订单号         |
+|                          | `productName`          | `String`     | Aggregate | 商品名         |
+|                          | `complainantNickname`  | `String`     | Aggregate | 投诉人昵称       |
+|                          | `accusedNickname`      | `String`     | Aggregate | 被投诉人昵称      |
+|                          | `type`                 | `String`     | DB        | 类型          |
+|                          | `status`               | `String`     | DB        | 状态          |
+|                          | `openedBySystem`       | `Boolean`    | DB        | 是否系统开放      |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+|                          | `handledAt`            | `String`     | DB        | 处理时间        |
+| `AdminComplaintDetailVO` | `complaintId`          | `Long`       | DB        | 投诉 ID       |
+|                          | `complaintNo`          | `String`     | DB        | 编号          |
+|                          | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `orderNo`              | `String`     | Aggregate | 订单号         |
+|                          | `productName`          | `String`     | Aggregate | 商品名         |
+|                          | `complainantUserId`    | `Long`       | DB        | 投诉人 ID      |
+|                          | `complainantNickname`  | `String`     | Aggregate | 投诉人昵称       |
+|                          | `accusedUserId`        | `Long`       | DB        | 被投诉人 ID     |
+|                          | `accusedNickname`      | `String`     | Aggregate | 被投诉人昵称      |
+|                          | `type`                 | `String`     | DB        | 类型          |
+|                          | `content`              | `String`     | DB        | 内容          |
+|                          | `status`               | `String`     | DB        | 状态          |
+|                          | `openedBySystem`       | `Boolean`    | DB        | 是否系统开放      |
+|                          | `handleResult`         | `String`     | DB        | 处理结果        |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+|                          | `handledAt`            | `String`     | DB        | 处理时间        |
+| `AdminHandleComplaintVO` | `complaintId`          | `Long`       | DB        | 投诉 ID       |
+|                          | `status`               | `String`     | DB        | `PROCESSED` |
+|                          | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `orderStatus`          | `String`     | DB        | `CANCELED`  |
+|                          | `refundedMemberCount`  | `Integer`    | Aggregate | 本次退款人数      |
+|                          | `creatorCreditDelta`   | `Integer`    | Aggregate | 固定 `-10`    |
+| `CapitalRecordItemVO`    | `recordId`             | `Long`       | DB        | 流水 ID       |
+|                          | `bizNo`                | `String`     | DB        | 业务号         |
+|                          | `userId`               | `Long`       | DB        | 用户 ID       |
+|                          | `userNickname`         | `String`     | Aggregate | 用户昵称        |
+|                          | `orderId`              | `Long`       | DB        | 订单 ID       |
+|                          | `orderNo`              | `String`     | Aggregate | 订单号         |
+|                          | `type`                 | `String`     | DB        | 流水类型        |
+|                          | `amount`               | `BigDecimal` | DB        | 金额          |
+|                          | `status`               | `String`     | DB        | 状态          |
+|                          | `remark`               | `String`     | DB        | 备注          |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+|                          | `successAt`            | `String`     | DB        | 成功时间        |
+| `OperationLogItemVO`     | `logId`                | `Long`       | DB        | 日志 ID       |
+|                          | `operatorType`         | `String`     | DB        | 操作者类型       |
+|                          | `operatorId`           | `Long`       | DB        | 操作者 ID      |
+|                          | `operatorName`         | `String`     | Aggregate | 操作者名称       |
+|                          | `bizType`              | `String`     | DB        | 业务类型        |
+|                          | `bizId`                | `Long`       | DB        | 业务 ID       |
+|                          | `action`               | `String`     | DB        | 动作          |
+|                          | `detailJson`           | `String`     | DB        | 详情 JSON     |
+|                          | `createdAt`            | `String`     | DB        | 创建时间        |
+
+### 冲突修正说明
+
+1. **时间字段在 DTO / VO 中统一使用 `String`**，格式固定 `yyyy-MM-dd HH:mm:ss`；Entity 内部仍使用 `LocalDateTime`。
+2. `ComplaintInfoVO` **不保留** `canComplain`，按钮控制唯一来源是 `actionFlags.canCreateComplaint`。
+3. 管理端订单详情直接复用 `OrderDetailVO`；当 `viewerRoleInOrder=ADMIN` 时，所有可写动作 flag 固定为 `false`，`canViewReceipt` 仅随 `hasReceipt` 决定。
+4. `GET /api/complaints/{complaintId}` 保留，供“我的投诉”抽屉读取使用；它不是独立页面接口，但它是正式只读接口。
+
+---
+
+# 4. Controller / Service / Mapper 冻结清单
+
+控制层、服务层、持久化层必须与文档模块边界一致；复杂业务全部放 Service，自动规则全部放 `task + service`，Controller 不承担任何状态流转逻辑。 
+
+## 4.1 Controller
+
+| 类名                         | 负责接口                                                                                                                                      | 职责               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| `AuthController`           | `/api/auth/register` `/api/auth/login` `/api/auth/admin/login` `/api/auth/me` `/api/auth/logout`                                          | 注册、登录、恢复当前身份、退出  |
+| `UserController`           | `/api/users/verify-student` `/api/users/profile` `/api/users/credit` `/api/users/my-orders`                                               | 实名、个人资料、信用分、我的拼单 |
+| `OrderController`          | `/api/orders` `/api/orders/{orderId}` `/api/orders/{orderId}/join` `/pay` `/exit` `/upload-receipt` `/mark-delivered` `/confirm-received` | 拼单主流程全部用户端接口     |
+| `ComplaintController`      | `/api/complaints` `/api/complaints/my` `/api/complaints/{complaintId}`                                                                    | 用户投诉提交与查询        |
+| `AdminUserController`      | `/api/admin/users` `/api/admin/users/{userId}/ban` `/unban`                                                                               | 后台用户管理           |
+| `AdminOrderController`     | `/api/admin/orders` `/api/admin/orders/{orderId}` `/api/admin/orders/{orderId}/cancel`                                                    | 后台订单管理           |
+| `AdminComplaintController` | `/api/admin/complaints` `/api/admin/complaints/{complaintId}` `/api/admin/complaints/{complaintId}/handle`                                | 后台投诉管理           |
+| `AdminRecordController`    | `/api/admin/records/capital` `/api/admin/records/logs`                                                                                    | 后台资金记录与操作日志      |
+
+## 4.2 Service / ServiceImpl
+
+| Service 接口              | ServiceImpl                 | 职责                                                     |
+| ----------------------- | --------------------------- | ------------------------------------------------------ |
+| `AuthService`           | `AuthServiceImpl`           | 注册、登录、管理员登录、恢复身份、退出                                    |
+| `UserService`           | `UserServiceImpl`           | 实名、资料读取与修改、信用分读取、我的拼单                                  |
+| `OrderService`          | `OrderServiceImpl`          | 创建订单、列表、详情、加入、支付、退出、上传凭证、差额退款、确认送达、确认收货、自动成团、自动完成、系统取消 |
+| `ComplaintService`      | `ComplaintServiceImpl`      | 用户投诉提交、我的投诉列表、投诉详情                                     |
+| `AdminUserService`      | `AdminUserServiceImpl`      | 后台用户列表、封禁、解封                                           |
+| `AdminOrderService`     | `AdminOrderServiceImpl`     | 后台订单列表、详情、强制取消                                         |
+| `AdminComplaintService` | `AdminComplaintServiceImpl` | 后台投诉列表、详情、处理投诉                                         |
+| `AdminRecordService`    | `AdminRecordServiceImpl`    | 后台资金记录分页、日志分页                                          |
+| `NotificationService`   | `NotificationServiceImpl`   | 写通知、批量发通知                                              |
+| `CapitalRecordService`  | `CapitalRecordServiceImpl`  | 支付、差额退款、取消退款、完成结算流水写入与幂等校验                             |
+| `CreditService`         | `CreditServiceImpl`         | 完成拼单加分、投诉成立扣分                                          |
+| `OperationLogService`   | `OperationLogServiceImpl`   | 用户/管理员/系统操作日志写入                                        |
+
+## 4.3 Mapper
+
+| Mapper                     | 对应实体                 | 职责               |
+| -------------------------- | -------------------- | ---------------- |
+| `UserAccountMapper`        | `UserAccount`        | 用户表 CRUD / 条件分页  |
+| `AdminAccountMapper`       | `AdminAccount`       | 管理员表 CRUD        |
+| `GroupOrderMapper`         | `GroupOrder`         | 订单主表 CRUD / 定时扫描 |
+| `GroupOrderMemberMapper`   | `GroupOrderMember`   | 成员表 CRUD / 聚合查询  |
+| `OrderReceiptMapper`       | `OrderReceipt`       | 凭证 CRUD          |
+| `ComplaintMapper`          | `Complaint`          | 投诉 CRUD / 列表分页   |
+| `CapitalRecordMapper`      | `CapitalRecord`      | 资金流水 CRUD / 后台查询 |
+| `CreditChangeRecordMapper` | `CreditChangeRecord` | 信用分记录 CRUD       |
+| `NotificationMapper`       | `Notification`       | 通知 CRUD          |
+| `OperationLogMapper`       | `OperationLog`       | 日志 CRUD / 后台查询   |
+
+### 冲突修正说明
+
+1. V1 **不保留** `TestController` 作为正式业务 Controller；它只允许在本地临时调试阶段存在。
+2. V1 **不单独建立** `ComplaintScheduler`，投诉开放逻辑统一放在 `OrderScheduler`，因为触发条件全部基于订单超时。
+3. `OrderServiceImpl` 内必须包含 `tryGroupAfterPay(orderId)`、`tryCompleteOrder(orderId)`、`cancelOrderWithRefund(...)` 这类领域辅助方法；不再拆额外 Domain Service。
+
+---
+
+# 5. 统一错误码与异常体系
+
+错误码必须与前端约定直接对齐，前端统一根据 `code` 做跳转、提示和刷新；后端所有异常最后都必须转换成 `{ code, message, data: null }`。 
+
+## 5.1 最终错误码表
+
+|    code | message          | 触发场景                          | 前端处理建议                              |
+| ------: | ---------------- | ----------------------------- | ----------------------------------- |
+|     `0` | `success`        | 正常成功                          | 正常处理                                |
+| `40001` | `参数校验错误`         | DTO 字段缺失、长度越界、枚举非法            | 表单报错，停留当前页                          |
+| `40002` | `手机号格式错误`        | 手机号不匹配规则                      | 表单报错                                |
+| `40003` | `密码格式错误`         | 密码不匹配规则                       | 表单报错                                |
+| `40004` | `学号格式错误`         | 学号不是 10 位数字                   | 表单报错                                |
+| `40005` | `金额格式错误`         | 金额小于等于 0 或超过两位小数              | 表单报错                                |
+| `40006` | `时间格式错误`         | 日期时间格式错误或逻辑非法                 | 表单报错                                |
+| `40101` | `请先登录`           | 未带 token 或 SecurityContext 为空 | 清 token，跳 `/login` 或 `/admin/login` |
+| `40102` | `登录已过期，请重新登录`    | token 过期、签名错误、无法解析            | 清 token，跳登录页                        |
+| `40301` | `无权限访问`          | 角色不匹配；管理员访问用户接口；用户访问后台接口      | 保持当前页，提示即可                          |
+| `40302` | `账号已被封禁，请联系管理员`  | 用户 / 管理员状态为 `BANNED`          | 清 token，跳登录页                        |
+| `40303` | `请先完成实名认证`       | 未实名用户访问必须实名的业务接口              | 跳 `/verify-student`                 |
+| `40401` | `拼单不存在或已删除`      | 订单 ID 不存在                     | 详情页跳列表，其他页提示                        |
+| `40402` | `投诉不存在`          | 投诉 ID 不存在                     | 抽屉关闭或提示                             |
+| `40403` | `用户不存在`          | 用户 ID 不存在                     | 提示                                  |
+| `40404` | `管理员不存在`         | 管理员 ID 不存在                    | 跳管理员登录                              |
+| `40901` | `手机号已注册`         | 注册手机号重复                       | 注册页提示                               |
+| `40902` | `该学号已绑定其他账号`     | 实名绑定重复学号                      | 实名页提示                               |
+| `40903` | `订单已满员`          | `join` 时无剩余名额                 | 提示并重拉列表/详情                          |
+| `40904` | `订单状态不允许当前操作`    | 在非法主状态执行动作                    | 提示并重拉详情                             |
+| `40905` | `已加入该拼单`         | 重复加入                          | 提示并重拉详情                             |
+| `40906` | `当前用户不是该拼单成员`    | pay/exit/confirm 等成员动作时查不到成员行 | 提示并重拉详情                             |
+| `40907` | `已支付，无需重复支付`     | 重复支付                          | 提示并重拉详情                             |
+| `40908` | `当前用户尚未支付`       | 依赖支付前提但未支付                    | 提示并重拉详情                             |
+| `40909` | `凭证已上传，无需重复上传`   | 重复上传凭证                        | 提示并重拉详情                             |
+| `40910` | `不能重复投诉`         | 同订单重复投诉                       | 提示并重拉投诉/详情                          |
+| `40911` | `投诉已处理`          | 重复处理投诉                        | 后台重拉投诉列表                            |
+| `40912` | `发起人不能退出自己创建的拼单` | 发起人调用 `/exit`                 | 提示并重拉详情                             |
+| `40913` | `当前未开放投诉`        | 未满足投诉条件时提交投诉                  | 提示并重拉详情                             |
+| `40914` | `当前成员已确认收货`      | 重复确认收货                        | 提示并重拉详情                             |
+| `50000` | `系统异常，请稍后再试`     | 未预期异常                         | 通用错误提示                              |
+
+## 5.2 异常体系
+
+| 类名                       | 作用                                            |
+| ------------------------ | --------------------------------------------- |
+| `BusinessException`      | 统一业务异常，内部持有 `ErrorCodeEnum`                   |
+| `GlobalExceptionHandler` | `@RestControllerAdvice`，统一把异常转成 `ApiResponse` |
+| `ErrorCodeEnum`          | 错误码、默认 message、HTTP 语义的唯一枚举源                  |
+
+## 5.3 参数校验异常处理规则
+
+| 异常类型                              | 返回 code | 最终处理             |
+| --------------------------------- | ------: | ---------------- |
+| `MethodArgumentNotValidException` | `40001` | 取第一条字段错误返回       |
+| `BindException`                   | `40001` | 绑定错误统一返回         |
+| `ConstraintViolationException`    | `40001` | 查询参数/路径参数校验错误    |
+| `HttpMessageNotReadableException` | `40001` | JSON 格式错误、时间格式错误 |
+| `MaxUploadSizeExceededException`  | `40001` | 上传文件过大           |
+| `BusinessException`               |   对应业务码 | 直接返回业务码与 message |
+| 其他 `Exception`                    | `50000` | 打日志，返回系统异常       |
+
+### 冲突修正说明
+
+1. “管理员账号无权限”不单独建新错误码，统一使用 `40301`。
+2. “订单状态不允许当前操作”与“某具体动作的重复执行”分开：
+
+   * 大状态不对，用 `40904`
+   * 已支付/已上传/已收货/重复投诉，分别用专属冲突码。
+3. `40303` 只用于**需要实名的业务接口**，不用于 `/api/auth/me`。
+
+---
+
+# 6. 安全与鉴权冻结方案
+
+V1 只使用 `Spring Security + JWT + 数据库二次校验`；不使用 Session，不使用 MQ，不做复杂授权模型。后台与普通用户分离登录，JWT 中必须带角色，所有受保护请求在进入业务前都要用数据库确认账号状态。 
+
+## 6.1 JWT 载荷规则
+
+| 账号类型    | claims 最终版                                   |
+| ------- | -------------------------------------------- |
+| `USER`  | `sub`, `role=USER`, `userId`, `iat`, `exp`   |
+| `ADMIN` | `sub`, `role=ADMIN`, `adminId`, `iat`, `exp` |
+
+**冻结规则**：
+
+* JWT 只作为身份入口，不作为实名状态和封禁状态的最终真相。
+* 每次受保护请求都要根据 `userId/adminId` 重新查库。
+
+## 6.2 接口权限表
+
+| 权限级别                            | 接口                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `permitAll`                     | `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/admin/login`、`GET /uploads/**`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `authenticated (USER or ADMIN)` | `GET /api/auth/me`、`POST /api/auth/logout`                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `USER` 且可未实名                    | `POST /api/users/verify-student`                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `USER` 且必须实名                    | `GET /api/users/profile`、`PUT /api/users/profile`、`GET /api/users/credit`、`GET /api/users/my-orders`、`GET /api/orders`、`POST /api/orders`、`GET /api/orders/{orderId}`、`POST /api/orders/{orderId}/join`、`POST /api/orders/{orderId}/pay`、`POST /api/orders/{orderId}/exit`、`POST /api/orders/{orderId}/upload-receipt`、`POST /api/orders/{orderId}/mark-delivered`、`POST /api/orders/{orderId}/confirm-received`、`POST /api/complaints`、`GET /api/complaints/my`、`GET /api/complaints/{complaintId}` |
+| `ADMIN`                         | `/api/admin/**` 全部                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+
+## 6.3 Spring Security 组织规则
+
+| 项目         | 最终规则                                                                   |
+| ---------- | ---------------------------------------------------------------------- |
+| CSRF       | 关闭                                                                     |
+| Session    | `STATELESS`                                                            |
+| 表单登录       | 关闭                                                                     |
+| HTTP Basic | 关闭                                                                     |
+| JWT 过滤器    | `JwtAuthenticationFilter` 放在 `UsernamePasswordAuthenticationFilter` 之前 |
+| 未登录处理      | `RestAuthenticationEntryPoint` 返回 `40101/40102` JSON                   |
+| 无权限处理      | `RestAccessDeniedHandler` 返回 `40301` JSON                              |
+| CORS       | 统一在 `CorsConfig` 配置，允许前端开发域名                                           |
+| 资源映射       | `GET /uploads/**` 放行，供凭证图片直接访问                                         |
+| Principal  | 统一封装为 `LoginIdentity`，包含 `role`、`userId/adminId`                       |
+
+## 6.4 `GET /api/auth/me` 恢复身份规则
+
+| token 角色 | 后端行为                                                            |
+| -------- | --------------------------------------------------------------- |
+| `USER`   | 解析 `userId`，查 `user_account`，校验存在、未封禁，返回 `CurrentLoginInfoVO`   |
+| `ADMIN`  | 解析 `adminId`，查 `admin_account`，校验存在、未封禁，返回 `CurrentLoginInfoVO` |
+
+## 6.5 被封禁用户处理规则
+
+| 场景                                     | 后端返回    |
+| -------------------------------------- | ------- |
+| 被封禁普通用户再次登录                            | `40302` |
+| 被封禁管理员再次登录                             | `40302` |
+| 已持有旧 token 的被封禁用户访问任何受保护接口             | `40302` |
+| 已持有旧 token 的被封禁用户访问 `GET /api/auth/me` | `40302` |
+
+### 冲突修正说明
+
+1. `GET /uploads/**` 必须 `permitAll`，否则前端 `<img>` 无法直接加载凭证图。
+2. 认证通过后仍要查库，不能只相信 token 里的 `status/isVerified` 快照。
+3. 后端实名校验与前端路由守卫保持一致：**只要进入订单/投诉/信用分页/我的拼单/个人中心这些业务接口，就必须实名**。
+
+---
+
+# 7. 状态流转与事务边界
+
+创建订单、加入、支付、成团、退出、上传凭证、差额退款、确认送达、确认收货、自动确认、自动完成、投诉、管理员取消和处理投诉，都必须按事务边界执行；开发规划与系统设计文档已明确“自动逻辑统一放在服务层或定时任务，不要散写在控制器里”，并要求支付、退款、投诉、信用分、日志都可追溯。 
+
+## 7.1 事务规则表
+
+| 动作      | 修改表                                                                                                                   | 修改字段                                                                                                      | 是否生成资金流水                   | 是否写日志                                              | 是否发通知               | 是否改信用分                                 | 是否必须同一事务       |
+| ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------- | ------------------- | -------------------------------------- | -------------- |
+| 创建订单    | `group_order` `group_order_member` `operation_log`                                                                    | 订单主字段；发起人成员 `ACTIVE/UNPAID/NOT_READY`                                                                     | 否                          | 是，`ORDER_CREATE`                                   | 否                   | 否                                      | 是              |
+| 加入订单    | `group_order_member` `group_order` `operation_log`                                                                    | 新增成员；`current_member_count +1`                                                                            | 否                          | 是，`ORDER_JOIN`                                     | 否                   | 否                                      | 是              |
+| 支付      | `group_order_member` `capital_record` `operation_log`，必要时 `group_order` `notification`                                | 成员 `pay_status=PAID`、`pay_amount`、`paid_at`；若成团则订单 `status=GROUPED`、`receipt_upload_deadline_at=now+30m`  | 是，`PAY`                    | 是，`ORDER_PAY`；若成团再写 `ORDER_GROUPED`                | 成团时通知全部 `ACTIVE` 成员 | 否                                      | 是              |
+| 成团      | 同支付事务内                                                                                                                | `group_order.status=GROUPED`                                                                              | 否                          | 是                                                  | 是                   | 否                                      | 是，必须跟最后一次支付同事务 |
+| 退出订单    | `group_order_member` `group_order` `capital_record` `operation_log`                                                   | `join_status=EXITED`；`current_member_count -1`；若已支付则 `refund_amount_total += 本次退款`                        | 已支付才生成 `REFUND_CANCEL`     | 是，`ORDER_EXIT`                                     | 否                   | 否                                      | 是              |
+| 上传凭证    | `order_receipt` `group_order` `operation_log`，必要时 `capital_record` `group_order_member` `notification`                | 新增凭证；订单写 `actual_total_amount`、`actual_per_amount`、`expected_delivery_*`、`status=WAIT_DELIVERY`           | 可能生成 `REFUND_DIFF`         | 是，`ORDER_UPLOAD_RECEIPT`；若退款再写 `ORDER_REFUND_DIFF` | 差额退款时通知 `ACTIVE` 成员 | 否                                      | 是              |
+| 差额退款    | 同上传凭证事务内                                                                                                              | 每个 `ACTIVE` 成员 `refund_amount_total += perRefundAmount`                                                   | 是，`REFUND_DIFF`            | 是                                                  | 是                   | 否                                      | 是，必须跟上传凭证同事务   |
+| 确认送达    | `group_order` `group_order_member` `operation_log` `notification`                                                     | 订单 `status=WAIT_RECEIVE`、`delivered_at=now`；发起人成员 `receive_status=RECEIVED`；其他 `ACTIVE` 成员 `WAIT_CONFIRM` | 否                          | 是，`ORDER_MARK_DELIVERED`                           | 是，通知可取货             | 否                                      | 是              |
+| 确认收货    | `group_order_member` `operation_log`，必要时 `group_order` `capital_record` `credit_change_record` `notification`         | 成员 `receive_status=RECEIVED`、`received_at=now`；若全员完成则订单 `status=COMPLETED`                                | 若完成则生成 `SETTLE_TO_CREATOR` | 是，`ORDER_CONFIRM_RECEIVED`；若完成再写 `ORDER_COMPLETED` | 完成时通知全部 `ACTIVE` 成员 | 完成时给全部 `ACTIVE` 成员 `ORDER_FINISHED +2` | 是              |
+| 自动确认收货  | `group_order_member` `operation_log`，必要时 `group_order` `capital_record` `credit_change_record` `notification`         | 成员 `receive_status=AUTO_RECEIVED`、`received_at=now`；若全员完成则订单 `status=COMPLETED`                           | 若完成则生成 `SETTLE_TO_CREATOR` | 是，`ORDER_AUTO_RECEIVED`；若完成再写 `ORDER_COMPLETED`    | 完成时通知全部 `ACTIVE` 成员 | 完成时给全部 `ACTIVE` 成员 `ORDER_FINISHED +2` | 是              |
+| 自动完成订单  | `group_order` `capital_record` `credit_change_record` `operation_log` `notification`                                  | `status=COMPLETED`                                                                                        | 是，`SETTLE_TO_CREATOR`      | 是，`ORDER_COMPLETED`                                | 是                   | 是，`ORDER_FINISHED +2`                  | 是              |
+| 投诉提交    | `complaint` `operation_log`                                                                                           | 新增投诉 `PENDING`                                                                                            | 否                          | 是，`COMPLAINT_CREATE`                               | 否                   | 否                                      | 是              |
+| 投诉处理    | `complaint` `group_order` `group_order_member` `capital_record` `credit_change_record` `operation_log` `notification` | 投诉 `PROCESSED`；订单 `CANCELED`；成员 `ACTIVE->CANCELED`；发起人扣分                                                  | 是，`REFUND_CANCEL` 净退款      | 是，`COMPLAINT_HANDLE`、`ORDER_CANCELED_BY_COMPLAINT` | 是，投诉结果 & 订单取消通知     | 是，发起人 `COMPLAINT_CONFIRMED -10`        | 是              |
+| 管理员取消订单 | `group_order` `group_order_member` `capital_record` `operation_log` `notification`                                    | 订单 `CANCELED`；成员 `ACTIVE->CANCELED`                                                                       | 是，`REFUND_CANCEL` 净退款      | 是，`ORDER_CANCELED_BY_ADMIN`                        | 是                   | 否                                      | 是              |
+
+## 7.2 关键实现规则补充
+
+| 规则              | 最终版                                                                       |
+| --------------- | ------------------------------------------------------------------------- |
+| 发起人是否也必须支付      | 必须                                                                        |
+| 成团条件            | `currentMemberCount == totalMemberCount` 且全部 `ACTIVE` 成员 `payStatus=PAID` |
+| 发起人能否退出自己的拼单    | 不能，固定返回 `40912`                                                           |
+| 差额退款何时发生        | 只在上传凭证时                                                                   |
+| 差额退款是否改变主状态     | 不改变，上传成功后仍进入 `WAIT_DELIVERY`                                              |
+| 取消退款公式          | `refundCancelAmount = max(payAmount - refundAmountTotal, 0)`              |
+| 完成结算公式          | `settleToCreatorAmount = min(actualTotalAmount, estimatedTotalAmount)`    |
+| 投诉成立后订单状态       | 固定 `CANCELED`                                                             |
+| 自动确认收货后如何完成     | 调 `tryCompleteOrder(orderId)` 立即判定是否 `COMPLETED`                          |
+| 发起人确认送达时自己的收货状态 | 直接置 `RECEIVED`                                                            |
+
+### 冲突修正说明
+
+1. **发起人不能退出自己创建的拼单**；这条在前端按钮矩阵里隐含，但必须在后端硬校验。
+2. **订单完成后的信用分规则固定为：全部 `ACTIVE` 成员 +2；投诉成立时被投诉发起人 -10**。不实现“未上传凭证再额外 -10”双重扣分。
+3. `current_member_count` 只在 `join` / `exit` 时改；订单被取消时不归零，保留取消当时的人数快照。
+
+---
+
+# 8. 定时任务冻结方案
+
+当前版本只允许使用 `@Scheduled + Service + @Transactional`；不引入 MQ。自动规则的扫描条件、频率、服务调用和日志动作全部固定如下。 
+
+## 8.1 最终任务清单
+
+| 所属类              | 方法名                               | 扫描条件                                                                                                                                                       | 扫描频率   | 调用 Service                                     | 修改表                                                                                                           | 写日志                                         |
+| ---------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `OrderScheduler` | `cancelExpiredOpenOrders()`       | `group_order.status=OPEN AND deadline_at <= now`                                                                                                           | 每 1 分钟 | `OrderService.cancelExpiredOpenOrders()`       | `group_order` `group_order_member` `capital_record` `notification` `operation_log`                            | `ORDER_AUTO_CANCELED`                       |
+| `OrderScheduler` | `openReceiptTimeoutComplaints()`  | `group_order.status=GROUPED AND complaint_opened=0 AND receipt_upload_deadline_at <= now AND 不存在 order_receipt`                                            | 每 1 分钟 | `OrderService.openReceiptTimeoutComplaints()`  | `group_order` `notification` `operation_log`                                                                  | `COMPLAINT_CHANNEL_OPENED_RECEIPT_TIMEOUT`  |
+| `OrderScheduler` | `openDeliveryTimeoutComplaints()` | `group_order.status=WAIT_DELIVERY AND complaint_opened=0 AND delivered_at IS NULL AND expected_delivery_end_at + 60m <= now`                               | 每 1 分钟 | `OrderService.openDeliveryTimeoutComplaints()` | `group_order` `notification` `operation_log`                                                                  | `COMPLAINT_CHANNEL_OPENED_DELIVERY_TIMEOUT` |
+| `OrderScheduler` | `autoConfirmReceivedMembers()`    | `group_order.status=WAIT_RECEIVE AND group_order_member.join_status=ACTIVE AND is_creator=0 AND receive_status=WAIT_CONFIRM AND delivered_at + 30m <= now` | 每 1 分钟 | `OrderService.autoConfirmReceivedMembers()`    | `group_order_member`，必要时 `group_order` `capital_record` `credit_change_record` `notification` `operation_log` | `ORDER_AUTO_RECEIVED`、必要时 `ORDER_COMPLETED` |
+| `OrderScheduler` | `recoverCompletedOrders()`        | `group_order.status=WAIT_RECEIVE` 且所有 `ACTIVE` 成员 `receive_status in (RECEIVED,AUTO_RECEIVED)`                                                             | 每 1 分钟 | `OrderService.recoverCompletedOrders()`        | `group_order` `capital_record` `credit_change_record` `notification` `operation_log`                          | `ORDER_COMPLETED`                           |
+
+## 8.2 任务实现规则
+
+| 规则      | 最终版                                              |
+| ------- | ------------------------------------------------ |
+| 定时任务类数量 | 只保留 `OrderScheduler`                             |
+| 定时器实现   | `@Scheduled(cron = "0 */1 * * * ?")`             |
+| 事务位置    | 任务方法本身不写业务，调用 `@Transactional` 的 Service 方法      |
+| 幂等控制    | 退款、结算前必须先查 `capital_record.biz_no` 或同类记录是否已存在    |
+| 扫描分页    | 每次按固定批量查询，例如 100 条，循环处理                          |
+| 日志      | 所有任务型动作都写 `operation_log`，`operator_type=SYSTEM` |
+| 通知      | 统一写入 `notification` 表，不做 WebSocket、不做消息队列        |
+
+### 冲突修正说明
+
+1. V1 **不新建** `ComplaintScheduler`；投诉开放任务仍然是订单超时任务。
+2. “成团后 30 分钟未上传凭证”和“预计最晚送达 + 60 分钟未确认送达”都**只开放投诉，不自动取消订单**。
+3. `recoverCompletedOrders()` 是**兜底任务**，不是主触发路径；主触发仍然是 `confirm-received` 和 `autoConfirmReceivedMembers()` 内部的 `tryCompleteOrder(orderId)`。
+
+---
+
+# 9. 数据库索引与约束建议
+
+索引与唯一约束按后台查询、定时任务扫描、联表详情、重复投诉拦截和流水追踪需求冻结如下。系统设计文档明确要求手机号、学号、凭证一单一条、成员一单一用户、资金日志可追溯，开发规划也明确要求先冻结数据库结构再编码。 
+
+## 9.1 唯一约束
+
+| 约束名                                | 表                    | 字段                                      | 理由         |
+| ---------------------------------- | -------------------- | --------------------------------------- | ---------- |
+| `uk_user_account_phone`            | `user_account`       | `phone`                                 | 手机号唯一登录    |
+| `uk_user_account_student_no`       | `user_account`       | `student_no`                            | 学号唯一绑定     |
+| `uk_admin_account_username`        | `admin_account`      | `username`                              | 管理员账号唯一    |
+| `uk_group_order_order_no`          | `group_order`        | `order_no`                              | 订单编号唯一     |
+| `uk_group_order_member_order_user` | `group_order_member` | `(group_order_id, user_id)`             | 防止重复加入同一拼单 |
+| `uk_order_receipt_group_order_id`  | `order_receipt`      | `group_order_id`                        | 一单一凭证      |
+| `uk_complaint_complaint_no`        | `complaint`          | `complaint_no`                          | 投诉编号唯一     |
+| `uk_complaint_order_complainant`   | `complaint`          | `(group_order_id, complainant_user_id)` | 防止重复投诉     |
+| `uk_capital_record_biz_no`         | `capital_record`     | `biz_no`                                | 流水幂等追踪     |
+
+## 9.2 普通索引
+
+| 索引名                                               | 表                      | 字段                                         | 理由           |
+| ------------------------------------------------- | ---------------------- | ------------------------------------------ | ------------ |
+| `idx_user_account_status_created_at`              | `user_account`         | `(status, created_at)`                     | 后台用户筛选       |
+| `idx_group_order_status_deadline_at`              | `group_order`          | `(status, deadline_at)`                    | 未成团超时取消扫描    |
+| `idx_group_order_creator_created_at`              | `group_order`          | `(creator_user_id, created_at)`            | 我的发起拼单分页     |
+| `idx_group_order_status_receipt_deadline_at`      | `group_order`          | `(status, receipt_upload_deadline_at)`     | 成团后超时未上传凭证扫描 |
+| `idx_group_order_status_expected_delivery_end_at` | `group_order`          | `(status, expected_delivery_end_at)`       | 送达超时投诉扫描     |
+| `idx_group_order_member_order_join`               | `group_order_member`   | `(group_order_id, join_status)`            | 统计有效成员       |
+| `idx_group_order_member_order_pay`                | `group_order_member`   | `(group_order_id, pay_status)`             | 成团判断         |
+| `idx_group_order_member_order_receive`            | `group_order_member`   | `(group_order_id, receive_status)`         | 完成判断         |
+| `idx_group_order_member_user_created_at`          | `group_order_member`   | `(user_id, created_at)`                    | 我的拼单分页       |
+| `idx_order_receipt_uploader_uploaded_at`          | `order_receipt`        | `(uploader_user_id, uploaded_at)`          | 上传记录查询       |
+| `idx_complaint_status_created_at`                 | `complaint`            | `(status, created_at)`                     | 后台投诉列表       |
+| `idx_complaint_type_status_created_at`            | `complaint`            | `(type, status, created_at)`               | 后台投诉组合筛选     |
+| `idx_complaint_order_created_at`                  | `complaint`            | `(group_order_id, created_at)`             | 订单投诉聚合       |
+| `idx_complaint_accused_status_created_at`         | `complaint`            | `(accused_user_id, status, created_at)`    | 查看被投诉记录      |
+| `idx_capital_record_user_created_at`              | `capital_record`       | `(user_id, created_at)`                    | 用户维度流水查询     |
+| `idx_capital_record_order_type_created_at`        | `capital_record`       | `(group_order_id, type, created_at)`       | 订单维度资金统计     |
+| `idx_capital_record_member_created_at`            | `capital_record`       | `(member_id, created_at)`                  | 成员维度幂等与追踪    |
+| `idx_credit_change_record_user_created_at`        | `credit_change_record` | `(user_id, created_at)`                    | 个人信用分历史      |
+| `idx_notification_user_read_created_at`           | `notification`         | `(user_id, is_read, created_at)`           | 通知列表与未读数     |
+| `idx_notification_user_type_created_at`           | `notification`         | `(user_id, type, created_at)`              | 分类通知查询       |
+| `idx_operation_log_operator_created_at`           | `operation_log`        | `(operator_type, operator_id, created_at)` | 操作者日志追踪      |
+| `idx_operation_log_biz_created_at`                | `operation_log`        | `(biz_type, biz_id, created_at)`           | 业务对象日志追踪     |
+| `idx_operation_log_action_created_at`             | `operation_log`        | `(action, created_at)`                     | 按动作检索        |
+
+### 冲突修正说明
+
+1. `complaint` 新增唯一索引 `(group_order_id, complainant_user_id)`，前端“重复投诉拦截”由后端数据库和业务双保险实现。
+2. `group_order` 不再单独为 `status` 建低价值单列索引，统一用组合索引覆盖定时任务和后台查询。
+3. `notification` 的核心读路径按 `(user_id, is_read, created_at)` 固定，V1 不做通知页面也必须保留此索引。
+
+---
+
+# 10. 最小后端开发顺序
+
+开发顺序必须和前端主链路一致，先跑通认证与订单 P0，再补闭环，再补投诉和后台；开发规划文档已经明确要求先补依赖、先冻结数据库、再做认证、用户、拼单主流程接口。 
+
+| 步骤               | 本步产出                                                                                                                                                                                    | 前端可联调页面                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| 第一步：统一基础设施       | `application.yml`、MySQL 连接、MyBatis-Plus、统一返回体、统一异常、全部枚举、JWT 工具、Security 骨架、`GET /uploads/**` 资源映射、基础表 SQL                                                                               | 暂无正式页面；可先保后端可启动         |
+| 第二步：Auth         | `user_account` / `admin_account`、`POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/admin/login`、`GET /api/auth/me`、`POST /api/auth/logout`                               | 登录页、注册页、管理员登录页          |
+| 第三步：User         | `POST /api/users/verify-student`、`GET/PUT /api/users/profile`、`GET /api/users/credit`、`GET /api/users/my-orders`（先可空列表）                                                                 | 实名认证页、个人中心页、信用分页        |
+| 第四步：Order P0 主链路 | `group_order`、`group_order_member`、`capital_record`；`POST /api/orders`、`GET /api/orders`、`GET /api/orders/{orderId}`、`POST /join`、`POST /pay`、`POST /exit`；`tryGroupAfterPay()`；未成团取消任务 | 拼单列表页、拼单详情页、发起拼单页、我的拼单页 |
+| 第五步：收尾闭环         | `order_receipt`、`POST /upload-receipt`、`POST /mark-delivered`、`POST /confirm-received`、差额退款、自动确认收货、自动完成、结算、信用分 +2                                                                       | 订单详情页完整动作联调             |
+| 第六步：投诉与后台        | `complaint`、`credit_change_record`、`notification`、`operation_log`；投诉接口、管理员用户/订单/投诉/记录接口、管理员取消订单、处理投诉                                                                                    | 投诉页、管理后台全部页面            |
+
+### 冲突修正说明
+
+1. `GET /api/users/my-orders` 在第三步就先做，哪怕先返回空分页，也要让前端页面先接上。
+2. 第四步必须把 `GET /api/orders` 和 `GET /api/orders/{orderId}` 一起做出来，否则前端 P0 页面无法真正联调。
+3. 差额退款、自动确认收货、结算都放在第五步，不拆到后台模块之后。
+
+---
+
+# 11. 后端验收用例最小集合
+
+P0 验收与前端冻结契约完全对齐：注册登录、实名认证、创建订单、加入订单、支付、自动成团、未成团超时取消、订单列表、订单详情。 
+
+| 用例编号               | 前置条件                                      | 调用接口                                                                      | 预期数据库变化                                                                                             | 预期返回结构                                                                                                                      |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `P0-01` 注册登录       | 数据库无该手机号                                  | `POST /api/auth/register` -> `POST /api/auth/login` -> `GET /api/auth/me` | `user_account` 新增；登录不改表；`/auth/me` 只读                                                               | 注册返回 `userId/phone/nickname/isVerified/status/creditScore`；登录返回 `token+userInfo`；`/auth/me` 返回 `role=USER`                  |
+| `P0-02` 实名认证       | 已登录用户，`is_verified=0`                     | `POST /api/users/verify-student`                                          | `user_account.student_no` 写入；`is_verified=1`                                                        | 返回 `userId/studentNo/isVerified`                                                                                            |
+| `P0-03` 创建订单       | 已实名用户                                     | `POST /api/orders`                                                        | `group_order` 新增一条 `OPEN`；`group_order_member` 新增发起人成员一条                                            | 返回 `orderId/orderNo/status/currentMemberCount/estimatedPerAmount/currentUserMember`                                         |
+| `P0-04` 发起人支付      | 订单存在，发起人成员 `UNPAID`                       | `POST /api/orders/{orderId}/pay`                                          | 发起人成员 `pay_status=PAID`；新增一条 `capital_record(type=PAY)`                                             | 返回 `memberId/payStatus/payAmount/paidAt/orderStatus`                                                                        |
+| `P0-05` 参与者加入      | 订单 `OPEN`，未满员，当前用户未加入                     | `POST /api/orders/{orderId}/join`                                         | `group_order_member` 新增一条；`group_order.current_member_count +1`                                     | 返回 `memberId/joinStatus/payStatus`                                                                                          |
+| `P0-06` 最后一人支付自动成团 | 当前订单只差最后一人支付                              | `POST /api/orders/{orderId}/pay`                                          | 最后一个成员 `pay_status=PAID`；新增 `PAY`；`group_order.status=GROUPED`；`receipt_upload_deadline_at=now+30m` | 返回 `orderStatus=GROUPED`                                                                                                    |
+| `P0-07` 未成团超时取消    | 存在 `OPEN` 订单且 `deadline_at <= now`，有已支付成员 | 触发 `OrderScheduler.cancelExpiredOpenOrders()`                             | `group_order.status=CANCELED`；`ACTIVE->CANCELED`；已支付成员新增 `REFUND_CANCEL`；`refund_amount_total` 更新   | 后续查详情/列表能看到 `status=CANCELED`                                                                                               |
+| `P0-08` 订单列表       | 已有若干订单                                    | `GET /api/orders?page=1&pageSize=10`                                      | 无写操作                                                                                                | `PageResult<OrderListItemVO>`，每项包含 `orderId/orderNo/productName/.../creatorNickname/currentUserJoined/currentUserPayStatus` |
+| `P0-09` 订单详情       | 已有订单、成员和支付记录                              | `GET /api/orders/{orderId}`                                               | 无写操作                                                                                                | 返回完整 `OrderDetailVO`，11 个模块齐全                                                                                               |
+
+### 冲突修正说明
+
+1. `P0-07` 验收必须验证**净退款**，不是只验证订单状态变了。
+2. `P0-08` 和 `P0-09` 必须使用真实聚合返回，而不是只返回占位字符串。
+3. `P0-06` 必须验证 `receiptUploadDeadlineAt` 已写入，否则第五步上传凭证超时任务无法联调。
+
+---
+
+# 12. MySQL 8 建表 SQL 初稿
+
+下面这版 SQL 是**唯一初稿**。金额统一 `DECIMAL(10,2)`，状态统一 `VARCHAR`，时间统一 `DATETIME`，包含必须的唯一约束和索引，可直接执行。
+
+```sql
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+DROP TABLE IF EXISTS operation_log;
+DROP TABLE IF EXISTS notification;
+DROP TABLE IF EXISTS credit_change_record;
+DROP TABLE IF EXISTS capital_record;
+DROP TABLE IF EXISTS complaint;
+DROP TABLE IF EXISTS order_receipt;
+DROP TABLE IF EXISTS group_order_member;
+DROP TABLE IF EXISTS group_order;
+DROP TABLE IF EXISTS admin_account;
+DROP TABLE IF EXISTS user_account;
+
+CREATE TABLE user_account (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '用户主键',
+    phone VARCHAR(20) NOT NULL COMMENT '手机号',
+    password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
+    nickname VARCHAR(50) NOT NULL COMMENT '昵称',
+    student_no VARCHAR(20) NULL COMMENT '学号',
+    is_verified TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否实名',
+    credit_score INT NOT NULL DEFAULT 80 COMMENT '信用分',
+    status VARCHAR(32) NOT NULL DEFAULT 'NORMAL' COMMENT '账号状态',
+    contact_info VARCHAR(100) NULL COMMENT '联系方式',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_user_account_phone (phone),
+    UNIQUE KEY uk_user_account_student_no (student_no),
+    KEY idx_user_account_status_created_at (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='普通用户表';
+
+CREATE TABLE admin_account (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '管理员主键',
+    username VARCHAR(50) NOT NULL COMMENT '管理员用户名',
+    password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
+    status VARCHAR(32) NOT NULL DEFAULT 'NORMAL' COMMENT '账号状态',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    last_login_at DATETIME NULL COMMENT '最近登录时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_admin_account_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员表';
+
+CREATE TABLE group_order (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '拼单主键',
+    order_no VARCHAR(32) NOT NULL COMMENT '拼单编号',
+    creator_user_id BIGINT UNSIGNED NOT NULL COMMENT '发起人ID',
+    product_name VARCHAR(100) NOT NULL COMMENT '商品名称',
+    product_desc VARCHAR(255) NULL COMMENT '商品描述',
+    total_member_count INT UNSIGNED NOT NULL COMMENT '总人数',
+    current_member_count INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '当前有效人数',
+    estimated_total_amount DECIMAL(10,2) NOT NULL COMMENT '预估总额',
+    estimated_per_amount DECIMAL(10,2) NOT NULL COMMENT '预估人均',
+    actual_total_amount DECIMAL(10,2) NULL COMMENT '实际总额',
+    actual_per_amount DECIMAL(10,2) NULL COMMENT '实际人均',
+    pickup_point VARCHAR(100) NOT NULL COMMENT '取货点',
+    deadline_at DATETIME NOT NULL COMMENT '截止时间',
+    receipt_upload_deadline_at DATETIME NULL COMMENT '上传凭证截止时间',
+    expected_delivery_start_at DATETIME NULL COMMENT '预计最早送达时间',
+    expected_delivery_end_at DATETIME NULL COMMENT '预计最晚送达时间',
+    delivered_at DATETIME NULL COMMENT '实际送达时间',
+    status VARCHAR(32) NOT NULL COMMENT '主状态',
+    cancel_reason VARCHAR(255) NULL COMMENT '取消原因',
+    complaint_opened TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否开放投诉',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_group_order_order_no (order_no),
+    KEY idx_group_order_status_deadline_at (status, deadline_at),
+    KEY idx_group_order_creator_created_at (creator_user_id, created_at),
+    KEY idx_group_order_status_receipt_deadline_at (status, receipt_upload_deadline_at),
+    KEY idx_group_order_status_expected_delivery_end_at (status, expected_delivery_end_at),
+    CONSTRAINT fk_group_order_creator_user
+        FOREIGN KEY (creator_user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='拼单主表';
+
+CREATE TABLE group_order_member (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '拼单成员主键',
+    group_order_id BIGINT UNSIGNED NOT NULL COMMENT '拼单ID',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    is_creator TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否发起人',
+    remark VARCHAR(100) NULL COMMENT '成员备注',
+    join_status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE' COMMENT '加入状态',
+    pay_status VARCHAR(32) NOT NULL DEFAULT 'UNPAID' COMMENT '支付状态',
+    pay_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '支付金额',
+    paid_at DATETIME NULL COMMENT '支付时间',
+    refund_amount_total DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT '累计退款金额',
+    receive_status VARCHAR(32) NOT NULL DEFAULT 'NOT_READY' COMMENT '收货状态',
+    received_at DATETIME NULL COMMENT '收货时间',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_group_order_member_order_user (group_order_id, user_id),
+    KEY idx_group_order_member_order_join (group_order_id, join_status),
+    KEY idx_group_order_member_order_pay (group_order_id, pay_status),
+    KEY idx_group_order_member_order_receive (group_order_id, receive_status),
+    KEY idx_group_order_member_user_created_at (user_id, created_at),
+    CONSTRAINT fk_group_order_member_order
+        FOREIGN KEY (group_order_id) REFERENCES group_order(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_group_order_member_user
+        FOREIGN KEY (user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='拼单成员表';
+
+CREATE TABLE order_receipt (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '凭证主键',
+    group_order_id BIGINT UNSIGNED NOT NULL COMMENT '拼单ID',
+    uploader_user_id BIGINT UNSIGNED NOT NULL COMMENT '上传人ID',
+    image_url VARCHAR(255) NOT NULL COMMENT '凭证图片地址',
+    actual_total_amount DECIMAL(10,2) NOT NULL COMMENT '实际总额',
+    expected_delivery_start_at DATETIME NOT NULL COMMENT '预计最早送达',
+    expected_delivery_end_at DATETIME NOT NULL COMMENT '预计最晚送达',
+    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '上传时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_order_receipt_group_order_id (group_order_id),
+    KEY idx_order_receipt_uploader_uploaded_at (uploader_user_id, uploaded_at),
+    CONSTRAINT fk_order_receipt_order
+        FOREIGN KEY (group_order_id) REFERENCES group_order(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_order_receipt_uploader
+        FOREIGN KEY (uploader_user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单凭证表';
+
+CREATE TABLE complaint (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '投诉主键',
+    complaint_no VARCHAR(32) NOT NULL COMMENT '投诉编号',
+    group_order_id BIGINT UNSIGNED NOT NULL COMMENT '拼单ID',
+    complainant_user_id BIGINT UNSIGNED NOT NULL COMMENT '投诉人ID',
+    accused_user_id BIGINT UNSIGNED NOT NULL COMMENT '被投诉人ID',
+    type VARCHAR(32) NOT NULL COMMENT '投诉类型',
+    content VARCHAR(255) NOT NULL COMMENT '投诉内容',
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING' COMMENT '投诉状态',
+    opened_by_system TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否系统开放投诉',
+    handled_by_admin_id BIGINT UNSIGNED NULL COMMENT '处理管理员ID',
+    handle_result VARCHAR(255) NULL COMMENT '处理结果',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    handled_at DATETIME NULL COMMENT '处理时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_complaint_complaint_no (complaint_no),
+    UNIQUE KEY uk_complaint_order_complainant (group_order_id, complainant_user_id),
+    KEY idx_complaint_status_created_at (status, created_at),
+    KEY idx_complaint_type_status_created_at (type, status, created_at),
+    KEY idx_complaint_order_created_at (group_order_id, created_at),
+    KEY idx_complaint_accused_status_created_at (accused_user_id, status, created_at),
+    CONSTRAINT fk_complaint_order
+        FOREIGN KEY (group_order_id) REFERENCES group_order(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_complaint_complainant
+        FOREIGN KEY (complainant_user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_complaint_accused
+        FOREIGN KEY (accused_user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_complaint_admin
+        FOREIGN KEY (handled_by_admin_id) REFERENCES admin_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='投诉表';
+
+CREATE TABLE capital_record (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '资金流水主键',
+    biz_no VARCHAR(32) NOT NULL COMMENT '业务号',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    group_order_id BIGINT UNSIGNED NOT NULL COMMENT '拼单ID',
+    member_id BIGINT UNSIGNED NULL COMMENT '成员ID',
+    type VARCHAR(32) NOT NULL COMMENT '流水类型',
+    amount DECIMAL(10,2) NOT NULL COMMENT '金额',
+    status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS' COMMENT '流水状态',
+    remark VARCHAR(255) NULL COMMENT '备注',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    success_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '成功时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_capital_record_biz_no (biz_no),
+    KEY idx_capital_record_user_created_at (user_id, created_at),
+    KEY idx_capital_record_order_type_created_at (group_order_id, type, created_at),
+    KEY idx_capital_record_member_created_at (member_id, created_at),
+    CONSTRAINT fk_capital_record_user
+        FOREIGN KEY (user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_capital_record_order
+        FOREIGN KEY (group_order_id) REFERENCES group_order(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_capital_record_member
+        FOREIGN KEY (member_id) REFERENCES group_order_member(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='资金流水表';
+
+CREATE TABLE credit_change_record (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '信用分记录主键',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    change_value INT NOT NULL COMMENT '分值变化',
+    reason_type VARCHAR(32) NOT NULL COMMENT '原因类型',
+    related_order_id BIGINT UNSIGNED NULL COMMENT '关联订单ID',
+    related_complaint_id BIGINT UNSIGNED NULL COMMENT '关联投诉ID',
+    remark VARCHAR(255) NULL COMMENT '备注',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_credit_change_record_user_created_at (user_id, created_at),
+    KEY idx_credit_change_record_reason_created_at (reason_type, created_at),
+    KEY idx_credit_change_record_order_id (related_order_id),
+    KEY idx_credit_change_record_complaint_id (related_complaint_id),
+    CONSTRAINT fk_credit_change_record_user
+        FOREIGN KEY (user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='信用分变更表';
+
+CREATE TABLE notification (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '通知主键',
+    user_id BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    type VARCHAR(32) NOT NULL COMMENT '通知类型',
+    title VARCHAR(100) NOT NULL COMMENT '标题',
+    content VARCHAR(255) NOT NULL COMMENT '内容',
+    is_read TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否已读',
+    related_order_id BIGINT UNSIGNED NULL COMMENT '关联订单ID',
+    related_complaint_id BIGINT UNSIGNED NULL COMMENT '关联投诉ID',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    read_at DATETIME NULL COMMENT '已读时间',
+    PRIMARY KEY (id),
+    KEY idx_notification_user_read_created_at (user_id, is_read, created_at),
+    KEY idx_notification_user_type_created_at (user_id, type, created_at),
+    CONSTRAINT fk_notification_user
+        FOREIGN KEY (user_id) REFERENCES user_account(id)
+        ON UPDATE CASCADE
+        ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表';
+
+CREATE TABLE operation_log (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '日志主键',
+    operator_type VARCHAR(32) NOT NULL COMMENT '操作者类型',
+    operator_id BIGINT UNSIGNED NULL COMMENT '操作者ID',
+    biz_type VARCHAR(32) NOT NULL COMMENT '业务类型',
+    biz_id BIGINT UNSIGNED NULL COMMENT '业务ID',
+    action VARCHAR(64) NOT NULL COMMENT '动作',
+    detail_json JSON NULL COMMENT '详情JSON',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (id),
+    KEY idx_operation_log_operator_created_at (operator_type, operator_id, created_at),
+    KEY idx_operation_log_biz_created_at (biz_type, biz_id, created_at),
+    KEY idx_operation_log_action_created_at (action, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作日志表';
+
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+### 冲突修正说明
+
+1. 本 SQL 初稿**保留数据库级唯一约束**，但只对最关键的幂等点和唯一点加约束。
+2. `operation_log` 不做物理外键，避免 `USER/ADMIN/SYSTEM` 多态操作者造成结构僵硬。
+3. `credit_change_record`、`notification` 的 `related_*` 字段只建索引，不建强外键，保留历史记录灵活性。
+
+---
+
+# 13. Java 类名总表
+
+下面是后端最终需要创建的 Java 类总表，后端组可以直接照着建文件。
+
+## 13.1 response / exception / enums / util
+
+| 类名                        | 所属包                | 职责一句话说明         |
+| ------------------------- | ------------------ | --------------- |
+| `ApiResponse`             | `common.response`  | 统一响应包装          |
+| `PageResult`              | `common.response`  | 统一分页包装          |
+| `BusinessException`       | `common.exception` | 统一业务异常          |
+| `GlobalExceptionHandler`  | `common.exception` | 全局异常转统一 JSON    |
+| `ErrorCodeEnum`           | `common.enums`     | 错误码与默认 message  |
+| `RoleEnum`                | `common.enums`     | `USER/ADMIN`    |
+| `UserStatusEnum`          | `common.enums`     | `NORMAL/BANNED` |
+| `OrderStatusEnum`         | `common.enums`     | 订单主状态           |
+| `JoinStatusEnum`          | `common.enums`     | 成员加入状态          |
+| `PayStatusEnum`           | `common.enums`     | 成员支付状态          |
+| `ReceiveStatusEnum`       | `common.enums`     | 成员收货状态          |
+| `ComplaintTypeEnum`       | `common.enums`     | 投诉类型            |
+| `ComplaintStatusEnum`     | `common.enums`     | 投诉状态            |
+| `CapitalRecordTypeEnum`   | `common.enums`     | 支付/退款/结算类型      |
+| `CapitalRecordStatusEnum` | `common.enums`     | 流水状态            |
+| `CreditReasonTypeEnum`    | `common.enums`     | 信用分原因类型         |
+| `NotificationTypeEnum`    | `common.enums`     | 通知类型            |
+| `OperatorTypeEnum`        | `common.enums`     | 操作者类型           |
+| `BizTypeEnum`             | `common.enums`     | 业务类型            |
+| `ViewerRoleEnum`          | `common.enums`     | 订单详情查看身份        |
+| `BigDecimalUtil`          | `common.util`      | 金额计算与四舍五入       |
+| `BizNoGenerator`          | `common.util`      | 流水号生成           |
+| `CurrentLoginUtil`        | `common.util`      | 获取当前登录身份        |
+| `JwtUtil`                 | `common.util`      | JWT 生成/解析       |
+| `MaskUtil`                | `common.util`      | 手机号/学号脱敏        |
+| `OrderNoGenerator`        | `common.util`      | 订单号/投诉号生成       |
+| `PasswordUtil`            | `common.util`      | BCrypt 加密与匹配    |
+| `TimeUtil`                | `common.util`      | 时间转换与截止计算       |
+
+## 13.2 security
+
+| 类名                             | 所属包        | 职责一句话说明               |
+| ------------------------------ | ---------- | --------------------- |
+| `JwtAuthenticationFilter`      | `security` | 解析 JWT 并注入认证上下文       |
+| `LoginIdentity`                | `security` | 当前登录身份载体              |
+| `RestAuthenticationEntryPoint` | `security` | 未登录/Token 错误统一返回 JSON |
+| `RestAccessDeniedHandler`      | `security` | 无权限统一返回 JSON          |
+
+## 13.3 config
+
+| 类名                      | 所属包      | 职责一句话说明              |
+| ----------------------- | -------- | -------------------- |
+| `CorsConfig`            | `config` | CORS 配置              |
+| `JacksonConfig`         | `config` | 统一时间序列化格式            |
+| `JwtProperties`         | `config` | JWT 配置绑定             |
+| `MyBatisPlusConfig`     | `config` | MyBatis-Plus 配置      |
+| `ResourceMappingConfig` | `config` | `/uploads/**` 静态资源映射 |
+| `SecurityConfig`        | `config` | Spring Security 规则   |
+| `StorageProperties`     | `config` | 本地文件存储目录配置           |
+
+## 13.4 controller
+
+| 类名                         | 所属包                    | 职责一句话说明            |
+| -------------------------- | ---------------------- | ------------------ |
+| `AuthController`           | `controller.auth`      | 认证接口入口             |
+| `UserController`           | `controller.user`      | 用户资料、实名、信用分、我的拼单入口 |
+| `OrderController`          | `controller.order`     | 拼单主流程入口            |
+| `ComplaintController`      | `controller.complaint` | 用户投诉入口             |
+| `AdminUserController`      | `controller.admin`     | 后台用户管理入口           |
+| `AdminOrderController`     | `controller.admin`     | 后台订单管理入口           |
+| `AdminComplaintController` | `controller.admin`     | 后台投诉管理入口           |
+| `AdminRecordController`    | `controller.admin`     | 后台资金记录/日志入口        |
+
+## 13.5 dto
+
+| 类名                           | 所属包             | 职责一句话说明    |
+| ---------------------------- | --------------- | ---------- |
+| `UserRegisterRequest`        | `dto.auth`      | 用户注册入参     |
+| `UserLoginRequest`           | `dto.auth`      | 用户登录入参     |
+| `AdminLoginRequest`          | `dto.auth`      | 管理员登录入参    |
+| `VerifyStudentRequest`       | `dto.user`      | 实名认证入参     |
+| `UpdateUserProfileRequest`   | `dto.user`      | 修改资料入参     |
+| `UserCreditQueryRequest`     | `dto.user`      | 信用分列表查询入参  |
+| `MyOrdersQueryRequest`       | `dto.user`      | 我的拼单查询入参   |
+| `CreateOrderRequest`         | `dto.order`     | 创建拼单入参     |
+| `OrderListQueryRequest`      | `dto.order`     | 拼单列表查询入参   |
+| `JoinOrderRequest`           | `dto.order`     | 加入拼单入参     |
+| `UploadReceiptRequest`       | `dto.order`     | 上传凭证入参     |
+| `CreateComplaintRequest`     | `dto.complaint` | 提交投诉入参     |
+| `ComplaintListQueryRequest`  | `dto.complaint` | 我的投诉查询入参   |
+| `AdminUserQueryRequest`      | `dto.admin`     | 后台用户列表查询入参 |
+| `AdminBanUserRequest`        | `dto.admin`     | 封禁用户入参     |
+| `AdminOrderQueryRequest`     | `dto.admin`     | 后台订单列表查询入参 |
+| `AdminCancelOrderRequest`    | `dto.admin`     | 管理员取消订单入参  |
+| `AdminComplaintQueryRequest` | `dto.admin`     | 后台投诉列表查询入参 |
+| `HandleComplaintRequest`     | `dto.admin`     | 处理投诉入参     |
+| `CapitalRecordQueryRequest`  | `dto.admin`     | 资金记录查询入参   |
+| `OperationLogQueryRequest`   | `dto.admin`     | 日志查询入参     |
+
+## 13.6 vo
+
+| 类名                         | 所属包            | 职责一句话说明    |
+| -------------------------- | -------------- | ---------- |
+| `RegisterResultVO`         | `vo.auth`      | 注册结果       |
+| `LoginUserInfoVO`          | `vo.auth`      | 用户登录信息     |
+| `UserLoginVO`              | `vo.auth`      | 用户登录响应     |
+| `LoginAdminInfoVO`         | `vo.auth`      | 管理员登录信息    |
+| `AdminLoginVO`             | `vo.auth`      | 管理员登录响应    |
+| `CurrentLoginInfoVO`       | `vo.auth`      | 当前登录态信息    |
+| `SimpleResultVO`           | `vo.auth`      | 简单布尔响应     |
+| `VerifyStudentVO`          | `vo.user`      | 实名结果       |
+| `UserProfileVO`            | `vo.user`      | 用户资料       |
+| `UpdateUserProfileVO`      | `vo.user`      | 修改资料结果     |
+| `CreditRecordItemVO`       | `vo.user`      | 信用分记录项     |
+| `UserCreditVO`             | `vo.user`      | 信用分页面响应    |
+| `MyOrderListItemVO`        | `vo.user`      | 我的拼单列表项    |
+| `CurrentUserMemberBriefVO` | `vo.order`     | 当前用户成员简要信息 |
+| `CreateOrderVO`            | `vo.order`     | 创建拼单结果     |
+| `OrderListItemVO`          | `vo.order`     | 拼单列表项      |
+| `JoinOrderVO`              | `vo.order`     | 加入拼单结果     |
+| `PayOrderVO`               | `vo.order`     | 支付结果       |
+| `ExitOrderVO`              | `vo.order`     | 退出拼单结果     |
+| `UploadReceiptVO`          | `vo.order`     | 上传凭证结果     |
+| `MarkDeliveredVO`          | `vo.order`     | 确认送达结果     |
+| `ConfirmReceivedVO`        | `vo.order`     | 确认收货结果     |
+| `OrderDetailVO`            | `vo.order`     | 订单详情总 VO   |
+| `OrderBasicInfoVO`         | `vo.order`     | 订单基础信息     |
+| `InitiatorInfoVO`          | `vo.order`     | 发起人信息      |
+| `CurrentUserMemberVO`      | `vo.order`     | 当前用户成员信息   |
+| `OrderMemberVO`            | `vo.order`     | 成员列表项      |
+| `PaymentSummaryVO`         | `vo.order`     | 支付汇总       |
+| `ReceiptInfoVO`            | `vo.order`     | 凭证信息       |
+| `ReceiveInfoVO`            | `vo.order`     | 收货信息       |
+| `OrderTimelineItemVO`      | `vo.order`     | 时间线项       |
+| `ComplaintInfoVO`          | `vo.order`     | 订单投诉信息     |
+| `OrderActionFlagsVO`       | `vo.order`     | 详情按钮控制     |
+| `CreateComplaintVO`        | `vo.complaint` | 提交投诉结果     |
+| `MyComplaintItemVO`        | `vo.complaint` | 我的投诉列表项    |
+| `ComplaintDetailVO`        | `vo.complaint` | 投诉详情       |
+| `AdminUserItemVO`          | `vo.admin`     | 后台用户列表项    |
+| `AdminBanUserVO`           | `vo.admin`     | 封禁用户结果     |
+| `AdminUnbanUserVO`         | `vo.admin`     | 解封用户结果     |
+| `AdminOrderItemVO`         | `vo.admin`     | 后台订单列表项    |
+| `AdminCancelOrderVO`       | `vo.admin`     | 后台取消订单结果   |
+| `AdminComplaintItemVO`     | `vo.admin`     | 后台投诉列表项    |
+| `AdminComplaintDetailVO`   | `vo.admin`     | 后台投诉详情     |
+| `AdminHandleComplaintVO`   | `vo.admin`     | 后台处理投诉结果   |
+| `CapitalRecordItemVO`      | `vo.admin`     | 后台资金流水列表项  |
+| `OperationLogItemVO`       | `vo.admin`     | 后台日志列表项    |
+
+## 13.7 entity
+
+| 类名                   | 所属包      | 职责一句话说明 |
+| -------------------- | -------- | ------- |
+| `UserAccount`        | `entity` | 用户表实体   |
+| `AdminAccount`       | `entity` | 管理员表实体  |
+| `GroupOrder`         | `entity` | 订单主表实体  |
+| `GroupOrderMember`   | `entity` | 订单成员表实体 |
+| `OrderReceipt`       | `entity` | 凭证表实体   |
+| `Complaint`          | `entity` | 投诉表实体   |
+| `CapitalRecord`      | `entity` | 资金流水实体  |
+| `CreditChangeRecord` | `entity` | 信用分变化实体 |
+| `Notification`       | `entity` | 通知实体    |
+| `OperationLog`       | `entity` | 操作日志实体  |
+
+## 13.8 mapper
+
+| 类名                         | 所属包      | 职责一句话说明  |
+| -------------------------- | -------- | -------- |
+| `UserAccountMapper`        | `mapper` | 用户表持久化   |
+| `AdminAccountMapper`       | `mapper` | 管理员表持久化  |
+| `GroupOrderMapper`         | `mapper` | 订单主表持久化  |
+| `GroupOrderMemberMapper`   | `mapper` | 订单成员表持久化 |
+| `OrderReceiptMapper`       | `mapper` | 凭证表持久化   |
+| `ComplaintMapper`          | `mapper` | 投诉表持久化   |
+| `CapitalRecordMapper`      | `mapper` | 资金流水持久化  |
+| `CreditChangeRecordMapper` | `mapper` | 信用分记录持久化 |
+| `NotificationMapper`       | `mapper` | 通知持久化    |
+| `OperationLogMapper`       | `mapper` | 日志持久化    |
+
+## 13.9 service
+
+| 类名                      | 所属包       | 职责一句话说明    |
+| ----------------------- | --------- | ---------- |
+| `AuthService`           | `service` | 认证能力定义     |
+| `UserService`           | `service` | 用户能力定义     |
+| `OrderService`          | `service` | 订单主流程能力定义  |
+| `ComplaintService`      | `service` | 用户投诉能力定义   |
+| `AdminUserService`      | `service` | 后台用户管理能力定义 |
+| `AdminOrderService`     | `service` | 后台订单管理能力定义 |
+| `AdminComplaintService` | `service` | 后台投诉管理能力定义 |
+| `AdminRecordService`    | `service` | 后台记录查询能力定义 |
+| `NotificationService`   | `service` | 通知写入能力定义   |
+| `CapitalRecordService`  | `service` | 流水写入能力定义   |
+| `CreditService`         | `service` | 信用分能力定义    |
+| `OperationLogService`   | `service` | 日志写入能力定义   |
+
+## 13.10 service/impl
+
+| 类名                          | 所属包            | 职责一句话说明 |
+| --------------------------- | -------------- | ------- |
+| `AuthServiceImpl`           | `service.impl` | 认证实现    |
+| `UserServiceImpl`           | `service.impl` | 用户实现    |
+| `OrderServiceImpl`          | `service.impl` | 订单实现    |
+| `ComplaintServiceImpl`      | `service.impl` | 投诉实现    |
+| `AdminUserServiceImpl`      | `service.impl` | 后台用户实现  |
+| `AdminOrderServiceImpl`     | `service.impl` | 后台订单实现  |
+| `AdminComplaintServiceImpl` | `service.impl` | 后台投诉实现  |
+| `AdminRecordServiceImpl`    | `service.impl` | 后台记录实现  |
+| `NotificationServiceImpl`   | `service.impl` | 通知实现    |
+| `CapitalRecordServiceImpl`  | `service.impl` | 流水实现    |
+| `CreditServiceImpl`         | `service.impl` | 信用分实现   |
+| `OperationLogServiceImpl`   | `service.impl` | 日志实现    |
+
+## 13.11 task
+
+| 类名               | 所属包    | 职责一句话说明        |
+| ---------------- | ------ | -------------- |
+| `OrderScheduler` | `task` | 所有订单生命周期定时任务扫描 |
+
+---
+
+# 14. 后端第一批建文件清单
+
+当前仓库还是骨架阶段，第一批文件必须按真正开工顺序创建，先建基础设施，再建认证与用户，再建订单主链路。 
+
+## 第一批：统一基础设施
+
+| 先建哪些类                                                                                                                         | 为什么先建                      | 建完后前端能联调哪些页面                |
+| ----------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------- |
+| `ApiResponse` `PageResult` `BusinessException` `GlobalExceptionHandler` `ErrorCodeEnum`                                       | 没有统一响应和异常，前后端无法稳定对接        | 暂无正式页面，但后端响应格式先统一           |
+| 全部状态枚举类                                                                                                                       | 状态名必须先固定，避免 Service 里乱写字符串 | 前端可以先按固定状态名做映射              |
+| `JwtUtil` `PasswordUtil` `CurrentLoginUtil` `OrderNoGenerator` `BizNoGenerator` `BigDecimalUtil` `MaskUtil` `TimeUtil`        | 认证、编号、金额、脱敏是后续所有业务基础       | 暂无                          |
+| `JwtProperties` `StorageProperties` `JacksonConfig` `MyBatisPlusConfig` `CorsConfig` `ResourceMappingConfig` `SecurityConfig` | 没有配置类，应用无法稳定启动             | 前端可以先保证 axios 请求不会被 CORS 卡住 |
+| `JwtAuthenticationFilter` `LoginIdentity` `RestAuthenticationEntryPoint` `RestAccessDeniedHandler`                            | 认证链路必须先打通                  | 登录态恢复逻辑可开始联调                |
+| 10 个 `Entity` + 10 个 `Mapper`                                                                                                 | 先有数据模型，后续 Service 才能落地     | 暂无                          |
+| 建表 SQL                                                                                                                        | 后端所有模块的唯一数据基线              | 暂无                          |
+
+## 第二批：认证与用户
+
+| 先建哪些类                                                                                                                               | 为什么先建                     | 建完后前端能联调哪些页面     |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------- | ---------------- |
+| `UserRegisterRequest` `UserLoginRequest` `AdminLoginRequest`                                                                        | 认证入参先固定                   | 登录页、注册页、管理员登录页   |
+| `RegisterResultVO` `LoginUserInfoVO` `UserLoginVO` `LoginAdminInfoVO` `AdminLoginVO` `CurrentLoginInfoVO` `SimpleResultVO`          | 认证返回结构先固定                 | 登录页、路由守卫         |
+| `AuthService` `AuthServiceImpl` `AuthController`                                                                                    | 注册、登录、`/auth/me` 是第一批真实接口 | 登录页、注册页、管理员登录页   |
+| `VerifyStudentRequest` `VerifyStudentVO` `UpdateUserProfileRequest` `UserProfileVO` `UserCreditVO` `MyOrderListItemVO` 等用户相关 DTO/VO | 用户模块接口结构固定                | 实名认证页、个人中心页、信用分页 |
+| `UserService` `UserServiceImpl` `UserController`                                                                                    | 先跑通实名认证与基本资料              | 实名页、个人资料页        |
+
+## 第三批：订单主链路
+
+| 先建哪些类                                                                                             | 为什么先建                  | 建完后前端能联调哪些页面    |
+| ------------------------------------------------------------------------------------------------- | ---------------------- | --------------- |
+| `CreateOrderRequest` `OrderListQueryRequest` `JoinOrderRequest` `UploadReceiptRequest`            | 订单主动作入参固定              | 发起拼单页、拼单列表页、详情页 |
+| `CreateOrderVO` `OrderListItemVO` `JoinOrderVO` `PayOrderVO` `ExitOrderVO` `OrderDetailVO` 全套子 VO | 列表和详情是前端最核心依赖          | 列表页、详情页         |
+| `CapitalRecordService` `CapitalRecordServiceImpl` `OperationLogService` `OperationLogServiceImpl` | 支付、退款、日志必须先能写          | 支付与状态流转联调       |
+| `OrderService` `OrderServiceImpl` `OrderController`                                               | 订单主链路核心实现              | 发起、加入、支付、详情、退出  |
+| `OrderScheduler`                                                                                  | 未成团超时取消和自动成团后的延迟逻辑必须可跑 | P0 验收可联调        |
+| `NotificationService` `NotificationServiceImpl`                                                   | 成团通知、取消通知、后续送达通知统一落表   | 虽无通知页面，但数据链路完整  |
+
+---
+
+# 15. 前后端对接风险清单
+
+下面这 10 个点是联调最容易炸的地方，后端必须按最终预防规则执行，不留模糊空间。
+
+| 风险点                 | 触发场景                                                                          | 后果                         | 最终预防规则                                                                                |
+| ------------------- | ----------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------- |
+| 字段名不一致              | 后端返回 `groupOrderId`，前端取 `orderId`；后端返回 `productDescription`，前端取 `productDesc` | 页面数据空白、按钮条件错乱              | **所有 JSON 字段统一 lowerCamelCase，且只用冻结契约字段名；Entity 可以 `groupOrderId`，VO 一律输出 `orderId`** |
+| 时间格式不一致             | 后端直接返回 `LocalDateTime` 默认序列化或带时区                                              | 前端显示异常、表单回填失败              | **DTO/VO 的时间字段统一用 `String`，格式固定 `yyyy-MM-dd HH:mm:ss`**                               |
+| 金额精度错误              | 后端用 `double` 或不统一四舍五入                                                         | 列表金额、退款金额、结算金额出现 11.999999 | **金额计算只用 `BigDecimal`，统一 `HALF_UP` 保留 2 位**                                           |
+| 状态机判断不一致            | 前端以为发起人可退出；后端放行；或后端允许未实名访问订单                                                  | 联调时按钮和接口行为相互打架             | **状态名只认冻结枚举；发起人不可退出；需要实名的接口后端也必须硬校验**                                                 |
+| 分页结构不一致             | 后端返回 MyBatis 默认分页对象                                                           | 前端表格不认                     | **分页响应只允许 `{ list, page, pageSize, total, pages }`**                                  |
+| `actionFlags` 推导不一致 | 前端自己推导按钮，后端也推导，条件不同                                                           | 详情页按钮错显/误禁用                | **按钮展示唯一信源是后端 `actionFlags`；前端不再自行推断业务权限**                                            |
+| 错误码不一致              | 后端把重复投诉写成 `40001`，前端按 `40910` 处理                                              | 前端跳错页、提示错、刷新错              | **所有业务冲突码固定按本契约实现，不能临时换码**                                                            |
+| 用户 / 管理员 token 混用   | 用户 token 去调 `/api/admin/**`；管理员 token 去调 `/api/orders/**`                     | 越权或错误信息不清晰                 | **JWT 必带 `role`；权限不匹配统一返回 `40301`；`/api/auth/me` 根据 token role 查对应表**                 |
+| 退款重复生成              | 用户退出、管理员取消、投诉处理、定时任务同时命中                                                      | 一笔订单被退两次                   | **所有退款与结算都必须走 `biz_no` 幂等校验；取消退款始终按 `payAmount - refundAmountTotal` 计算净额**            |
+| 自动任务与手动操作并发冲突       | 用户刚上传凭证，任务同一刻扫描“未上传凭证超时”；用户刚确认收货，任务同刻自动确认                                     | 状态回滚、重复日志、重复结算             | **所有任务进入 Service 前先按当前最新数据库状态二次校验；所有关键动作走事务；任务逻辑必须幂等**                                |
+
+### 补充风险 11：凭证图片访问失败
+
+| 风险点               | 触发场景                                            | 后果        | 最终预防规则                                            |
+| ----------------- | ----------------------------------------------- | --------- | ------------------------------------------------- |
+| 凭证图片返回 URL 但前端打不开 | `/uploads/**` 被 Security 拦截或 ResourceMapping 未配 | 详情页图片加载失败 | **后端统一返回可直接访问的 `imageUrl`，并放行 `GET /uploads/**`** |
+
+### 补充风险 12：信用分重复扣减
+
+| 风险点                                                          | 触发场景           | 后果                | 最终预防规则                                                             |
+| ------------------------------------------------------------ | -------------- | ----------------- | ------------------------------------------------------------------ |
+| 投诉成立时同时写 `COMPLAINT_CONFIRMED -10` 和 `NO_RECEIPT_UPLOAD -10` | 发起人一次投诉被扣 20 分 | 前端信用分记录和后台处理结果不一致 | **V1 只保留 `COMPLAINT_CONFIRMED -10`；不再追加 `NO_RECEIPT_UPLOAD` 额外扣分** |
+
+---
+
+这份就是后端开发组可以直接开工的冻结版。

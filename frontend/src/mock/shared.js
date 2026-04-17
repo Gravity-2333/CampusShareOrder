@@ -51,6 +51,28 @@ export const maskPhone = (value) =>
 export const maskStudentNo = (value) =>
   value ? `${value.slice(0, 2)}****${value.slice(-2)}` : ''
 
+const toDate = (value) => {
+  if (!value) {
+    return null
+  }
+
+  const normalized = String(value).replace(' ', 'T')
+  const date = new Date(normalized)
+
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+export const addMinutes = (value, minutes) => {
+  const date = toDate(value)
+
+  if (!date) {
+    return ''
+  }
+
+  date.setMinutes(date.getMinutes() + minutes)
+  return date.toISOString().slice(0, 19).replace('T', ' ')
+}
+
 const compareTimeline = (left, right) => String(left.at).localeCompare(String(right.at))
 
 const buildTimeline = (order, complaints) => {
@@ -74,11 +96,33 @@ const buildTimeline = (order, complaints) => {
       })
     }
 
-    if (member.joinStatus === 'EXITED') {
+    if (member.paidAt) {
+      timeline.push({
+        action: member.role === 'INITIATOR' ? 'INITIATOR_PAID' : 'MEMBER_PAID',
+        at: member.paidAt,
+        description:
+          member.role === 'INITIATOR'
+            ? `${member.nickname} 已完成发起人支付`
+            : `${member.nickname} 已完成支付`,
+      })
+    }
+
+    if (member.exitedAt) {
       timeline.push({
         action: 'MEMBER_EXITED',
-        at: order.deadlineAt,
+        at: member.exitedAt,
         description: `${member.nickname} 已退出拼单`,
+      })
+    }
+
+    if (member.receivedAt) {
+      timeline.push({
+        action: member.role === 'INITIATOR' ? 'INITIATOR_RECEIVED' : 'MEMBER_RECEIVED',
+        at: member.receivedAt,
+        description:
+          member.role === 'INITIATOR'
+            ? `${member.nickname} 已同步为收货完成`
+            : `${member.nickname} 已确认收货`,
       })
     }
   })
@@ -204,10 +248,15 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
     },
     currentUserMember: currentUserMember
       ? {
+          exitedAt: currentUserMember.exitedAt || null,
           joinStatus: currentUserMember.joinStatus,
+          joinedAt: currentUserMember.joinedAt || null,
           memberId: currentUserMember.memberId,
           myRole: currentUserMember.role,
+          paidAt: currentUserMember.paidAt || null,
+          payAmount: currentUserMember.payAmount,
           payStatus: currentUserMember.payStatus,
+          receivedAt: currentUserMember.receivedAt || null,
           receiveStatus: currentUserMember.receiveStatus,
           refundAmountTotal: currentUserMember.refundAmountTotal,
         }
@@ -219,10 +268,14 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
       userId: order.creatorUserId,
     },
     memberList: order.members.map((member) => ({
+      exitedAt: member.exitedAt || null,
       joinStatus: member.joinStatus,
+      joinedAt: member.joinedAt || null,
       nickname: member.nickname,
+      paidAt: member.paidAt || null,
       payAmount: member.payAmount,
       payStatus: member.payStatus,
+      receivedAt: member.receivedAt || null,
       receiveStatus: member.receiveStatus,
       refundAmountTotal: member.refundAmountTotal,
       role: member.role,
@@ -246,10 +299,11 @@ export const buildOrderDetail = (orderId, viewerId, isAdmin = false) => {
         }
       : null,
     receiveInfo: {
-      autoConfirmDeadlineAt: order.deliveredAt,
+      autoConfirmDeadlineAt: addMinutes(order.deliveredAt, 30),
       deliveredAt: order.deliveredAt,
       receiveStatusSummary: order.members.map((item) => ({
         nickname: item.nickname,
+        receivedAt: item.receivedAt || null,
         receiveStatus: item.receiveStatus,
       })),
     },

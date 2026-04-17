@@ -1,6 +1,7 @@
 import {
   complaintStatusTextMap,
   complaintTypeTextMap,
+  joinStatusTextMap,
   orderStatusTextMap,
   payStatusTextMap,
   receiveStatusTextMap,
@@ -36,6 +37,8 @@ export const formatUserStatus = (value) => userStatusTextMap[value] || value || 
 export const formatOrderStatus = (value) => orderStatusTextMap[value] || value || '--'
 
 export const formatPayStatus = (value) => payStatusTextMap[value] || value || '--'
+
+export const formatJoinStatus = (value) => joinStatusTextMap[value] || value || '--'
 
 export const formatReceiveStatus = (value) => receiveStatusTextMap[value] || value || '--'
 

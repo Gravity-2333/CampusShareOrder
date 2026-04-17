@@ -1,6 +1,9 @@
 export const roleTextMap = {
   ADMIN: '管理员',
+  INITIATOR: '发起人',
+  MEMBER: '成员',
   USER: '用户',
+  VISITOR: '访客',
 }
 
 export const userStatusTextMap = {
@@ -22,6 +25,12 @@ export const payStatusTextMap = {
   UNPAID: '未支付',
 }
 
+export const joinStatusTextMap = {
+  ACTIVE: '已参与',
+  CANCELED: '已取消',
+  EXITED: '已退出',
+}
+
 export const receiveStatusTextMap = {
   AUTO_RECEIVED: '系统代收',
   NOT_READY: '未开始收货',
@@ -40,10 +49,14 @@ export const complaintTypeTextMap = {
 }
 
 export const statusToneMap = {
+  ACTIVE: 'success',
+  AUTO_RECEIVED: 'success',
   BANNED: 'danger',
   CANCELED: 'info',
   COMPLETED: 'success',
+  EXITED: 'info',
   GROUPED: 'success',
+  NOT_READY: 'info',
   NORMAL: 'success',
   OPEN: 'warning',
   PAID: 'success',

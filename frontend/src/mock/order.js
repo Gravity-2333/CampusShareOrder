@@ -1,5 +1,5 @@
 import { getDatabase, mutateDatabase, pageResult, timestamp } from './database'
-import { buildOrderDetail, requireUser, sleep } from './shared'
+import { addMinutes, buildOrderDetail, requireUser, sleep } from './shared'
 import { makeFailure } from './database'
 
 export const createOrder = async (payload) => {
@@ -24,12 +24,15 @@ export const createOrder = async (payload) => {
       totalMemberCount: Number(payload.totalMemberCount),
       members: [
         {
+          exitedAt: null,
           joinStatus: 'ACTIVE',
           joinedAt: timestamp(),
           memberId,
           nickname: user.nickname,
           payAmount: Number(payload.estimatedTotalAmount) / Number(payload.totalMemberCount),
+          paidAt: null,
           payStatus: 'UNPAID',
+          receivedAt: null,
           receiveStatus: 'NOT_READY',
           refundAmountTotal: 0,
           role: 'INITIATOR',
@@ -107,12 +110,15 @@ export const joinOrder = async (orderId) => {
       Math.max(0, ...draft.orders.flatMap((item) => item.members.map((member) => member.memberId))) + 1
 
     target.members.push({
+      exitedAt: null,
       joinStatus: 'ACTIVE',
       joinedAt: timestamp(),
       memberId,
       nickname: user.nickname,
       payAmount: Number(target.estimatedTotalAmount) / Number(target.totalMemberCount),
+      paidAt: null,
       payStatus: 'UNPAID',
+      receivedAt: null,
       receiveStatus: 'NOT_READY',
       refundAmountTotal: 0,
       role: 'MEMBER',
@@ -133,9 +139,10 @@ const refreshOrderStatusAfterPayment = (order) => {
     order.currentMemberCount === order.totalMemberCount &&
     order.members.every((member) => member.joinStatus === 'ACTIVE' && member.payStatus === 'PAID')
   ) {
+    const groupedAt = timestamp()
     order.status = 'GROUPED'
-    order.receiptUploadDeadlineAt = timestamp()
-    order.expectedDeliveryEndAt = '2026-04-17 23:00:00'
+    order.receiptUploadDeadlineAt = addMinutes(groupedAt, 30)
+    order.expectedDeliveryEndAt = addMinutes(groupedAt, 90)
   }
 }
 
@@ -155,6 +162,7 @@ export const payOrder = async (orderId) => {
     }
 
     member.payStatus = 'PAID'
+    member.paidAt = timestamp()
     refreshOrderStatusAfterPayment(order)
   })
 
@@ -184,6 +192,7 @@ export const exitOrder = async (orderId) => {
     }
 
     member.joinStatus = 'EXITED'
+    member.exitedAt = timestamp()
     order.currentMemberCount = Math.max(order.currentMemberCount - 1, 0)
   })
 
@@ -232,10 +241,12 @@ export const markDelivered = async (orderId) => {
       makeFailure(40301, '只有发起人可以确认送达')
     }
 
+    const deliveredAt = timestamp()
     order.status = 'WAIT_RECEIVE'
-    order.deliveredAt = timestamp()
+    order.deliveredAt = deliveredAt
     order.members.forEach((member) => {
       member.receiveStatus = member.role === 'INITIATOR' ? 'RECEIVED' : 'WAIT_CONFIRM'
+      member.receivedAt = member.role === 'INITIATOR' ? deliveredAt : null
     })
   })
 
@@ -261,6 +272,7 @@ export const confirmReceived = async (orderId) => {
     }
 
     member.receiveStatus = 'RECEIVED'
+    member.receivedAt = timestamp()
 
     if (
       order.members

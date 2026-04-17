@@ -1,10 +1,11 @@
 import provider from './provider'
+import { normalizeOrderDetail } from './adapters/order'
 
 export const createOrder = (payload) => provider.order.createOrder(payload)
 
 export const getOrderList = (params) => provider.order.getOrderList(params)
 
-export const getOrderDetail = (orderId) => provider.order.getOrderDetail(orderId)
+export const getOrderDetail = async (orderId) => normalizeOrderDetail(await provider.order.getOrderDetail(orderId))
 
 export const joinOrder = (orderId, payload) => provider.order.joinOrder(orderId, payload)
 

@@ -1,4 +1,5 @@
 import provider from './provider'
+import { normalizeOrderDetail } from './adapters/order'
 
 export const getAdminUsers = (params) => provider.admin.getUsers(params)
 
@@ -10,7 +11,8 @@ export const unbanUser = (userId) => provider.admin.unbanUser(userId)
 
 export const getAdminOrders = (params) => provider.admin.getOrders(params)
 
-export const getAdminOrderDetail = (orderId) => provider.admin.getOrderDetail(orderId)
+export const getAdminOrderDetail = async (orderId) =>
+  normalizeOrderDetail(await provider.admin.getOrderDetail(orderId))
 
 export const cancelAdminOrder = (orderId, payload) => provider.admin.cancelOrder(orderId, payload)
 

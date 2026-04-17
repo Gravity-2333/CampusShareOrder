@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import PageSection from '../../components/common/PageSection.vue'
@@ -8,6 +9,7 @@ import { useAppStore } from '../../stores/app'
 import { useAdminStore } from '../../stores/admin'
 import { useUserStore } from '../../stores/user'
 
+const router = useRouter()
 const appStore = useAppStore()
 const adminStore = useAdminStore()
 const userStore = useUserStore()
@@ -32,6 +34,20 @@ onMounted(async () => {
     ElMessage.error(error.message)
   }
 })
+
+const handleResetMock = async () => {
+  try {
+    const reset = await appStore.resetMockData()
+
+    if (reset) {
+      userStore.clearSession()
+      ElMessage.success('Mock 数据已重置，请重新登录查看初始状态')
+      router.push('/admin/login')
+    }
+  } catch (error) {
+    ElMessage.error(error.message)
+  }
+}
 </script>
 
 <template>
@@ -69,6 +85,16 @@ onMounted(async () => {
             <li><span>当前目标</span><strong>前端主干与契约展示基座</strong></li>
             <li><span>下一重点</span><strong>订单详情与动作闭环深化</strong></li>
           </ul>
+          <div v-if="appStore.apiMode === 'mock'" class="page-actions">
+            <el-button
+              type="warning"
+              plain
+              :loading="appStore.mockResetting"
+              @click="handleResetMock"
+            >
+              重置 Mock 数据
+            </el-button>
+          </div>
         </div>
       </div>
     </PageSection>

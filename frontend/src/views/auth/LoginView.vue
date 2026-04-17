@@ -15,8 +15,28 @@ const form = reactive({
   phone: '13800000001',
 })
 const loading = ref(false)
+const demoAccounts = [
+  { label: '张三', phone: '13800000001' },
+  { label: '李四', phone: '13800000002' },
+  { label: '王五', phone: '13800000003' },
+]
+
+const applyDemoAccount = (phone) => {
+  form.phone = phone
+  form.password = '123456'
+}
 
 const handleSubmit = async () => {
+  if (!form.phone.trim()) {
+    ElMessage.warning('请输入手机号')
+    return
+  }
+
+  if (!form.password.trim()) {
+    ElMessage.warning('请输入密码')
+    return
+  }
+
   loading.value = true
 
   try {
@@ -40,6 +60,16 @@ const handleSubmit = async () => {
         当前运行模式为 <strong>{{ appStore.apiMode }}</strong
         >，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
       </p>
+      <div v-if="appStore.apiMode === 'mock'" class="page-actions">
+        <el-button
+          v-for="account in demoAccounts"
+          :key="account.phone"
+          plain
+          @click="applyDemoAccount(account.phone)"
+        >
+          使用{{ account.label }}账号
+        </el-button>
+      </div>
     </section>
 
     <el-card class="auth-card" shadow="hover">

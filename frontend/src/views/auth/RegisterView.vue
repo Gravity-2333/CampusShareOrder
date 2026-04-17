@@ -16,6 +16,21 @@ const form = reactive({
 const loading = ref(false)
 
 const handleSubmit = async () => {
+  if (!form.nickname.trim()) {
+    ElMessage.warning('请输入昵称')
+    return
+  }
+
+  if (!form.phone.trim()) {
+    ElMessage.warning('请输入手机号')
+    return
+  }
+
+  if (!form.password.trim()) {
+    ElMessage.warning('请输入密码')
+    return
+  }
+
   loading.value = true
 
   try {
@@ -42,6 +57,14 @@ const handleSubmit = async () => {
           <el-button link @click="router.push('/login')">返回登录</el-button>
         </div>
       </template>
+
+      <el-alert
+        v-if="userStore.session.role === ''"
+        class="auth-alert"
+        title="注册后将进入用户端登录流程，管理员账号与普通用户账号分离。"
+        type="info"
+        :closable="false"
+      />
 
       <el-form label-position="top" :model="form" @submit.prevent="handleSubmit">
         <el-form-item label="昵称">

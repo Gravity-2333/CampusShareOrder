@@ -214,6 +214,10 @@
   border-radius: var(--radius-large);
 }
 
+.auth-alert {
+  margin-bottom: var(--space-sm);
+}
+
 .card-header-row {
   align-items: center;
   display: flex;

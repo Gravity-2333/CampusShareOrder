@@ -313,6 +313,7 @@ onMounted(() => {
               </li>
               <li><span>投诉数量</span><strong>{{ detail.complaintInfo.complaintCount }}</strong></li>
               <li><span>我的投诉状态</span><strong>{{ detail.complaintInfo.myComplaintStatus || '--' }}</strong></li>
+              <li><span>我的投诉单</span><strong>{{ detail.complaintInfo.myComplaintId || '--' }}</strong></li>
               <li>
                 <span>凭证金额</span>
                 <strong>{{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}</strong>
@@ -435,6 +436,14 @@ onMounted(() => {
             @click="router.push(`/complaints/create?orderId=${detail.basicInfo.orderId}`)"
           >
             发起投诉
+          </el-button>
+          <el-button
+            v-else-if="detail.complaintInfo.myComplaintId"
+            type="danger"
+            plain
+            @click="router.push(`/complaints/${detail.complaintInfo.myComplaintId}`)"
+          >
+            查看投诉
           </el-button>
         </div>
       </template>

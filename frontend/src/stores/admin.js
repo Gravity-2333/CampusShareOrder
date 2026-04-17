@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import {
   banUser,
   cancelAdminOrder,
+  getAdminComplaintDetail,
   getAdminComplaints,
   getAdminOrders,
   getAdminUsers,
@@ -22,6 +23,12 @@ const defaultPageData = () => ({
 
 export const useAdminStore = defineStore('admin', {
   state: () => ({
+    complaintDetail: null,
+    complaintDetailLoading: false,
+    complaintsFilters: {
+      page: 1,
+      pageSize: 10,
+    },
     complaintsLoading: false,
     complaintsPage: defaultPageData(),
     logsLoading: false,
@@ -95,21 +102,47 @@ export const useAdminStore = defineStore('admin', {
       this.complaintsLoading = true
 
       try {
-        this.complaintsPage = await getAdminComplaints(params)
+        this.complaintsFilters = {
+          ...this.complaintsFilters,
+          ...params,
+        }
+        this.complaintsPage = await getAdminComplaints(this.complaintsFilters)
         return this.complaintsPage
       } finally {
         this.complaintsLoading = false
       }
     },
-    async processComplaint(complaintId) {
+    async loadComplaintDetail(complaintId) {
+      this.complaintDetailLoading = true
+
+      try {
+        this.complaintDetail = await getAdminComplaintDetail(complaintId)
+        return this.complaintDetail
+      } finally {
+        this.complaintDetailLoading = false
+      }
+    },
+    async processComplaint(complaintId, payload = { handleResult: '管理员已介入处理' }) {
       this.submitting = true
 
       try {
-        await handleAdminComplaint(complaintId, { handleResult: '管理员已介入处理' })
-        return await this.loadComplaints({
-          page: this.complaintsPage.page || 1,
-          pageSize: this.complaintsPage.pageSize || 10,
-        })
+        await handleAdminComplaint(complaintId, payload)
+
+        const refreshTasks = [
+          this.loadComplaints(this.complaintsFilters),
+          this.loadOrders({
+            page: this.ordersPage.page || 1,
+            pageSize: this.ordersPage.pageSize || 10,
+          }),
+          this.loadDashboardMetrics(),
+        ]
+
+        if (this.complaintDetail?.complaintId === Number(complaintId)) {
+          refreshTasks.push(this.loadComplaintDetail(complaintId))
+        }
+
+        await Promise.allSettled(refreshTasks)
+        return this.complaintsPage
       } finally {
         this.submitting = false
       }

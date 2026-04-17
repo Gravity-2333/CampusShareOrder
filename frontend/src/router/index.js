@@ -11,111 +11,121 @@ const routes = [
     redirect: '/orders',
   },
   {
+    path: '/',
     children: [
       {
+        path: '/login',
         component: () => import('../views/auth/LoginView.vue'),
         meta: { guestOnly: true, title: '用户登录' },
-        path: '/login',
       },
       {
+        path: '/register',
         component: () => import('../views/auth/RegisterView.vue'),
         meta: { guestOnly: true, title: '用户注册' },
-        path: '/register',
       },
       {
+        path: '/admin/login',
         component: () => import('../views/admin/AdminLoginView.vue'),
         meta: { guestOnly: true, title: '管理员登录' },
-        path: '/admin/login',
       },
     ],
-    path: '/',
   },
   {
+    path: '/',
+    component: UserLayout,
     children: [
       {
+        path: '/orders',
         component: () => import('../views/order/OrderListView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '拼单大厅' },
-        path: '/orders',
       },
       {
+        path: '/orders/create',
         component: () => import('../views/order/CreateOrderView.vue'),
         meta: { requiresAuth: true, requiresVerified: true, role: 'USER', title: '发起拼单' },
-        path: '/orders/create',
       },
       {
+        path: '/orders/:orderId',
         component: () => import('../views/order/OrderDetailView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '拼单详情' },
-        path: '/orders/:orderId',
       },
       {
+        path: '/my-orders',
         component: () => import('../views/order/MyOrdersView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '我的拼单' },
-        path: '/my-orders',
       },
       {
+        path: '/verify-student',
         component: () => import('../views/auth/VerifyStudentView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '实名认证' },
-        path: '/verify-student',
       },
       {
+        path: '/profile',
         component: () => import('../views/user/ProfileView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '个人资料' },
-        path: '/profile',
       },
       {
+        path: '/credit',
         component: () => import('../views/user/CreditView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '信用分' },
-        path: '/credit',
       },
       {
+        path: '/complaints',
         component: () => import('../views/complaint/MyComplaintView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '我的投诉' },
-        path: '/complaints',
       },
       {
+        path: '/complaints/create',
         component: () => import('../views/complaint/ComplaintCreateView.vue'),
         meta: { requiresAuth: true, role: 'USER', title: '发起投诉' },
-        path: '/complaints/create',
+      },
+      {
+        path: '/complaints/:complaintId',
+        component: () => import('../views/complaint/ComplaintDetailView.vue'),
+        meta: { requiresAuth: true, role: 'USER', title: '投诉详情' },
       },
     ],
-    component: UserLayout,
-    path: '/',
   },
   {
+    path: '/',
+    component: AdminLayout,
     children: [
       {
+        path: '/admin/dashboard',
         component: () => import('../views/admin/AdminDashBoardView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '管理台' },
-        path: '/admin/dashboard',
       },
       {
+        path: '/admin/users',
         component: () => import('../views/admin/AdminUserView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '用户管理' },
-        path: '/admin/users',
       },
       {
+        path: '/admin/orders',
         component: () => import('../views/admin/AdminOrderView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '订单管理' },
-        path: '/admin/orders',
       },
       {
+        path: '/admin/complaints',
         component: () => import('../views/admin/AdminComplaintView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '投诉管理' },
-        path: '/admin/complaints',
       },
       {
+        path: '/admin/complaints/:complaintId',
+        component: () => import('../views/admin/AdminComplaintDetailView.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN', title: '投诉详情' },
+      },
+      {
+        path: '/admin/records/capital',
         component: () => import('../views/admin/AdminCapitalView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '资金记录' },
-        path: '/admin/records/capital',
       },
       {
+        path: '/admin/records/logs',
         component: () => import('../views/admin/AdminLogView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '操作日志' },
-        path: '/admin/records/logs',
       },
     ],
-    component: AdminLayout,
-    path: '/',
   },
 ]
 

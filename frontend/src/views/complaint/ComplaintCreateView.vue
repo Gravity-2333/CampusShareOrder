@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -15,9 +15,15 @@ const complaintStore = useComplaintStore()
 const loading = ref(false)
 const form = reactive({
   content: '',
-  orderId: Number(route.query.orderId || 1),
+  orderId: Number(route.query.orderId || 0),
   type: 'NOT_PURCHASED',
 })
+
+const previewRows = computed(() => [
+  { label: 'orderId', value: form.orderId || '--' },
+  { label: 'type', value: form.type },
+  { label: 'content', value: form.content || '--' },
+])
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -33,9 +39,9 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    await complaintStore.submitComplaint(form)
+    const result = await complaintStore.submitComplaint(form)
     ElMessage.success('投诉已提交')
-    router.push('/complaints')
+    router.push(`/complaints/${result.complaintId}`)
   } catch (error) {
     ElMessage.error(error.message)
   } finally {
@@ -56,6 +62,12 @@ const handleSubmit = async () => {
     </div>
 
     <PageSection title="发起投诉" description="对应 POST /api/complaints。">
+      <el-alert
+        title="投诉提交后将进入待处理状态，后续可在我的投诉中查看处理结果。"
+        type="warning"
+        :closable="false"
+      />
+
       <el-form label-position="top" :model="form" class="form-grid">
         <el-form-item label="订单 ID">
           <el-input-number v-model="form.orderId" :min="1" />
@@ -70,16 +82,19 @@ const handleSubmit = async () => {
           <el-input v-model="form.content" type="textarea" :rows="4" />
         </el-form-item>
       </el-form>
+
       <div class="page-actions">
+        <el-button @click="router.push('/complaints')">返回我的投诉</el-button>
         <el-button type="danger" :loading="loading" @click="handleSubmit">提交投诉</el-button>
       </div>
     </PageSection>
 
-    <PageSection title="提交预览" description="方便在前端阶段核对投诉请求字段与文档一致。">
+    <PageSection title="提交预览" description="方便在前端阶段核对投诉请求字段与契约一致。">
       <ul class="detail-list">
-        <li><span>orderId</span><strong>{{ form.orderId || '--' }}</strong></li>
-        <li><span>type</span><strong>{{ form.type }}</strong></li>
-        <li><span>content</span><strong>{{ form.content || '--' }}</strong></li>
+        <li v-for="row in previewRows" :key="row.label">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.value }}</strong>
+        </li>
       </ul>
     </PageSection>
   </div>

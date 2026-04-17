@@ -1,14 +1,31 @@
 <script setup>
-import { onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import AppPagination from '../../components/common/AppPagination.vue'
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
+import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
-import { formatComplaintStatus, formatComplaintType } from '../../utils/format'
+import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
 
+const router = useRouter()
 const adminStore = useAdminStore()
+
+const stats = computed(() => [
+  {
+    label: '投诉总量',
+    value: adminStore.complaintsPage.total,
+    hint: '管理端列表与用户端列表共用固定分页协议',
+  },
+  {
+    label: '待处理',
+    value: adminStore.complaintsPage.list.filter((item) => item.status === 'PENDING').length,
+    hint: '优先关注待处理投诉',
+  },
+])
 
 const loadComplaints = async () => {
   try {
@@ -20,9 +37,27 @@ const loadComplaints = async () => {
 
 const handleComplaint = async (row) => {
   try {
-    await adminStore.processComplaint(row.complaintId)
+    const { value } = await ElMessageBox.prompt('请输入处理结果摘要', '处理投诉', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确认处理',
+      inputPlaceholder: '例如：投诉成立，订单已取消',
+      inputValidator: (inputValue) => {
+        if (!inputValue?.trim()) {
+          return '请输入处理结果'
+        }
+
+        return true
+      },
+    })
+
+    await adminStore.processComplaint(row.complaintId, { handleResult: value.trim() })
+    ElMessage.success('投诉已处理')
   } catch (error) {
-    ElMessage.error(error.message)
+    if (error === 'cancel' || error?.message === 'cancel') {
+      return
+    }
+
+    ElMessage.error(error.message || '处理失败，请稍后重试')
   }
 }
 
@@ -38,32 +73,59 @@ onMounted(loadComplaints)
 </script>
 
 <template>
-  <PageSection title="投诉管理" description="管理端投诉处理也保持 provider 同签名结构。">
-    <div class="table-stack">
-      <el-table v-loading="adminStore.complaintsLoading" :data="adminStore.complaintsPage.list" stripe>
-        <el-table-column prop="complaintNo" label="投诉单号" />
-        <el-table-column label="类型">
-          <template #default="{ row }">{{ formatComplaintType(row.type) }}</template>
-        </el-table-column>
-        <el-table-column label="状态">
-          <template #default="{ row }">
-            <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="content" label="内容" />
-        <el-table-column label="操作">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="handleComplaint(row)">标记处理</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <AppPagination
-        :page="adminStore.complaintsPage.page"
-        :page-size="adminStore.complaintsPage.pageSize"
-        :pages="adminStore.complaintsPage.pages"
-        :total="adminStore.complaintsPage.total"
-        @change="handlePageChange"
-      />
+  <div class="stack-page">
+    <div class="stats-grid">
+      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
     </div>
-  </PageSection>
+
+    <PageSection title="投诉管理" description="管理员处理投诉前，先查看详情，再决定处理结果。">
+      <div v-if="adminStore.complaintsPage.list.length" class="table-stack">
+        <el-table v-loading="adminStore.complaintsLoading" :data="adminStore.complaintsPage.list" stripe>
+          <el-table-column prop="complaintNo" label="投诉单号" />
+          <el-table-column label="类型">
+            <template #default="{ row }">{{ formatComplaintType(row.type) }}</template>
+          </el-table-column>
+          <el-table-column prop="productName" label="商品" />
+          <el-table-column prop="accusedNickname" label="被投诉人" />
+          <el-table-column label="状态">
+            <template #default="{ row }">
+              <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="提交时间">
+            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="220">
+            <template #default="{ row }">
+              <div class="page-actions">
+                <el-button link type="primary" @click="router.push(`/admin/complaints/${row.complaintId}`)">
+                  查看详情
+                </el-button>
+                <el-button
+                  v-if="row.status === 'PENDING'"
+                  link
+                  type="danger"
+                  @click="handleComplaint(row)"
+                >
+                  标记处理
+                </el-button>
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+        <AppPagination
+          :page="adminStore.complaintsPage.page"
+          :page-size="adminStore.complaintsPage.pageSize"
+          :pages="adminStore.complaintsPage.pages"
+          :total="adminStore.complaintsPage.total"
+          @change="handlePageChange"
+        />
+      </div>
+      <EmptyState
+        v-else
+        title="暂无投诉"
+        description="当前没有投诉记录，后续切 live 时页面结构无需调整。"
+      />
+    </PageSection>
+  </div>
 </template>

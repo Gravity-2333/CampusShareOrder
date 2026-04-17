@@ -1,6 +1,6 @@
 import { getDatabase, mutateDatabase, pageResult, timestamp } from './database'
-import { requireUser, sleep } from './shared'
 import { makeFailure } from './database'
+import { requireUser, sleep } from './shared'
 
 export const createComplaint = async (payload) => {
   const user = await requireUser()
@@ -25,6 +25,7 @@ export const createComplaint = async (payload) => {
 
     const complaintId = Math.max(0, ...draft.complaints.map((item) => item.complaintId)) + 1
     const accusedMember = order.members.find((item) => item.role === 'INITIATOR')
+
     createdComplaint = {
       accusedNickname: accusedMember?.nickname || order.initiatorNickname,
       accusedUserId: order.creatorUserId,
@@ -42,6 +43,7 @@ export const createComplaint = async (payload) => {
       status: 'PENDING',
       type: payload.type,
     }
+
     draft.complaints.unshift(createdComplaint)
   })
 

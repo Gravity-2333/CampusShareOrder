@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { createComplaint, getMyComplaints } from '../api/complaint'
+import { createComplaint, getComplaintDetail, getMyComplaints } from '../api/complaint'
 
 const defaultPageData = () => ({
   list: [],
@@ -12,6 +12,12 @@ const defaultPageData = () => ({
 
 export const useComplaintStore = defineStore('complaint', {
   state: () => ({
+    complaintDetail: null,
+    complaintDetailLoading: false,
+    myComplaintsFilters: {
+      page: 1,
+      pageSize: 10,
+    },
     myComplaintsLoading: false,
     myComplaintsPage: defaultPageData(),
     submitting: false,
@@ -21,17 +27,33 @@ export const useComplaintStore = defineStore('complaint', {
       this.myComplaintsLoading = true
 
       try {
-        this.myComplaintsPage = await getMyComplaints(params)
+        this.myComplaintsFilters = {
+          ...this.myComplaintsFilters,
+          ...params,
+        }
+        this.myComplaintsPage = await getMyComplaints(this.myComplaintsFilters)
         return this.myComplaintsPage
       } finally {
         this.myComplaintsLoading = false
+      }
+    },
+    async loadComplaintDetail(complaintId) {
+      this.complaintDetailLoading = true
+
+      try {
+        this.complaintDetail = await getComplaintDetail(complaintId)
+        return this.complaintDetail
+      } finally {
+        this.complaintDetailLoading = false
       }
     },
     async submitComplaint(payload) {
       this.submitting = true
 
       try {
-        return await createComplaint(payload)
+        const result = await createComplaint(payload)
+        await this.loadMyComplaints(this.myComplaintsFilters)
+        return result
       } finally {
         this.submitting = false
       }

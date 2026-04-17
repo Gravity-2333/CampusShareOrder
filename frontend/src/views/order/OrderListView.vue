@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import EmptyState from '../../components/common/EmptyState.vue'
+import AppPagination from '../../components/common/AppPagination.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -47,6 +48,12 @@ const handleJoin = async (orderId) => {
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const handlePageChange = async ({ page, pageSize }) => {
+  filters.page = page
+  filters.pageSize = pageSize
+  await loadOrders()
 }
 
 onMounted(loadOrders)
@@ -101,6 +108,13 @@ onMounted(loadOrders)
             </div>
           </article>
         </div>
+        <AppPagination
+          :page="orderStore.hallPage.page"
+          :page-size="orderStore.hallPage.pageSize"
+          :pages="orderStore.hallPage.pages"
+          :total="orderStore.hallPage.total"
+          @change="handlePageChange"
+        />
       </template>
       <EmptyState v-else title="暂无拼单" description="切换到 live 后只需替换 provider，无需修改本页展示逻辑。" />
     </PageSection>

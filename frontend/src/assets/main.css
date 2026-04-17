@@ -286,6 +286,24 @@
   padding: var(--space-lg);
 }
 
+.pagination-bar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+}
+
+.pagination-summary {
+  color: var(--color-text-muted);
+}
+
+.table-stack {
+  display: grid;
+  gap: var(--space-sm);
+}
+
 @media (max-width: 960px) {
   .app-shell,
   .auth-page {
@@ -298,5 +316,10 @@
 
   .app-sidebar.collapsed {
     width: auto;
+  }
+
+  .pagination-bar {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 
+import AppPagination from '../../components/common/AppPagination.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
@@ -25,27 +26,44 @@ const toggleStatus = async (row) => {
   }
 }
 
+const handlePageChange = async ({ page, pageSize }) => {
+  try {
+    await adminStore.loadUsers({ page, pageSize })
+  } catch (error) {
+    ElMessage.error(error.message)
+  }
+}
+
 onMounted(loadUsers)
 </script>
 
 <template>
   <PageSection title="用户管理" description="管理端页面也通过统一 provider 获取数据。">
-    <el-table v-loading="adminStore.usersLoading" :data="adminStore.usersPage.list" stripe>
-      <el-table-column prop="userId" label="用户 ID" width="88" />
-      <el-table-column prop="nickname" label="昵称" />
-      <el-table-column prop="phone" label="手机号" />
-      <el-table-column label="状态">
-        <template #default="{ row }">
-          <StatusTag :value="row.status" :text="formatUserStatus(row.status)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="toggleStatus(row)">
-            {{ row.status === 'NORMAL' ? '封禁' : '解封' }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-stack">
+      <el-table v-loading="adminStore.usersLoading" :data="adminStore.usersPage.list" stripe>
+        <el-table-column prop="userId" label="用户 ID" width="88" />
+        <el-table-column prop="nickname" label="昵称" />
+        <el-table-column prop="phone" label="手机号" />
+        <el-table-column label="状态">
+          <template #default="{ row }">
+            <StatusTag :value="row.status" :text="formatUserStatus(row.status)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="toggleStatus(row)">
+              {{ row.status === 'NORMAL' ? '封禁' : '解封' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <AppPagination
+        :page="adminStore.usersPage.page"
+        :page-size="adminStore.usersPage.pageSize"
+        :pages="adminStore.usersPage.pages"
+        :total="adminStore.usersPage.total"
+        @change="handlePageChange"
+      />
+    </div>
   </PageSection>
 </template>

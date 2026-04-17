@@ -512,6 +512,81 @@ const phaseSummaryText = computed(() => {
   return currentPhase ? `当前处于“${currentPhase.label}”阶段。` : '--'
 })
 
+const phaseOwnerCards = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  const flags = detail.value.actionFlags
+  const status = detail.value.basicInfo.status
+
+  if (status === 'CANCELED') {
+    return [
+      { key: 'owner', label: '当前负责人', value: '--' },
+      { key: 'blocker', label: '当前卡点', value: '订单已取消' },
+      { key: 'next', label: '下一步', value: '无需继续推进' },
+    ]
+  }
+
+  if (status === 'COMPLETED') {
+    return [
+      { key: 'owner', label: '当前负责人', value: '--' },
+      { key: 'blocker', label: '当前卡点', value: '无阻塞' },
+      { key: 'next', label: '下一步', value: '订单流程已完成' },
+    ]
+  }
+
+  if (flags.canPay || activeMembersNeedPay.value > 0) {
+    return [
+      { key: 'owner', label: '当前负责人', value: flags.canPay ? '当前账号' : '待支付成员' },
+      { key: 'blocker', label: '当前卡点', value: '仍有成员未支付，无法稳定推进成团' },
+      { key: 'next', label: '下一步', value: '完成支付并等待订单进入成团状态' },
+    ]
+  }
+
+  if (flags.canUploadReceipt) {
+    return [
+      { key: 'owner', label: '当前负责人', value: '发起人' },
+      { key: 'blocker', label: '当前卡点', value: '尚未上传购买凭证' },
+      { key: 'next', label: '下一步', value: '上传凭证后进入待确认送达阶段' },
+    ]
+  }
+
+  if (flags.canMarkDelivered) {
+    return [
+      { key: 'owner', label: '当前负责人', value: '发起人' },
+      { key: 'blocker', label: '当前卡点', value: '尚未确认送达' },
+      { key: 'next', label: '下一步', value: '确认送达后成员即可确认收货' },
+    ]
+  }
+
+  if (flags.canConfirmReceived || activeMembersWaitingReceive.value > 0) {
+    return [
+      {
+        key: 'owner',
+        label: '当前负责人',
+        value: flags.canConfirmReceived ? '当前账号' : '待收货成员',
+      },
+      { key: 'blocker', label: '当前卡点', value: '仍有成员待确认收货' },
+      { key: 'next', label: '下一步', value: '完成收货确认并等待订单结束' },
+    ]
+  }
+
+  if (detail.value.complaintInfo.complaintOpened) {
+    return [
+      { key: 'owner', label: '当前负责人', value: '投诉相关方' },
+      { key: 'blocker', label: '当前卡点', value: '投诉通道已开启，需关注异常处理' },
+      { key: 'next', label: '下一步', value: '根据投诉处理结果继续跟进订单状态' },
+    ]
+  }
+
+  return [
+    { key: 'owner', label: '当前负责人', value: '系统流程' },
+    { key: 'blocker', label: '当前卡点', value: '暂无明显阻塞' },
+    { key: 'next', label: '下一步', value: '按当前阶段继续推进' },
+  ]
+})
+
 const stats = computed(() => {
   if (!detail.value) {
     return []
@@ -840,6 +915,22 @@ onMounted(() => {
             </div>
           </div>
           <p class="muted-text">{{ phaseSummaryText }}</p>
+        </PageSection>
+
+        <PageSection
+          title="阶段摘要"
+          description="把当前负责人、当前卡点和下一步动作集中展示，减少来回判断。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in phaseOwnerCards"
+              :key="item.key"
+              class="surface-card action-summary-card is-enabled"
+            >
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </div>
+          </div>
         </PageSection>
 
         <PageSection

@@ -119,6 +119,50 @@ onMounted(loadDetail)
           </el-table>
         </PageSection>
 
+        <div class="detail-grid">
+          <PageSection title="支付汇总" description="对应 paymentSummary 聚合字段。">
+            <ul class="detail-list">
+              <li>
+                <span>预计总额</span>
+                <strong>{{ formatCurrency(detail.paymentSummary.estimatedTotalAmount) }}</strong>
+              </li>
+              <li>
+                <span>实付总额</span>
+                <strong>{{ formatCurrency(detail.paymentSummary.totalPaidAmount) }}</strong>
+              </li>
+              <li>
+                <span>已支付人数</span>
+                <strong>{{ detail.paymentSummary.paidMemberCount }}</strong>
+              </li>
+              <li>
+                <span>退款总额</span>
+                <strong>{{ formatCurrency(detail.paymentSummary.refundAmountTotal) }}</strong>
+              </li>
+            </ul>
+          </PageSection>
+
+          <PageSection title="投诉与凭证" description="对应 complaintInfo 与 receiptInfo。">
+            <ul class="detail-list">
+              <li><span>投诉通道</span><strong>{{ detail.complaintInfo.complaintOpened ? '已开放' : '未开放' }}</strong></li>
+              <li><span>投诉数量</span><strong>{{ detail.complaintInfo.complaintCount }}</strong></li>
+              <li><span>我的投诉状态</span><strong>{{ detail.complaintInfo.myComplaintStatus || '--' }}</strong></li>
+              <li><span>凭证金额</span><strong>{{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}</strong></li>
+            </ul>
+          </PageSection>
+        </div>
+
+        <PageSection title="时间线" description="对应 timeline 聚合展示。">
+          <el-timeline>
+            <el-timeline-item
+              v-for="item in detail.timeline"
+              :key="`${item.action}-${item.at}`"
+              :timestamp="formatDateTime(item.at)"
+            >
+              {{ item.description }}
+            </el-timeline-item>
+          </el-timeline>
+        </PageSection>
+
         <div class="page-actions wrap-actions">
           <el-button @click="router.push('/orders')">返回大厅</el-button>
           <el-button

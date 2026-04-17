@@ -43,6 +43,11 @@ const handleSubmit = async () => {
         :value="userStore.session.isVerified ? '已认证' : '未认证'"
         hint="仅用户端需要实名认证"
       />
+      <StatCard
+        label="当前学号"
+        :value="userStore.profile?.studentNo || '--'"
+        hint="VerifyStudentRequest 仅提交 studentNo"
+      />
     </div>
 
     <PageSection title="实名认证" description="该页面对应契约中的 POST /api/users/verify-student">
@@ -54,6 +59,15 @@ const handleSubmit = async () => {
       <div class="page-actions">
         <el-button type="primary" :loading="loading" @click="handleSubmit">提交认证</el-button>
       </div>
+    </PageSection>
+
+    <PageSection title="当前资料" description="方便核对认证前后 UserProfileVO 的变化。">
+      <ul class="detail-list">
+        <li><span>用户 ID</span><strong>{{ userStore.profile?.userId || '--' }}</strong></li>
+        <li><span>昵称</span><strong>{{ userStore.profile?.nickname || '--' }}</strong></li>
+        <li><span>手机号</span><strong>{{ userStore.profile?.phone || '--' }}</strong></li>
+        <li><span>学号</span><strong>{{ userStore.profile?.studentNo || '--' }}</strong></li>
+      </ul>
     </PageSection>
   </div>
 </template>

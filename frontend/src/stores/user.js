@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { adminLogin, getCurrentLoginInfo, login, logout, register } from '../api/auth'
-import { getUserProfile, updateUserProfile, verifyStudent } from '../api/user'
+import { getUserCredit, getUserProfile, updateUserProfile, verifyStudent } from '../api/user'
 import { clearSessionStorage, getStoredSession, saveSessionStorage } from '../utils/auth'
 
 const defaultSession = () => ({
@@ -17,6 +17,10 @@ const defaultSession = () => ({
 
 export const useUserStore = defineStore('user', {
   state: () => ({
+    credit: {
+      creditScore: 0,
+      records: [],
+    },
     initialized: false,
     initializing: false,
     profile: null,
@@ -48,6 +52,10 @@ export const useUserStore = defineStore('user', {
       }
     },
     clearSession() {
+      this.credit = {
+        creditScore: 0,
+        records: [],
+      }
       this.profile = null
       this.session = defaultSession()
       clearSessionStorage()
@@ -134,6 +142,11 @@ export const useUserStore = defineStore('user', {
       const result = await updateUserProfile(payload)
       await this.loadProfile()
       return result
+    },
+    async loadCredit() {
+      const credit = await getUserCredit()
+      this.credit = credit
+      return credit
     },
     async submitStudentVerification(payload) {
       const result = await verifyStudent(payload)

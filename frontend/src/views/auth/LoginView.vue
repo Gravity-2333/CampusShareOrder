@@ -1,16 +1,70 @@
-<template>
-    <div class="login-container">
-      <h2>Login Page</h2>
-      <p>项目已成功启动</p>
-    </div>
-  </template>
-  
-  <script setup>
-  </script>
-  
-  <style scoped>
-  .login-container {
-    padding: 40px;
-    text-align: center;
+<script setup>
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+
+import { useAppStore } from '../../stores/app'
+import { useUserStore } from '../../stores/user'
+
+const router = useRouter()
+const appStore = useAppStore()
+const userStore = useUserStore()
+
+const form = reactive({
+  password: '123456',
+  phone: '13800000001',
+})
+const loading = ref(false)
+
+const handleSubmit = async () => {
+  loading.value = true
+
+  try {
+    await userStore.loginUser(form)
+    ElMessage.success('登录成功')
+    router.push('/orders')
+  } catch (error) {
+    ElMessage.error(error.message)
+  } finally {
+    loading.value = false
   }
-  </style>
+}
+</script>
+
+<template>
+  <div class="auth-page">
+    <section class="auth-hero">
+      <p class="section-kicker">Mock Friendly Frontend</p>
+      <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
+      <p>
+        当前运行模式为 <strong>{{ appStore.apiMode }}</strong
+        >，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
+      </p>
+    </section>
+
+    <el-card class="auth-card" shadow="hover">
+      <template #header>
+        <div class="card-header-row">
+          <div>
+            <p class="section-kicker">User Auth</p>
+            <h2>用户登录</h2>
+          </div>
+          <el-button link @click="router.push('/admin/login')">管理员入口</el-button>
+        </div>
+      </template>
+
+      <el-form label-position="top" :model="form" @submit.prevent="handleSubmit">
+        <el-form-item label="手机号">
+          <el-input v-model="form.phone" placeholder="请输入手机号" />
+        </el-form-item>
+        <el-form-item label="密码">
+          <el-input v-model="form.password" show-password placeholder="请输入密码" />
+        </el-form-item>
+        <div class="page-actions">
+          <el-button type="primary" :loading="loading" @click="handleSubmit">登录</el-button>
+          <el-button @click="router.push('/register')">去注册</el-button>
+        </div>
+      </el-form>
+    </el-card>
+  </div>
+</template>

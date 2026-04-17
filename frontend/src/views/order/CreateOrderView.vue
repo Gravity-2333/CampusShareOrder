@@ -4,7 +4,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import PageSection from '../../components/common/PageSection.vue'
+import StatCard from '../../components/common/StatCard.vue'
 import { useOrderStore } from '../../stores/order'
+import { formatCurrency } from '../../utils/format'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -19,6 +21,21 @@ const form = reactive({
 })
 
 const handleSubmit = async () => {
+  if (!form.productName.trim()) {
+    ElMessage.warning('请填写商品名称')
+    return
+  }
+
+  if (!form.pickupPoint.trim()) {
+    ElMessage.warning('请填写取货点')
+    return
+  }
+
+  if (!form.deadlineAt.trim()) {
+    ElMessage.warning('请填写截止时间')
+    return
+  }
+
   loading.value = true
 
   try {
@@ -34,30 +51,52 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <PageSection title="发起拼单" description="CreateOrderRequest 字段严格对齐冻结契约。">
-    <el-form label-position="top" :model="form" class="form-grid">
-      <el-form-item label="商品名称">
-        <el-input v-model="form.productName" />
-      </el-form-item>
-      <el-form-item label="商品描述">
-        <el-input v-model="form.productDesc" type="textarea" />
-      </el-form-item>
-      <el-form-item label="拼单人数">
-        <el-input-number v-model="form.totalMemberCount" :min="2" :max="6" />
-      </el-form-item>
-      <el-form-item label="预计金额">
-        <el-input-number v-model="form.estimatedTotalAmount" :min="1" :precision="2" />
-      </el-form-item>
-      <el-form-item label="取货点">
-        <el-input v-model="form.pickupPoint" />
-      </el-form-item>
-      <el-form-item label="截止时间">
-        <el-input v-model="form.deadlineAt" />
-      </el-form-item>
-    </el-form>
-
-    <div class="page-actions">
-      <el-button type="primary" :loading="loading" @click="handleSubmit">创建拼单</el-button>
+  <div class="stack-page">
+    <div class="stats-grid">
+      <StatCard
+        label="预计人均"
+        :value="formatCurrency(form.estimatedTotalAmount / form.totalMemberCount)"
+        hint="仅作为前端预览，不替代后端结算逻辑"
+      />
+      <StatCard label="目标人数" :value="form.totalMemberCount" hint="创建后发起人也算成员之一" />
     </div>
-  </PageSection>
+
+    <PageSection title="发起拼单" description="CreateOrderRequest 字段严格对齐冻结契约。">
+      <el-form label-position="top" :model="form" class="form-grid">
+        <el-form-item label="商品名称">
+          <el-input v-model="form.productName" />
+        </el-form-item>
+        <el-form-item label="商品描述">
+          <el-input v-model="form.productDesc" type="textarea" />
+        </el-form-item>
+        <el-form-item label="拼单人数">
+          <el-input-number v-model="form.totalMemberCount" :min="2" :max="6" />
+        </el-form-item>
+        <el-form-item label="预计金额">
+          <el-input-number v-model="form.estimatedTotalAmount" :min="1" :precision="2" />
+        </el-form-item>
+        <el-form-item label="取货点">
+          <el-input v-model="form.pickupPoint" />
+        </el-form-item>
+        <el-form-item label="截止时间">
+          <el-input v-model="form.deadlineAt" />
+        </el-form-item>
+      </el-form>
+
+      <div class="page-actions">
+        <el-button type="primary" :loading="loading" @click="handleSubmit">创建拼单</el-button>
+      </div>
+    </PageSection>
+
+    <PageSection title="提交预览" description="这里用于在前端阶段先核对请求字段是否符合冻结契约。">
+      <ul class="detail-list">
+        <li><span>productName</span><strong>{{ form.productName || '--' }}</strong></li>
+        <li><span>productDesc</span><strong>{{ form.productDesc || '--' }}</strong></li>
+        <li><span>totalMemberCount</span><strong>{{ form.totalMemberCount }}</strong></li>
+        <li><span>estimatedTotalAmount</span><strong>{{ formatCurrency(form.estimatedTotalAmount) }}</strong></li>
+        <li><span>pickupPoint</span><strong>{{ form.pickupPoint || '--' }}</strong></li>
+        <li><span>deadlineAt</span><strong>{{ form.deadlineAt || '--' }}</strong></li>
+      </ul>
+    </PageSection>
+  </div>
 </template>

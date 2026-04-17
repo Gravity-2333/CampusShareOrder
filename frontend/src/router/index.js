@@ -158,4 +158,9 @@ router.beforeEach(async (to) => {
   return true
 })
 
+router.afterEach((to) => {
+  const pageTitle = to.meta?.title ? `${to.meta.title} | CampusShareOrder` : 'CampusShareOrder'
+  document.title = pageTitle
+})
+
 export default router

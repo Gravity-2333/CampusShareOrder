@@ -239,6 +239,106 @@ const getMemberLatestEvent = (member) => {
   return '--'
 }
 
+const activeMembersNeedPay = computed(
+  () => activeMemberList.value.filter((member) => member.payStatus === 'UNPAID').length,
+)
+
+const activeMembersWaitingReceive = computed(
+  () => activeMemberList.value.filter((member) => member.receiveStatus === 'WAIT_CONFIRM').length,
+)
+
+const riskAlerts = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  const alerts = []
+
+  if (detail.value.actionFlags.canPay) {
+    alerts.push({
+      key: 'self-unpaid',
+      tone: 'warning',
+      text: '当前账号仍未支付，订单无法继续推进成团。',
+    })
+  }
+
+  if (activeMembersNeedPay.value > 0) {
+    alerts.push({
+      key: 'members-unpaid',
+      tone: 'warning',
+      text: `仍有 ${activeMembersNeedPay.value} 名有效成员未支付。`,
+    })
+  }
+
+  if (detail.value.actionFlags.canUploadReceipt) {
+    alerts.push({
+      key: 'missing-receipt',
+      tone: 'primary',
+      text: '订单已成团，但发起人尚未上传购买凭证。',
+    })
+  }
+
+  if (detail.value.actionFlags.canMarkDelivered) {
+    alerts.push({
+      key: 'waiting-delivery-confirm',
+      tone: 'primary',
+      text: '凭证已上传，当前仍待发起人确认送达。',
+    })
+  }
+
+  if (activeMembersWaitingReceive.value > 0) {
+    alerts.push({
+      key: 'waiting-receive',
+      tone: 'warning',
+      text: `仍有 ${activeMembersWaitingReceive.value} 名成员待确认收货。`,
+    })
+  }
+
+  if (detail.value.complaintInfo.complaintOpened) {
+    alerts.push({
+      key: 'complaint-opened',
+      tone: detail.value.complaintInfo.complaintCount > 0 ? 'danger' : 'warning',
+      text:
+        detail.value.complaintInfo.complaintCount > 0
+          ? `投诉通道已开启，当前已有 ${detail.value.complaintInfo.complaintCount} 条投诉记录。`
+          : '投诉通道已开启，后续可能进入异常处理流程。',
+    })
+  }
+
+  if (!alerts.length) {
+    alerts.push({
+      key: 'no-risk',
+      tone: 'success',
+      text: '当前未发现明显阻塞项，详情状态可继续按既有流程推进。',
+    })
+  }
+
+  return alerts
+})
+
+const riskTagTypeMap = {
+  danger: 'danger',
+  primary: 'primary',
+  success: 'success',
+  warning: 'warning',
+}
+
+const formatRiskToneText = (tone) => {
+  if (tone === 'danger') {
+    return '高风险'
+  }
+
+  if (tone === 'warning') {
+    return '提醒'
+  }
+
+  if (tone === 'primary') {
+    return '处理中'
+  }
+
+  return '正常'
+}
+
 const stats = computed(() => {
   if (!detail.value) {
     return []
@@ -557,6 +657,24 @@ onMounted(() => {
             >
               <span>{{ item.label }}</span>
               <strong>{{ item.enabled ? '是' : '否' }}</strong>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
+          title="当前风险"
+          description="把支付、凭证、送达、投诉这些阻塞点集中展示，方便联调和演示。"
+        >
+          <div class="action-summary-grid">
+            <div
+              v-for="item in riskAlerts"
+              :key="item.key"
+              class="surface-card action-summary-card is-enabled"
+            >
+              <el-tag :type="riskTagTypeMap[item.tone] || 'info'" effect="light" round>
+                {{ formatRiskToneText(item.tone) }}
+              </el-tag>
+              <strong>{{ item.text }}</strong>
             </div>
           </div>
         </PageSection>

@@ -4,6 +4,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { useUserStore } from '../../stores/user'
+import {
+  firstValidationError,
+  validateNickname,
+  validatePassword,
+  validatePhone,
+} from '../../utils/validate'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -16,18 +22,14 @@ const form = reactive({
 const loading = ref(false)
 
 const handleSubmit = async () => {
-  if (!form.nickname.trim()) {
-    ElMessage.warning('请输入昵称')
-    return
-  }
+  const errorMessage = firstValidationError([
+    validateNickname(form.nickname),
+    validatePhone(form.phone),
+    validatePassword(form.password),
+  ])
 
-  if (!form.phone.trim()) {
-    ElMessage.warning('请输入手机号')
-    return
-  }
-
-  if (!form.password.trim()) {
-    ElMessage.warning('请输入密码')
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
     return
   }
 

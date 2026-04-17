@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useAppStore } from '../../stores/app'
 import { useUserStore } from '../../stores/user'
+import { firstValidationError, validatePassword, validatePhone } from '../../utils/validate'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -27,13 +28,13 @@ const applyDemoAccount = (phone) => {
 }
 
 const handleSubmit = async () => {
-  if (!form.phone.trim()) {
-    ElMessage.warning('请输入手机号')
-    return
-  }
+  const errorMessage = firstValidationError([
+    validatePhone(form.phone),
+    validatePassword(form.password),
+  ])
 
-  if (!form.password.trim()) {
-    ElMessage.warning('请输入密码')
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
     return
   }
 

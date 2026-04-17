@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useUserStore } from '../../stores/user'
+import { validateStudentNo } from '../../utils/validate'
 
 const userStore = useUserStore()
 const form = reactive({
@@ -21,6 +22,13 @@ onMounted(async () => {
 })
 
 const handleSubmit = async () => {
+  const errorMessage = validateStudentNo(form.studentNo)
+
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
+    return
+  }
+
   loading.value = true
 
   try {

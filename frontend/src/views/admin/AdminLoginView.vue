@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useAppStore } from '../../stores/app'
 import { useUserStore } from '../../stores/user'
+import { firstValidationError, validatePassword, requireValue } from '../../utils/validate'
 
 const router = useRouter()
 const appStore = useAppStore()
@@ -22,13 +23,13 @@ const fillAdminAccount = () => {
 }
 
 const handleSubmit = async () => {
-  if (!form.username.trim()) {
-    ElMessage.warning('请输入管理员账号')
-    return
-  }
+  const errorMessage = firstValidationError([
+    requireValue(form.username, '请输入管理员账号'),
+    validatePassword(form.password, '管理员密码'),
+  ])
 
-  if (!form.password.trim()) {
-    ElMessage.warning('请输入管理员密码')
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
     return
   }
 

@@ -7,6 +7,11 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useOrderStore } from '../../stores/order'
 import { formatCurrency } from '../../utils/format'
+import {
+  firstValidationError,
+  requireValue,
+  validatePositiveNumber,
+} from '../../utils/validate'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -21,18 +26,16 @@ const form = reactive({
 })
 
 const handleSubmit = async () => {
-  if (!form.productName.trim()) {
-    ElMessage.warning('请填写商品名称')
-    return
-  }
+  const errorMessage = firstValidationError([
+    requireValue(form.productName, '请填写商品名称'),
+    validatePositiveNumber(form.totalMemberCount, '拼单人数必须大于 0'),
+    validatePositiveNumber(form.estimatedTotalAmount, '预计金额必须大于 0'),
+    requireValue(form.pickupPoint, '请填写取货点'),
+    requireValue(form.deadlineAt, '请填写截止时间'),
+  ])
 
-  if (!form.pickupPoint.trim()) {
-    ElMessage.warning('请填写取货点')
-    return
-  }
-
-  if (!form.deadlineAt.trim()) {
-    ElMessage.warning('请填写截止时间')
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
     return
   }
 

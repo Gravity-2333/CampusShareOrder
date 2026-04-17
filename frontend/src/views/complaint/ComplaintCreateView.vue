@@ -7,6 +7,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useComplaintStore } from '../../stores/complaint'
 import { formatComplaintType } from '../../utils/format'
+import { firstValidationError, validatePositiveNumber, requireValue } from '../../utils/validate'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,13 +20,13 @@ const form = reactive({
 })
 
 const handleSubmit = async () => {
-  if (!form.orderId) {
-    ElMessage.warning('请填写订单 ID')
-    return
-  }
+  const errorMessage = firstValidationError([
+    validatePositiveNumber(form.orderId, '请填写正确的订单 ID'),
+    requireValue(form.content, '请填写投诉内容'),
+  ])
 
-  if (!form.content.trim()) {
-    ElMessage.warning('请填写投诉内容')
+  if (errorMessage) {
+    ElMessage.warning(errorMessage)
     return
   }
 

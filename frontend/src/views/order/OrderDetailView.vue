@@ -9,6 +9,7 @@ import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
 import {
+  formatComplaintStatus,
   formatCurrency,
   formatDateTime,
   formatOrderStatus,
@@ -32,6 +33,9 @@ const joinStatusTextMap = {
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
+const hasActualAmount = computed(
+  () => detail.value?.paymentSummary?.actualTotalAmount !== null && detail.value?.paymentSummary?.actualTotalAmount !== undefined,
+)
 const activeMemberList = computed(() =>
   detail.value?.memberList?.filter((member) => member.joinStatus === 'ACTIVE') || [],
 )
@@ -62,6 +66,69 @@ const complaintActionText = computed(() => {
   }
 
   return '投诉通道尚未开放'
+})
+const receiptStatusText = computed(() => {
+  if (!detail.value) {
+    return '--'
+  }
+
+  if (detail.value.receiptInfo) {
+    return '已上传凭证'
+  }
+
+  if (detail.value.actionFlags.canUploadReceipt) {
+    return '待上传凭证'
+  }
+
+  return '暂无凭证'
+})
+const paymentDeltaText = computed(() => {
+  if (!detail.value || !hasActualAmount.value) {
+    return '--'
+  }
+
+  const estimated = Number(detail.value.paymentSummary.estimatedTotalAmount || 0)
+  const actual = Number(detail.value.paymentSummary.actualTotalAmount || 0)
+  const delta = estimated - actual
+
+  return formatCurrency(delta)
+})
+const primaryAction = computed(() => {
+  if (!detail.value) {
+    return null
+  }
+
+  const flags = detail.value.actionFlags
+
+  if (flags.canJoin) {
+    return { key: 'join', label: '立即加入拼单', type: 'primary' }
+  }
+
+  if (flags.canPay) {
+    return { key: 'pay', label: '立即支付', type: 'primary' }
+  }
+
+  if (flags.canUploadReceipt) {
+    return { key: 'upload', label: '上传凭证', type: 'primary' }
+  }
+
+  if (flags.canMarkDelivered) {
+    return { key: 'delivered', label: '确认送达', type: 'success' }
+  }
+
+  if (flags.canConfirmReceived) {
+    return { key: 'received', label: '确认收货', type: 'success' }
+  }
+
+  if (flags.canCreateComplaint) {
+    return { key: 'complaint', label: '发起投诉', type: 'danger' }
+  }
+
+  if (flags.canViewReceipt) {
+    return { key: 'viewReceipt', label: '查看凭证', type: 'default' }
+  }
+
+  return null
 })
 const nextStepHint = computed(() => {
   if (!detail.value) {
@@ -102,6 +169,19 @@ const nextStepHint = computed(() => {
 })
 
 const formatJoinStatus = (value) => joinStatusTextMap[value] || value || '--'
+
+const runPrimaryAction = async () => {
+  if (!primaryAction.value) {
+    return
+  }
+
+  if (primaryAction.value.key === 'complaint') {
+    navigateToComplaint()
+    return
+  }
+
+  await runAction(primaryAction.value.key)
+}
 
 const stats = computed(() => {
   if (!detail.value) {
@@ -310,9 +390,20 @@ onMounted(() => {
 
         <div class="surface-card detail-panel">
           <h3>当前引导</h3>
-          <div class="detail-note">
-            <span>下一步建议</span>
-            <p>{{ nextStepHint }}</p>
+          <ul class="detail-list">
+            <li><span>下一步建议</span><strong>{{ nextStepHint }}</strong></li>
+            <li><span>投诉状态</span><strong>{{ complaintActionText }}</strong></li>
+            <li><span>凭证状态</span><strong>{{ receiptStatusText }}</strong></li>
+          </ul>
+          <div v-if="primaryAction" class="page-actions">
+            <el-button
+              :type="primaryAction.type"
+              :plain="primaryAction.type !== 'primary'"
+              :loading="orderStore.submitting"
+              @click="runPrimaryAction"
+            >
+              {{ primaryAction.label }}
+            </el-button>
           </div>
         </div>
 
@@ -375,13 +466,19 @@ onMounted(() => {
               <template #default="{ row }">{{ formatRole(row.role) }}</template>
             </el-table-column>
             <el-table-column label="加入状态">
-              <template #default="{ row }">{{ formatJoinStatus(row.joinStatus) }}</template>
+              <template #default="{ row }">
+                <StatusTag :value="row.joinStatus" :text="formatJoinStatus(row.joinStatus)" />
+              </template>
             </el-table-column>
             <el-table-column label="支付状态">
-              <template #default="{ row }">{{ formatPayStatus(row.payStatus) }}</template>
+              <template #default="{ row }">
+                <StatusTag :value="row.payStatus" :text="formatPayStatus(row.payStatus)" />
+              </template>
             </el-table-column>
             <el-table-column label="收货状态">
-              <template #default="{ row }">{{ formatReceiveStatus(row.receiveStatus) }}</template>
+              <template #default="{ row }">
+                <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+              </template>
             </el-table-column>
             <el-table-column label="应付金额">
               <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
@@ -417,9 +514,7 @@ onMounted(() => {
               </li>
               <li>
                 <span>与预估差额</span>
-                <strong>
-                  {{ formatCurrency(detail.paymentSummary.estimatedTotalAmount - Number(detail.paymentSummary.actualTotalAmount || 0)) }}
-                </strong>
+                <strong>{{ paymentDeltaText }}</strong>
               </li>
             </ul>
           </PageSection>
@@ -431,7 +526,10 @@ onMounted(() => {
                 <strong>{{ detail.complaintInfo.complaintOpened ? '已开放' : '未开放' }}</strong>
               </li>
               <li><span>投诉数量</span><strong>{{ detail.complaintInfo.complaintCount }}</strong></li>
-              <li><span>我的投诉状态</span><strong>{{ detail.complaintInfo.myComplaintStatus || '--' }}</strong></li>
+              <li>
+                <span>我的投诉状态</span>
+                <strong>{{ detail.complaintInfo.myComplaintStatus ? formatComplaintStatus(detail.complaintInfo.myComplaintStatus) : '--' }}</strong>
+              </li>
               <li><span>我的投诉单</span><strong>{{ detail.complaintInfo.myComplaintId || '--' }}</strong></li>
               <li><span>投诉引导</span><strong>{{ complaintActionText }}</strong></li>
               <li>
@@ -474,7 +572,9 @@ onMounted(() => {
             <el-table :data="detail.receiveInfo.receiveStatusSummary" stripe>
               <el-table-column prop="nickname" label="成员" />
               <el-table-column label="收货状态">
-                <template #default="{ row }">{{ formatReceiveStatus(row.receiveStatus) }}</template>
+                <template #default="{ row }">
+                  <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                </template>
               </el-table-column>
             </el-table>
           </PageSection>

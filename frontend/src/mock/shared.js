@@ -96,11 +96,33 @@ const buildTimeline = (order, complaints) => {
       })
     }
 
-    if (member.joinStatus === 'EXITED') {
+    if (member.paidAt) {
+      timeline.push({
+        action: member.role === 'INITIATOR' ? 'INITIATOR_PAID' : 'MEMBER_PAID',
+        at: member.paidAt,
+        description:
+          member.role === 'INITIATOR'
+            ? `${member.nickname} 已完成发起人支付`
+            : `${member.nickname} 已完成支付`,
+      })
+    }
+
+    if (member.exitedAt) {
       timeline.push({
         action: 'MEMBER_EXITED',
-        at: order.deadlineAt,
+        at: member.exitedAt,
         description: `${member.nickname} 已退出拼单`,
+      })
+    }
+
+    if (member.receivedAt) {
+      timeline.push({
+        action: member.role === 'INITIATOR' ? 'INITIATOR_RECEIVED' : 'MEMBER_RECEIVED',
+        at: member.receivedAt,
+        description:
+          member.role === 'INITIATOR'
+            ? `${member.nickname} 已同步为收货完成`
+            : `${member.nickname} 已确认收货`,
       })
     }
   })

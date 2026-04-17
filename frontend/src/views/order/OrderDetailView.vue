@@ -175,8 +175,12 @@ const nextStepHint = computed(() => {
 const timelineToneMap = {
   COMPLAINT_CREATED: 'danger',
   INITIATOR_JOINED: 'primary',
+  INITIATOR_PAID: 'success',
+  INITIATOR_RECEIVED: 'success',
   MEMBER_EXITED: 'info',
   MEMBER_JOINED: 'primary',
+  MEMBER_PAID: 'success',
+  MEMBER_RECEIVED: 'success',
   ORDER_CREATED: 'primary',
   ORDER_DELIVERED: 'success',
   ORDER_STATUS: 'warning',

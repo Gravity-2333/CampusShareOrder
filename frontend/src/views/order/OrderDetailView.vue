@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElImage, ElMessage, ElMessageBox } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -23,8 +24,84 @@ const orderStore = useOrderStore()
 const receiptDialogVisible = ref(false)
 const activeReceiptUrl = ref('')
 
+const joinStatusTextMap = {
+  ACTIVE: '已参与',
+  CANCELED: '已取消',
+  EXITED: '已退出',
+}
+
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
+const activeMemberList = computed(() =>
+  detail.value?.memberList?.filter((member) => member.joinStatus === 'ACTIVE') || [],
+)
+const paidMemberCount = computed(
+  () => activeMemberList.value.filter((member) => member.payStatus === 'PAID').length,
+)
+const receivedMemberCount = computed(
+  () =>
+    activeMemberList.value.filter((member) =>
+      ['RECEIVED', 'AUTO_RECEIVED'].includes(member.receiveStatus),
+    ).length,
+)
+const complaintActionText = computed(() => {
+  if (!detail.value) {
+    return '--'
+  }
+
+  if (detail.value.actionFlags.canCreateComplaint) {
+    return '当前可直接发起投诉'
+  }
+
+  if (detail.value.complaintInfo.myComplaintId) {
+    return '当前账号已有投诉记录'
+  }
+
+  if (detail.value.complaintInfo.complaintOpened) {
+    return '投诉通道已开，但当前账号不可再创建'
+  }
+
+  return '投诉通道尚未开放'
+})
+const nextStepHint = computed(() => {
+  if (!detail.value) {
+    return ''
+  }
+
+  const flags = detail.value.actionFlags
+
+  if (flags.canJoin) {
+    return '当前订单仍可加入，进入详情后可直接参与本次拼单。'
+  }
+
+  if (flags.canPay) {
+    return '你已加入但尚未支付，完成支付后订单才可能继续推进成团。'
+  }
+
+  if (flags.canUploadReceipt) {
+    return '当前已成团，下一步应由发起人上传购买凭证，进入待送达阶段。'
+  }
+
+  if (flags.canMarkDelivered) {
+    return '凭证已上传，当前由发起人确认送达，随后成员可确认收货。'
+  }
+
+  if (flags.canConfirmReceived) {
+    return '订单已送达，当前账号可以确认收货，推动订单走向完成。'
+  }
+
+  if (flags.canCreateComplaint) {
+    return '如订单异常，可直接从当前详情页发起投诉。'
+  }
+
+  if (detail.value.complaintInfo.myComplaintId) {
+    return '当前账号已经创建投诉，可直接查看投诉详情跟进处理结果。'
+  }
+
+  return '当前页面主要用于查看订单聚合信息，按钮是否可操作完全以 actionFlags 为准。'
+})
+
+const formatJoinStatus = (value) => joinStatusTextMap[value] || value || '--'
 
 const stats = computed(() => {
   if (!detail.value) {
@@ -43,9 +120,14 @@ const stats = computed(() => {
       value: Object.values(detail.value.actionFlags).filter(Boolean).length,
     },
     {
-      hint: '金额字段统一按契约输出 number',
-      label: '预计金额',
-      value: formatCurrency(detail.value.basicInfo.estimatedTotalAmount),
+      hint: '仅统计 ACTIVE 成员，用于判断当前成团推进程度',
+      label: '支付进度',
+      value: `${paidMemberCount.value}/${activeMemberList.value.length || 0}`,
+    },
+    {
+      hint: '成员参与情况来自 basicInfo.currentMemberCount / totalMemberCount',
+      label: '成员进度',
+      value: `${detail.value.basicInfo.currentMemberCount}/${detail.value.basicInfo.totalMemberCount}`,
     },
   ]
 })
@@ -141,6 +223,21 @@ const openReceiptDialog = () => {
   receiptDialogVisible.value = true
 }
 
+const navigateToComplaint = () => {
+  if (!detail.value) {
+    return
+  }
+
+  if (detail.value.actionFlags.canCreateComplaint) {
+    router.push(`/complaints/create?orderId=${detail.value.basicInfo.orderId}`)
+    return
+  }
+
+  if (detail.value.complaintInfo.myComplaintId) {
+    router.push(`/complaints/${detail.value.complaintInfo.myComplaintId}`)
+  }
+}
+
 const runAction = async (action) => {
   if (!currentOrderId.value) {
     return
@@ -211,6 +308,14 @@ onMounted(() => {
           <StatusTag :value="detail.basicInfo.status" :text="formatOrderStatus(detail.basicInfo.status)" />
         </div>
 
+        <div class="surface-card detail-panel">
+          <h3>当前引导</h3>
+          <div class="detail-note">
+            <span>下一步建议</span>
+            <p>{{ nextStepHint }}</p>
+          </div>
+        </div>
+
         <div class="detail-grid">
           <div class="surface-card detail-panel">
             <h3>基础信息</h3>
@@ -237,7 +342,7 @@ onMounted(() => {
             <h3>当前成员信息</h3>
             <ul v-if="detail.currentUserMember" class="detail-list">
               <li><span>我的角色</span><strong>{{ formatRole(detail.currentUserMember.myRole) }}</strong></li>
-              <li><span>加入状态</span><strong>{{ detail.currentUserMember.joinStatus }}</strong></li>
+              <li><span>加入状态</span><strong>{{ formatJoinStatus(detail.currentUserMember.joinStatus) }}</strong></li>
               <li><span>支付状态</span><strong>{{ formatPayStatus(detail.currentUserMember.payStatus) }}</strong></li>
               <li><span>收货状态</span><strong>{{ formatReceiveStatus(detail.currentUserMember.receiveStatus) }}</strong></li>
               <li>
@@ -269,12 +374,20 @@ onMounted(() => {
             <el-table-column label="角色">
               <template #default="{ row }">{{ formatRole(row.role) }}</template>
             </el-table-column>
-            <el-table-column prop="joinStatus" label="加入状态" />
+            <el-table-column label="加入状态">
+              <template #default="{ row }">{{ formatJoinStatus(row.joinStatus) }}</template>
+            </el-table-column>
             <el-table-column label="支付状态">
               <template #default="{ row }">{{ formatPayStatus(row.payStatus) }}</template>
             </el-table-column>
             <el-table-column label="收货状态">
               <template #default="{ row }">{{ formatReceiveStatus(row.receiveStatus) }}</template>
+            </el-table-column>
+            <el-table-column label="应付金额">
+              <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
+            </el-table-column>
+            <el-table-column label="退款合计">
+              <template #default="{ row }">{{ formatCurrency(row.refundAmountTotal) }}</template>
             </el-table-column>
           </el-table>
         </PageSection>
@@ -302,6 +415,12 @@ onMounted(() => {
                 <span>退款总额</span>
                 <strong>{{ formatCurrency(detail.paymentSummary.refundAmountTotal) }}</strong>
               </li>
+              <li>
+                <span>与预估差额</span>
+                <strong>
+                  {{ formatCurrency(detail.paymentSummary.estimatedTotalAmount - Number(detail.paymentSummary.actualTotalAmount || 0)) }}
+                </strong>
+              </li>
             </ul>
           </PageSection>
 
@@ -314,6 +433,7 @@ onMounted(() => {
               <li><span>投诉数量</span><strong>{{ detail.complaintInfo.complaintCount }}</strong></li>
               <li><span>我的投诉状态</span><strong>{{ detail.complaintInfo.myComplaintStatus || '--' }}</strong></li>
               <li><span>我的投诉单</span><strong>{{ detail.complaintInfo.myComplaintId || '--' }}</strong></li>
+              <li><span>投诉引导</span><strong>{{ complaintActionText }}</strong></li>
               <li>
                 <span>凭证金额</span>
                 <strong>{{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}</strong>
@@ -345,6 +465,10 @@ onMounted(() => {
                 <span>预计送达截止</span>
                 <strong>{{ formatDateTime(detail.basicInfo.expectedDeliveryEndAt) }}</strong>
               </li>
+              <li>
+                <span>当前收货进度</span>
+                <strong>{{ receivedMemberCount }}/{{ activeMemberList.length || 0 }}</strong>
+              </li>
             </ul>
 
             <el-table :data="detail.receiveInfo.receiveStatusSummary" stripe>
@@ -370,6 +494,8 @@ onMounted(() => {
 
         <div class="page-actions wrap-actions">
           <el-button @click="router.push('/orders')">返回大厅</el-button>
+          <el-button plain @click="router.push('/my-orders')">我的拼单</el-button>
+          <el-button plain :loading="orderStore.detailLoading" @click="loadDetail()">刷新详情</el-button>
           <el-button
             v-if="detail.actionFlags.canJoin"
             type="primary"
@@ -433,7 +559,7 @@ onMounted(() => {
             v-if="detail.actionFlags.canCreateComplaint"
             type="danger"
             plain
-            @click="router.push(`/complaints/create?orderId=${detail.basicInfo.orderId}`)"
+            @click="navigateToComplaint"
           >
             发起投诉
           </el-button>
@@ -441,12 +567,22 @@ onMounted(() => {
             v-else-if="detail.complaintInfo.myComplaintId"
             type="danger"
             plain
-            @click="router.push(`/complaints/${detail.complaintInfo.myComplaintId}`)"
+            @click="navigateToComplaint"
           >
             查看投诉
           </el-button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="!orderStore.detailLoading"
+        title="订单详情不可用"
+        description="当前未加载到订单详情数据，可以返回大厅重新进入，或手动刷新当前页面。"
+      >
+        <div class="page-actions">
+          <el-button @click="router.push('/orders')">返回大厅</el-button>
+          <el-button type="primary" plain @click="loadDetail()">重新加载</el-button>
+        </div>
+      </EmptyState>
     </PageSection>
 
     <el-dialog v-model="receiptDialogVisible" title="订单凭证" width="680px">

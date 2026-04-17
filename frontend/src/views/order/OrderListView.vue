@@ -3,8 +3,8 @@ import { computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import EmptyState from '../../components/common/EmptyState.vue'
 import AppPagination from '../../components/common/AppPagination.vue'
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -24,7 +24,7 @@ const stats = computed(() => [
   {
     label: '可见订单',
     value: orderStore.hallPage.total,
-    hint: '契约分页结构 list/page/pageSize/total/pages',
+    hint: '契约分页结构 list / page / pageSize / total / pages',
   },
   {
     label: '当前页',
@@ -116,7 +116,11 @@ onMounted(loadOrders)
           @change="handlePageChange"
         />
       </template>
-      <EmptyState v-else title="暂无拼单" description="切换到 live 后只需替换 provider，无需修改本页展示逻辑。" />
+      <EmptyState
+        v-else
+        title="暂无拼单"
+        description="切换到 live 后只需替换 provider，无需修改本页展示逻辑。"
+      />
     </PageSection>
   </div>
 </template>

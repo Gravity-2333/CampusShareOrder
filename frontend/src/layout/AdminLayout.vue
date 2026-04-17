@@ -31,7 +31,7 @@ const handleLogout = async () => {
   <div class="app-shell admin-shell">
     <aside class="app-sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
       <div class="brand-block">
-        <span class="brand-kicker">Admin Console</span>
+        <span class="brand-kicker">校园拼单后台</span>
         <h1>平台管理端</h1>
       </div>
       <el-menu :default-active="activePath" router class="shell-menu">

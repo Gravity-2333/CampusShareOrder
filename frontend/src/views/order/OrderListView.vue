@@ -3,16 +3,20 @@ import { computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import EmptyState from '../../components/common/EmptyState.vue'
 import AppPagination from '../../components/common/AppPagination.vue'
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
+import { useAppStore } from '../../stores/app'
 import { useOrderStore } from '../../stores/order'
+import { useUserStore } from '../../stores/user'
 import { formatCurrency, formatDateTime, formatOrderStatus } from '../../utils/format'
 
 const router = useRouter()
+const appStore = useAppStore()
 const orderStore = useOrderStore()
+const userStore = useUserStore()
 const filters = reactive({
   keyword: '',
   page: 1,
@@ -20,18 +24,52 @@ const filters = reactive({
   status: '',
 })
 
-const stats = computed(() => [
-  {
-    label: '可见订单',
-    value: orderStore.hallPage.total,
-    hint: '契约分页结构 list/page/pageSize/total/pages',
-  },
-  {
-    label: '当前页',
-    value: `${orderStore.hallPage.page}/${orderStore.hallPage.pages || 1}`,
-    hint: '支持后续切换到真实分页接口',
-  },
-])
+const visibleOrders = computed(() => orderStore.hallPage.list)
+const canCreateOrder = computed(() => userStore.session.isVerified)
+const canResetMock = computed(() => appStore.apiMode === 'mock')
+
+const stats = computed(() => {
+  const openCount = visibleOrders.value.filter((order) => order.status === 'OPEN').length
+  const remainingSeats = visibleOrders.value.reduce(
+    (total, order) => total + Number(order.remainingCount || 0),
+    0,
+  )
+
+  return [
+    {
+      label: '可见订单',
+      value: orderStore.hallPage.total,
+      hint: '契约分页结构 list / page / pageSize / total / pages',
+    },
+    {
+      label: '招募中',
+      value: openCount,
+      hint: '当前筛选结果里仍可继续加入的拼单数',
+    },
+    {
+      label: '剩余名额',
+      value: remainingSeats,
+      hint: '基于 remainingCount 聚合，便于快速浏览大厅供给',
+    },
+    {
+      label: '当前页',
+      value: `${orderStore.hallPage.page}/${orderStore.hallPage.pages || 1}`,
+      hint: '支持后续切换到真实分页接口',
+    },
+  ]
+})
+
+const hallTips = computed(() => {
+  if (!visibleOrders.value.length) {
+    return '当前筛选条件下没有可展示的拼单。'
+  }
+
+  if (!canCreateOrder.value) {
+    return '当前账号尚未实名认证，可以先浏览大厅，认证后再发起拼单。'
+  }
+
+  return '大厅页优先承接浏览、筛选、加入和跳转详情，不在列表页重复复杂业务推导。'
+})
 
 const loadOrders = async () => {
   try {
@@ -41,12 +79,89 @@ const loadOrders = async () => {
   }
 }
 
-const handleJoin = async (orderId) => {
+const submitFilters = async () => {
+  filters.page = 1
+  await loadOrders()
+}
+
+const resetFilters = async () => {
+  filters.keyword = ''
+  filters.page = 1
+  filters.pageSize = 10
+  filters.status = ''
+  await loadOrders()
+}
+
+const goCreateOrder = () => {
+  if (canCreateOrder.value) {
+    router.push('/orders/create')
+    return
+  }
+
+  ElMessage.warning('请先完成实名认证，再发起拼单')
+  router.push('/verify-student')
+}
+
+const canJoinOrder = (order) => order.status === 'OPEN' && Number(order.remainingCount || 0) > 0
+
+const getJoinButtonText = (order) => {
+  if (order.status !== 'OPEN') {
+    return '当前不可加入'
+  }
+
+  if (Number(order.remainingCount || 0) <= 0) {
+    return '名额已满'
+  }
+
+  return '快速加入'
+}
+
+const handleJoin = async (order) => {
+  if (!canJoinOrder(order)) {
+    if (order.status !== 'OPEN') {
+      ElMessage.warning('当前订单已不可直接加入')
+      return
+    }
+
+    ElMessage.warning('当前订单名额已满')
+    return
+  }
+
   try {
-    await orderStore.joinExistingOrder(orderId)
-    ElMessage.success('加入成功')
+    await orderStore.joinExistingOrder(order.orderId)
+    ElMessage.success('加入成功，已同步刷新大厅与我的拼单')
   } catch (error) {
     ElMessage.error(error.message)
+  }
+}
+
+const handleJoinAndView = async (order) => {
+  if (!canJoinOrder(order)) {
+    ElMessage.warning('当前订单已不可直接加入')
+    return
+  }
+
+  try {
+    await orderStore.joinExistingOrder(order.orderId)
+    ElMessage.success('加入成功，已同步刷新大厅与我的拼单')
+    router.push(`/orders/${order.orderId}`)
+  } catch (error) {
+    ElMessage.error(error.message)
+  }
+}
+
+const handleResetMock = async () => {
+  try {
+    const reset = await appStore.resetMockData()
+
+    if (!reset) {
+      return
+    }
+
+    await resetFilters()
+    ElMessage.success('演示数据已重置')
+  } catch (error) {
+    ElMessage.error(error.message || '重置失败')
   }
 }
 
@@ -66,8 +181,15 @@ onMounted(loadOrders)
     </div>
 
     <PageSection title="拼单大厅" description="页面只使用统一 API 服务，不直接拼接接口地址。">
+      <p class="muted-text">{{ hallTips }}</p>
+
       <div class="toolbar-row">
-        <el-input v-model="filters.keyword" placeholder="搜索商品名或订单号" clearable />
+        <el-input
+          v-model="filters.keyword"
+          placeholder="搜索商品名或订单号"
+          clearable
+          @keyup.enter="submitFilters"
+        />
         <el-select v-model="filters.status" placeholder="全部状态" clearable>
           <el-option label="招募中" value="OPEN" />
           <el-option label="已成团" value="GROUPED" />
@@ -76,13 +198,24 @@ onMounted(loadOrders)
           <el-option label="已完成" value="COMPLETED" />
           <el-option label="已取消" value="CANCELED" />
         </el-select>
-        <el-button type="primary" @click="loadOrders">查询</el-button>
+        <el-button type="primary" :loading="orderStore.hallLoading" @click="submitFilters">查询</el-button>
       </div>
 
-      <template v-if="orderStore.hallPage.list.length">
+      <div class="page-actions wrap-actions">
+        <el-button @click="resetFilters">重置筛选</el-button>
+        <el-button type="primary" plain @click="goCreateOrder">
+          {{ canCreateOrder ? '发起拼单' : '先去认证再发起' }}
+        </el-button>
+        <el-button v-if="canResetMock" :loading="appStore.mockResetting" @click="handleResetMock">
+          重置演示数据
+        </el-button>
+        <el-button plain @click="router.push('/my-orders')">查看我的拼单</el-button>
+      </div>
+
+      <template v-if="visibleOrders.length">
         <div class="order-grid">
           <article
-            v-for="order in orderStore.hallPage.list"
+            v-for="order in visibleOrders"
             :key="order.orderId"
             class="surface-card order-card"
           >
@@ -98,13 +231,37 @@ onMounted(loadOrders)
               <li><span>发起人</span><strong>{{ order.creatorNickname }}</strong></li>
               <li><span>截止时间</span><strong>{{ formatDateTime(order.deadlineAt) }}</strong></li>
               <li>
-                <span>金额</span>
+                <span>招募进度</span>
+                <strong>{{ order.currentMemberCount }}/{{ order.totalMemberCount }}</strong>
+              </li>
+              <li>
+                <span>剩余名额</span>
+                <strong>{{ order.remainingCount }}</strong>
+              </li>
+              <li>
+                <span>预计金额</span>
                 <strong>{{ formatCurrency(order.estimatedTotalAmount) }}</strong>
               </li>
             </ul>
             <div class="page-actions">
               <el-button @click="router.push(`/orders/${order.orderId}`)">查看详情</el-button>
-              <el-button type="primary" plain @click="handleJoin(order.orderId)">快速加入</el-button>
+              <el-button
+                type="primary"
+                plain
+                :disabled="!canJoinOrder(order)"
+                :loading="orderStore.submitting"
+                @click="handleJoin(order)"
+              >
+                {{ getJoinButtonText(order) }}
+              </el-button>
+              <el-button
+                v-if="canJoinOrder(order)"
+                type="primary"
+                :loading="orderStore.submitting"
+                @click="handleJoinAndView(order)"
+              >
+                加入并查看详情
+              </el-button>
             </div>
           </article>
         </div>
@@ -116,7 +273,18 @@ onMounted(loadOrders)
           @change="handlePageChange"
         />
       </template>
-      <EmptyState v-else title="暂无拼单" description="切换到 live 后只需替换 provider，无需修改本页展示逻辑。" />
+      <EmptyState
+        v-else
+        title="暂无匹配的拼单"
+        description="可以调整筛选条件，或在完成实名认证后自己发起一个新的拼单。"
+      >
+        <div class="page-actions">
+          <el-button @click="resetFilters">恢复默认筛选</el-button>
+          <el-button type="primary" plain @click="goCreateOrder">
+            {{ canCreateOrder ? '去发起拼单' : '去完成认证' }}
+          </el-button>
+        </div>
+      </EmptyState>
     </PageSection>
   </div>
 </template>

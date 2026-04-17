@@ -53,7 +53,7 @@ const handleSubmit = async () => {
       <template #header>
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">Register</p>
+            <p class="section-kicker">创建账号</p>
             <h2>创建用户账号</h2>
           </div>
           <el-button link @click="router.push('/login')">返回登录</el-button>

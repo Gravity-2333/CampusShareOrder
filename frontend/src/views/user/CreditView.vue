@@ -68,15 +68,33 @@ onMounted(loadCredit)
       </div>
 
       <div v-if="userStore.credit.records.length" class="table-stack">
-        <el-table v-loading="userStore.creditLoading" :data="userStore.credit.records" stripe>
-          <el-table-column label="时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-          <el-table-column prop="changeReason" label="变更原因" />
-          <el-table-column label="变更值">
-            <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
-          </el-table-column>
-        </el-table>
+        <div class="desktop-table">
+          <el-table v-loading="userStore.creditLoading" :data="userStore.credit.records" stripe>
+            <el-table-column label="时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+            <el-table-column prop="changeReason" label="变更原因" />
+            <el-table-column label="变更值">
+              <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article
+            v-for="(row, index) in userStore.credit.records"
+            :key="`${row.createdAt}-${index}`"
+            class="surface-card mobile-record-card"
+          >
+            <div class="mobile-record-title">
+              <span>{{ formatDateTime(row.createdAt) }}</span>
+              <strong>{{ row.changeReason || '信用分变更' }}</strong>
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+            </ul>
+          </article>
+        </div>
       </div>
       <EmptyState
         v-else

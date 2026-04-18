@@ -133,35 +133,62 @@ onMounted(loadUsers)
       </div>
 
       <div v-if="adminStore.usersPage.list.length" class="table-stack">
-        <el-table v-loading="adminStore.usersLoading" :data="adminStore.usersPage.list" stripe>
-          <el-table-column prop="userId" label="用户 ID" width="88" />
-          <el-table-column prop="nickname" label="昵称" />
-          <el-table-column prop="phone" label="手机号" />
-          <el-table-column label="认证状态">
-            <template #default="{ row }">{{ row.isVerified ? '已认证' : '未认证' }}</template>
-          </el-table-column>
-          <el-table-column prop="creditScore" label="信用分" width="90" />
-          <el-table-column label="状态">
-            <template #default="{ row }">
-              <StatusTag :value="row.status" :text="formatUserStatus(row.status)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="注册时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="220">
-            <template #default="{ row }">
-              <div class="row-action-group">
-                <el-button link type="primary" @click="router.push(`/admin/users/${row.userId}`)">
-                  查看详情
-                </el-button>
-                <el-button link :type="row.status === 'NORMAL' ? 'danger' : 'primary'" @click="toggleStatus(row)">
-                  {{ row.status === 'NORMAL' ? '封禁' : '解封' }}
-                </el-button>
+        <div class="desktop-table">
+          <el-table v-loading="adminStore.usersLoading" :data="adminStore.usersPage.list" stripe>
+            <el-table-column prop="userId" label="用户 ID" width="88" />
+            <el-table-column prop="nickname" label="昵称" />
+            <el-table-column prop="phone" label="手机号" />
+            <el-table-column label="认证状态">
+              <template #default="{ row }">{{ row.isVerified ? '已认证' : '未认证' }}</template>
+            </el-table-column>
+            <el-table-column prop="creditScore" label="信用分" width="90" />
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatUserStatus(row.status)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="注册时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="220">
+              <template #default="{ row }">
+                <div class="row-action-group">
+                  <el-button link type="primary" @click="router.push(`/admin/users/${row.userId}`)">
+                    查看详情
+                  </el-button>
+                  <el-button link :type="row.status === 'NORMAL' ? 'danger' : 'primary'" @click="toggleStatus(row)">
+                    {{ row.status === 'NORMAL' ? '封禁' : '解封' }}
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article v-for="row in adminStore.usersPage.list" :key="row.userId" class="surface-card mobile-record-card">
+            <div class="mobile-record-header">
+              <div class="mobile-record-title">
+                <span>用户 #{{ row.userId }}</span>
+                <strong>{{ row.nickname || '--' }}</strong>
               </div>
-            </template>
-          </el-table-column>
-        </el-table>
+              <StatusTag :value="row.status" :text="formatUserStatus(row.status)" />
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>手机号</span><strong>{{ row.phone || '--' }}</strong></li>
+              <li><span>认证状态</span><strong>{{ row.isVerified ? '已认证' : '未认证' }}</strong></li>
+              <li><span>信用分</span><strong>{{ row.creditScore ?? '--' }}</strong></li>
+              <li><span>注册时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
+            </ul>
+            <div class="page-actions">
+              <el-button type="primary" plain @click="router.push(`/admin/users/${row.userId}`)">查看详情</el-button>
+              <el-button :type="row.status === 'NORMAL' ? 'danger' : 'primary'" plain @click="toggleStatus(row)">
+                {{ row.status === 'NORMAL' ? '封禁用户' : '解封用户' }}
+              </el-button>
+            </div>
+          </article>
+        </div>
+
         <AppPagination
           :page="adminStore.usersPage.page"
           :page-size="adminStore.usersPage.pageSize"

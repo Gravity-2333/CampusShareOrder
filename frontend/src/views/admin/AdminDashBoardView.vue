@@ -157,15 +157,33 @@ onMounted(loadDashboard)
           </div>
         </div>
         <div v-if="adminStore.dashboardOverview.recentOrders.length" class="table-stack">
-          <el-table :data="adminStore.dashboardOverview.recentOrders" stripe>
-            <el-table-column prop="orderNo" label="订单号" />
-            <el-table-column prop="productName" label="商品" />
-            <el-table-column label="状态">
-              <template #default="{ row }">
+          <div class="desktop-table">
+            <el-table :data="adminStore.dashboardOverview.recentOrders" stripe>
+              <el-table-column prop="orderNo" label="订单号" />
+              <el-table-column prop="productName" label="商品" />
+              <el-table-column label="状态">
+                <template #default="{ row }">
+                  <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="mobile-record-list">
+            <article
+              v-for="row in adminStore.dashboardOverview.recentOrders"
+              :key="row.orderId || row.orderNo"
+              class="surface-card mobile-record-card"
+            >
+              <div class="mobile-record-header">
+                <div class="mobile-record-title">
+                  <span>{{ row.orderNo }}</span>
+                  <strong>{{ row.productName }}</strong>
+                </div>
                 <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
-              </template>
-            </el-table-column>
-          </el-table>
+              </div>
+            </article>
+          </div>
         </div>
         <p v-else class="muted-text">暂无订单数据。</p>
       </PageSection>
@@ -178,15 +196,33 @@ onMounted(loadDashboard)
           </div>
         </div>
         <div v-if="adminStore.dashboardOverview.recentComplaints.length" class="table-stack">
-          <el-table :data="adminStore.dashboardOverview.recentComplaints" stripe>
-            <el-table-column prop="complaintNo" label="投诉单号" />
-            <el-table-column prop="productName" label="商品" />
-            <el-table-column label="状态">
-              <template #default="{ row }">
+          <div class="desktop-table">
+            <el-table :data="adminStore.dashboardOverview.recentComplaints" stripe>
+              <el-table-column prop="complaintNo" label="投诉单号" />
+              <el-table-column prop="productName" label="商品" />
+              <el-table-column label="状态">
+                <template #default="{ row }">
+                  <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="mobile-record-list">
+            <article
+              v-for="row in adminStore.dashboardOverview.recentComplaints"
+              :key="row.complaintId || row.complaintNo"
+              class="surface-card mobile-record-card"
+            >
+              <div class="mobile-record-header">
+                <div class="mobile-record-title">
+                  <span>{{ row.complaintNo }}</span>
+                  <strong>{{ row.productName }}</strong>
+                </div>
                 <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
-              </template>
-            </el-table-column>
-          </el-table>
+              </div>
+            </article>
+          </div>
         </div>
         <p v-else class="muted-text">暂无投诉数据。</p>
       </PageSection>
@@ -200,14 +236,33 @@ onMounted(loadDashboard)
         </div>
       </div>
       <div v-if="adminStore.dashboardOverview.recentLogs.length" class="table-stack">
-        <el-table :data="adminStore.dashboardOverview.recentLogs" stripe>
-          <el-table-column prop="action" label="动作" />
-          <el-table-column prop="operatorName" label="操作人" />
-          <el-table-column prop="targetNo" label="目标编号" />
-          <el-table-column label="时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-        </el-table>
+        <div class="desktop-table">
+          <el-table :data="adminStore.dashboardOverview.recentLogs" stripe>
+            <el-table-column prop="action" label="动作" />
+            <el-table-column prop="operatorName" label="操作人" />
+            <el-table-column prop="targetNo" label="目标编号" />
+            <el-table-column label="时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article
+            v-for="(row, index) in adminStore.dashboardOverview.recentLogs"
+            :key="`${row.action}-${row.createdAt}-${index}`"
+            class="surface-card mobile-record-card"
+          >
+            <div class="mobile-record-title">
+              <span>{{ formatDateTime(row.createdAt) }}</span>
+              <strong>{{ row.action || '--' }}</strong>
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>操作人</span><strong>{{ row.operatorName || '--' }}</strong></li>
+              <li><span>目标编号</span><strong>{{ row.targetNo || '--' }}</strong></li>
+            </ul>
+          </article>
+        </div>
       </div>
       <p v-else class="muted-text">暂无日志数据。</p>
     </PageSection>

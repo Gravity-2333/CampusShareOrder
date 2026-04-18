@@ -147,6 +147,16 @@
     transform 0.22s ease;
 }
 
+.mobile-drawer-sidebar {
+  border-radius: 0;
+  display: block;
+  min-height: 100%;
+}
+
+.mobile-nav-drawer .el-drawer__body {
+  padding: 0;
+}
+
 .app-sidebar.collapsed {
   padding: 0.9rem 0.7rem;
 }
@@ -590,6 +600,61 @@
   color: var(--color-text-muted);
 }
 
+.desktop-table {
+  display: block;
+}
+
+.mobile-record-list {
+  display: none;
+  gap: var(--space-sm);
+}
+
+.mobile-record-card {
+  display: grid;
+  gap: var(--space-sm);
+  padding: 1rem 1.05rem;
+}
+
+.mobile-record-header {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: space-between;
+}
+
+.mobile-record-title {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.mobile-record-title strong {
+  font-family: var(--font-family-display);
+  font-size: 1.08rem;
+  line-height: 1.3;
+}
+
+.mobile-record-fields {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  padding: 0;
+}
+
+.mobile-record-fields li {
+  display: grid;
+  gap: 0.22rem;
+}
+
+.mobile-record-fields span {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.mobile-record-fields strong {
+  line-height: 1.65;
+  word-break: break-word;
+}
+
 .table-stack {
   display: grid;
   gap: var(--space-sm);
@@ -655,6 +720,14 @@
     padding: 0.75rem;
   }
 
+  .app-sidebar {
+    display: none;
+  }
+
+  .mobile-drawer-sidebar {
+    display: block;
+  }
+
   .app-header,
   .card-header-row,
   .section-header {
@@ -712,6 +785,14 @@
   .page-actions .el-button {
     flex: 1 1 160px;
     width: 100%;
+  }
+
+  .desktop-table {
+    display: none;
+  }
+
+  .mobile-record-list {
+    display: grid;
   }
 
   .stats-grid,

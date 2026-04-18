@@ -143,15 +143,33 @@ onMounted(() => {
         </div>
 
         <PageSection title="信用记录" description="便于后台查看该用户过往信用变化。">
-          <el-table :data="user.creditRecords || []" stripe>
-            <el-table-column label="时间">
-              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-            </el-table-column>
-            <el-table-column prop="changeReason" label="变更原因" />
-            <el-table-column label="变更值">
-              <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
-            </el-table-column>
-          </el-table>
+          <div class="desktop-table">
+            <el-table :data="user.creditRecords || []" stripe>
+              <el-table-column label="时间">
+                <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              </el-table-column>
+              <el-table-column prop="changeReason" label="变更原因" />
+              <el-table-column label="变更值">
+                <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="mobile-record-list">
+            <article
+              v-for="(row, index) in user.creditRecords || []"
+              :key="`${row.createdAt}-${index}`"
+              class="surface-card mobile-record-card"
+            >
+              <div class="mobile-record-title">
+                <span>{{ formatDateTime(row.createdAt) }}</span>
+                <strong>{{ row.changeReason || '信用分变更' }}</strong>
+              </div>
+              <ul class="mobile-record-fields">
+                <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+              </ul>
+            </article>
+          </div>
         </PageSection>
 
         <div class="page-actions wrap-actions">

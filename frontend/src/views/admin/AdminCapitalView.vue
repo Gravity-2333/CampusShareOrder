@@ -112,19 +112,40 @@ onMounted(loadRecords)
       </div>
 
       <div v-if="adminStore.recordsPage.list.length" class="table-stack">
-        <el-table v-loading="adminStore.recordsLoading" :data="adminStore.recordsPage.list" stripe>
-          <el-table-column prop="bizNo" label="业务单号" />
-          <el-table-column label="类型">
-            <template #default="{ row }">{{ formatCapitalRecordType(row.type) }}</template>
-          </el-table-column>
-          <el-table-column prop="userNickname" label="用户" />
-          <el-table-column label="金额">
-            <template #default="{ row }">{{ formatCurrency(row.amount) }}</template>
-          </el-table-column>
-          <el-table-column label="时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-        </el-table>
+        <div class="desktop-table">
+          <el-table v-loading="adminStore.recordsLoading" :data="adminStore.recordsPage.list" stripe>
+            <el-table-column prop="bizNo" label="业务单号" />
+            <el-table-column label="类型">
+              <template #default="{ row }">{{ formatCapitalRecordType(row.type) }}</template>
+            </el-table-column>
+            <el-table-column prop="userNickname" label="用户" />
+            <el-table-column label="金额">
+              <template #default="{ row }">{{ formatCurrency(row.amount) }}</template>
+            </el-table-column>
+            <el-table-column label="时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article
+            v-for="(row, index) in adminStore.recordsPage.list"
+            :key="`${row.bizNo}-${index}`"
+            class="surface-card mobile-record-card"
+          >
+            <div class="mobile-record-title">
+              <span>{{ row.bizNo || '业务记录' }}</span>
+              <strong>{{ formatCapitalRecordType(row.type) }}</strong>
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>用户</span><strong>{{ row.userNickname || '--' }}</strong></li>
+              <li><span>金额</span><strong>{{ formatCurrency(row.amount) }}</strong></li>
+              <li><span>时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
+            </ul>
+          </article>
+        </div>
+
         <AppPagination
           :page="adminStore.recordsPage.page"
           :page-size="adminStore.recordsPage.pageSize"

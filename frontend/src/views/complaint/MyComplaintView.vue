@@ -21,11 +21,24 @@ const stats = computed(() => [
     hint: '对应固定分页结构 total',
   },
   {
+    label: '待处理',
+    value: complaintStore.myComplaintsPage.list.filter((item) => item.status === 'PENDING').length,
+    hint: '便于快速识别仍在等待后台处理的投诉',
+  },
+  {
     label: '当前页',
     value: `${complaintStore.myComplaintsPage.page}/${complaintStore.myComplaintsPage.pages || 1}`,
     hint: '后续切 live 仍保持相同分页消费方式',
   },
 ])
+
+const summaryText = computed(() => {
+  if (!complaintStore.myComplaintsPage.list.length) {
+    return '当前没有投诉记录。'
+  }
+
+  return '投诉列表优先帮助你快速区分待处理和已处理项目，详细结果在详情页继续查看。'
+})
 
 const loadComplaints = async () => {
   try {
@@ -53,8 +66,13 @@ onMounted(loadComplaints)
     </div>
 
     <PageSection title="我的投诉" description="对应 GET /api/complaints/my。">
-      <div class="page-actions">
-        <el-button type="danger" plain @click="router.push('/complaints/create')">发起新投诉</el-button>
+      <p class="muted-text">{{ summaryText }}</p>
+
+      <div class="table-toolbar">
+        <span class="table-caption">共 {{ complaintStore.myComplaintsPage.total }} 条投诉记录，建议优先查看待处理项。</span>
+        <div class="page-actions">
+          <el-button type="danger" plain @click="router.push('/complaints/create')">发起新投诉</el-button>
+        </div>
       </div>
 
       <div v-if="complaintStore.myComplaintsPage.list.length" class="table-stack">
@@ -79,9 +97,11 @@ onMounted(loadComplaints)
           </el-table-column>
           <el-table-column label="操作">
             <template #default="{ row }">
-              <el-button link type="primary" @click="router.push(`/complaints/${row.complaintId}`)">
-                查看详情
-              </el-button>
+              <div class="row-action-group">
+                <el-button link type="primary" @click="router.push(`/complaints/${row.complaintId}`)">
+                  查看详情
+                </el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>

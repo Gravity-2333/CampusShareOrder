@@ -39,12 +39,32 @@ const stats = computed(() => [
   },
 ])
 
+const summaryText = computed(() => {
+  if (!adminStore.usersPage.list.length) {
+    return '当前筛选条件下没有用户数据。'
+  }
+
+  if (filters.keyword || filters.status) {
+    return '当前列表已经按关键词或状态过滤，适合快速处理目标用户。'
+  }
+
+  return '用户列表优先用于筛选、查看详情和治理账号状态，详细资料和信用记录在详情页查看。'
+})
+
 const loadUsers = async () => {
   try {
     await adminStore.loadUsers(filters)
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const resetFilters = async () => {
+  filters.keyword = ''
+  filters.page = 1
+  filters.pageSize = 10
+  filters.status = ''
+  await loadUsers()
 }
 
 const toggleStatus = async (row) => {
@@ -95,13 +115,21 @@ onMounted(loadUsers)
     </div>
 
     <PageSection title="用户管理" description="先收口用户筛选、详情查看和封禁治理这一条后台链路。">
+      <p class="muted-text">{{ summaryText }}</p>
       <div class="toolbar-row">
-        <el-input v-model="filters.keyword" placeholder="按昵称或手机号搜索" clearable />
+        <el-input v-model="filters.keyword" placeholder="按昵称或手机号搜索" clearable @keyup.enter="loadUsers" />
         <el-select v-model="filters.status" placeholder="按状态筛选" clearable>
           <el-option label="正常" value="NORMAL" />
           <el-option label="封禁" value="BANNED" />
         </el-select>
         <el-button type="primary" @click="loadUsers">查询</el-button>
+      </div>
+
+      <div class="table-toolbar">
+        <span class="table-caption">共 {{ adminStore.usersPage.total }} 个账号，详情页承接认证和信用记录等完整信息。</span>
+        <div class="page-actions">
+          <el-button @click="resetFilters">恢复默认筛选</el-button>
+        </div>
       </div>
 
       <div v-if="adminStore.usersPage.list.length" class="table-stack">
@@ -123,7 +151,7 @@ onMounted(loadUsers)
           </el-table-column>
           <el-table-column label="操作" width="220">
             <template #default="{ row }">
-              <div class="page-actions">
+              <div class="row-action-group">
                 <el-button link type="primary" @click="router.push(`/admin/users/${row.userId}`)">
                   查看详情
                 </el-button>

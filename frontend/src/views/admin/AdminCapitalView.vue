@@ -7,7 +7,7 @@ import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useAdminStore } from '../../stores/admin'
-import { formatCurrency, formatDateTime } from '../../utils/format'
+import { formatCapitalRecordType, formatCurrency, formatDateTime } from '../../utils/format'
 
 const adminStore = useAdminStore()
 
@@ -41,12 +41,36 @@ const stats = computed(() => {
   ]
 })
 
+const summaryText = computed(() => {
+  if (!adminStore.recordsPage.list.length) {
+    return '当前筛选条件下没有资金记录。'
+  }
+
+  if (filters.type) {
+    return '当前列表已经按流水类型筛选，适合集中查看同一类资金流转。'
+  }
+
+  return '资金记录页优先帮助后台快速核对订单支付、退款和发起人结算流向。'
+})
+
 const loadRecords = async () => {
   try {
     await adminStore.loadCapitalRecords(filters)
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const submitFilters = async () => {
+  filters.page = 1
+  await loadRecords()
+}
+
+const resetFilters = async () => {
+  filters.page = 1
+  filters.pageSize = 10
+  filters.type = ''
+  await loadRecords()
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
@@ -65,6 +89,8 @@ onMounted(loadRecords)
     </div>
 
     <PageSection title="资金记录" description="对应 GET /api/admin/records/capital。">
+      <p class="muted-text">{{ summaryText }}</p>
+
       <div class="toolbar-row">
         <el-select v-model="filters.type" placeholder="按流水类型筛选" clearable>
           <el-option label="支付" value="PAY" />
@@ -73,13 +99,24 @@ onMounted(loadRecords)
           <el-option label="发起人结算" value="SETTLE_TO_CREATOR" />
         </el-select>
         <div />
-        <el-button type="primary" @click="loadRecords">查询</el-button>
+        <el-button type="primary" @click="submitFilters">查询</el-button>
+      </div>
+
+      <div class="table-toolbar">
+        <span class="table-caption">
+          共 {{ adminStore.recordsPage.total }} 条资金记录{{ filters.type ? `，当前筛选：${formatCapitalRecordType(filters.type)}` : '' }}。
+        </span>
+        <div class="page-actions">
+          <el-button @click="resetFilters">恢复默认筛选</el-button>
+        </div>
       </div>
 
       <div v-if="adminStore.recordsPage.list.length" class="table-stack">
         <el-table v-loading="adminStore.recordsLoading" :data="adminStore.recordsPage.list" stripe>
           <el-table-column prop="bizNo" label="业务单号" />
-          <el-table-column prop="type" label="类型" />
+          <el-table-column label="类型">
+            <template #default="{ row }">{{ formatCapitalRecordType(row.type) }}</template>
+          </el-table-column>
           <el-table-column prop="userNickname" label="用户" />
           <el-table-column label="金额">
             <template #default="{ row }">{{ formatCurrency(row.amount) }}</template>

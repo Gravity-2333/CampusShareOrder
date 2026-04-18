@@ -27,6 +27,14 @@ const stats = computed(() => [
   },
 ])
 
+const summaryText = computed(() => {
+  if (!adminStore.complaintsPage.list.length) {
+    return '当前没有待展示的投诉记录。'
+  }
+
+  return '投诉管理页建议先看详情，再填写处理结果，避免只在列表里做过度判断。'
+})
+
 const loadComplaints = async () => {
   try {
     await adminStore.loadComplaints({ page: 1, pageSize: 10 })
@@ -79,6 +87,14 @@ onMounted(loadComplaints)
     </div>
 
     <PageSection title="投诉管理" description="管理员处理投诉前，先查看详情，再决定处理结果。">
+      <p class="muted-text">{{ summaryText }}</p>
+
+      <div class="table-toolbar">
+        <span class="table-caption">
+          共 {{ adminStore.complaintsPage.total }} 条投诉，当前待处理 {{ stats[1].value }} 条。
+        </span>
+      </div>
+
       <div v-if="adminStore.complaintsPage.list.length" class="table-stack">
         <el-table v-loading="adminStore.complaintsLoading" :data="adminStore.complaintsPage.list" stripe>
           <el-table-column prop="complaintNo" label="投诉单号" />
@@ -97,7 +113,7 @@ onMounted(loadComplaints)
           </el-table-column>
           <el-table-column label="操作" width="220">
             <template #default="{ row }">
-              <div class="page-actions">
+              <div class="row-action-group">
                 <el-button link type="primary" @click="router.push(`/admin/complaints/${row.complaintId}`)">
                   查看详情
                 </el-button>

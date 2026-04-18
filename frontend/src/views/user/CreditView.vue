@@ -30,6 +30,14 @@ const stats = computed(() => [
   },
 ])
 
+const summaryText = computed(() => {
+  if (!userStore.credit.records.length) {
+    return '当前还没有信用变更记录。'
+  }
+
+  return '信用分记录页重点展示变化原因和分值波动，便于快速回看信誉历史。'
+})
+
 const loadCredit = async () => {
   try {
     await Promise.all([userStore.loadCredit(), userStore.ensureProfileLoaded()])
@@ -48,8 +56,15 @@ onMounted(loadCredit)
     </div>
 
     <PageSection title="信用分记录" description="对应 GET /api/users/credit。">
-      <div class="page-actions">
+      <p class="muted-text">{{ summaryText }}</p>
+
+      <div class="table-toolbar">
+        <span class="table-caption">
+          当前信用分 <strong>{{ userStore.credit.creditScore }}</strong>，共 {{ userStore.credit.records.length }} 条变更记录。
+        </span>
+        <div class="page-actions">
         <el-button @click="router.push('/profile')">返回个人资料</el-button>
+        </div>
       </div>
 
       <div v-if="userStore.credit.records.length" class="table-stack">

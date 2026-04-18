@@ -36,6 +36,27 @@ const quickLinks = [
   { description: '查看后台操作与资金变动记录', label: '操作记录', path: '/admin/records/logs' },
 ]
 
+const recentSummary = computed(() => [
+  {
+    label: '近期订单',
+    value: adminStore.dashboardOverview.recentOrders.length,
+    hint: '帮助后台快速关注当前流转中的订单',
+    path: '/admin/orders',
+  },
+  {
+    label: '近期投诉',
+    value: adminStore.dashboardOverview.recentComplaints.length,
+    hint: '优先查看需要处理的异常反馈',
+    path: '/admin/complaints',
+  },
+  {
+    label: '近期日志',
+    value: adminStore.dashboardOverview.recentLogs.length,
+    hint: '便于回看后台最近的治理动作',
+    path: '/admin/records/logs',
+  },
+])
+
 const loadDashboard = async () => {
   try {
     await adminStore.loadDashboardOverview()
@@ -117,8 +138,24 @@ onMounted(loadDashboard)
       </div>
     </PageSection>
 
+    <div class="stats-grid">
+      <StatCard
+        v-for="item in recentSummary"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
+    </div>
+
     <div class="detail-grid">
       <PageSection title="近期订单" description="帮助后台快速定位当前需要关注的订单流转。">
+        <div class="table-toolbar">
+          <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentOrders.length }} 条订单摘要。</span>
+          <div class="page-actions">
+            <el-button link type="primary" @click="router.push('/admin/orders')">前往订单治理</el-button>
+          </div>
+        </div>
         <div v-if="adminStore.dashboardOverview.recentOrders.length" class="table-stack">
           <el-table :data="adminStore.dashboardOverview.recentOrders" stripe>
             <el-table-column prop="orderNo" label="订单号" />
@@ -134,6 +171,12 @@ onMounted(loadDashboard)
       </PageSection>
 
       <PageSection title="近期投诉" description="帮助后台优先处理待响应投诉。">
+        <div class="table-toolbar">
+          <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentComplaints.length }} 条投诉摘要。</span>
+          <div class="page-actions">
+            <el-button link type="primary" @click="router.push('/admin/complaints')">前往投诉处理</el-button>
+          </div>
+        </div>
         <div v-if="adminStore.dashboardOverview.recentComplaints.length" class="table-stack">
           <el-table :data="adminStore.dashboardOverview.recentComplaints" stripe>
             <el-table-column prop="complaintNo" label="投诉单号" />
@@ -150,6 +193,12 @@ onMounted(loadDashboard)
     </div>
 
     <PageSection title="近期日志" description="展示后台最近的关键操作，方便回看治理动作。">
+      <div class="table-toolbar">
+        <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentLogs.length }} 条后台日志摘要。</span>
+        <div class="page-actions">
+          <el-button link type="primary" @click="router.push('/admin/records/logs')">查看完整日志</el-button>
+        </div>
+      </div>
       <div v-if="adminStore.dashboardOverview.recentLogs.length" class="table-stack">
         <el-table :data="adminStore.dashboardOverview.recentLogs" stripe>
           <el-table-column prop="action" label="动作" />

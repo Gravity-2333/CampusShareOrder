@@ -21,6 +21,11 @@ const demoAccounts = [
   { label: '李四', phone: '13800000002' },
   { label: '王五', phone: '13800000003' },
 ]
+const heroMetrics = [
+  { label: '统一返回', value: '{ code, message, data }' },
+  { label: '鉴权方式', value: 'Bearer Token' },
+  { label: '数据模式', value: 'mock / live' },
+]
 
 const applyDemoAccount = (phone) => {
   form.phone = phone
@@ -61,15 +66,31 @@ const handleSubmit = async () => {
         当前运行模式为 <strong>{{ appStore.apiMode }}</strong
         >，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
       </p>
-      <div v-if="appStore.apiMode === 'mock'" class="page-actions">
-        <el-button
+
+      <div class="auth-metric-grid">
+        <article v-for="item in heroMetrics" :key="item.label" class="auth-metric-card">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </article>
+      </div>
+
+      <div class="auth-side-note">
+        <strong>当前重点</strong>
+        <p>先把用户主流程、订单详情闭环和后续联调结构稳定，再逐步切到真实接口。</p>
+      </div>
+
+      <div v-if="appStore.apiMode === 'mock'" class="auth-demo-grid">
+        <button
           v-for="account in demoAccounts"
           :key="account.phone"
-          plain
+          type="button"
+          class="auth-demo-card"
           @click="applyDemoAccount(account.phone)"
         >
-          使用{{ account.label }}账号
-        </el-button>
+          <span>演示账号</span>
+          <strong>{{ account.label }}</strong>
+          <small>{{ account.phone }}</small>
+        </button>
       </div>
     </section>
 
@@ -84,6 +105,11 @@ const handleSubmit = async () => {
         </div>
       </template>
 
+      <div class="auth-card-summary">
+        <strong>欢迎回来</strong>
+        <p>登录后会先进入拼单大厅，后续创建拼单、参与拼单和投诉流程都从统一路由继续。</p>
+      </div>
+
       <el-form label-position="top" :model="form" @submit.prevent="handleSubmit">
         <el-form-item label="手机号">
           <el-input v-model="form.phone" placeholder="请输入手机号" />
@@ -96,6 +122,11 @@ const handleSubmit = async () => {
           <el-button @click="router.push('/register')">去注册</el-button>
         </div>
       </el-form>
+
+      <div class="auth-card-footer">
+        <span>普通用户与管理员账号完全分离</span>
+        <button type="button" class="auth-inline-link" @click="router.push('/admin/login')">切换到管理员登录</button>
+      </div>
     </el-card>
   </div>
 </template>

@@ -1,4 +1,6 @@
 <script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+
 const props = defineProps({
   page: {
     default: 1,
@@ -19,6 +21,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['change'])
+const isMobileViewport = ref(false)
+
+const paginationLayout = computed(() => (isMobileViewport.value ? 'prev, pager, next' : 'prev, pager, next'))
+const pagerCount = computed(() => (isMobileViewport.value ? 5 : 7))
 
 const handleCurrentChange = (nextPage) => {
   emit('change', {
@@ -26,6 +32,29 @@ const handleCurrentChange = (nextPage) => {
     pageSize: props.pageSize,
   })
 }
+
+let mediaQuery = null
+let handleChange = null
+
+onMounted(() => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  mediaQuery = window.matchMedia('(max-width: 640px)')
+  handleChange = (event) => {
+    isMobileViewport.value = event.matches
+  }
+
+  isMobileViewport.value = mediaQuery.matches
+  mediaQuery.addEventListener('change', handleChange)
+})
+
+onBeforeUnmount(() => {
+  if (mediaQuery && handleChange) {
+    mediaQuery.removeEventListener('change', handleChange)
+  }
+})
 </script>
 
 <template>
@@ -35,7 +64,8 @@ const handleCurrentChange = (nextPage) => {
     </p>
     <el-pagination
       background
-      layout="prev, pager, next"
+      :layout="paginationLayout"
+      :pager-count="pagerCount"
       :current-page="page"
       :page-size="pageSize"
       :total="total"

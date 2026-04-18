@@ -40,12 +40,31 @@ const stats = computed(() => [
   },
 ])
 
+const summaryText = computed(() => {
+  if (!adminStore.ordersPage.list.length) {
+    return '当前筛选条件下没有订单数据。'
+  }
+
+  if (filters.status) {
+    return '当前列表已经按订单状态筛选，适合集中处理同一阶段的治理动作。'
+  }
+
+  return '后台列表优先用于定位异常状态、查看详情和执行取消，不在列表页重复推导复杂详情信息。'
+})
+
 const loadOrders = async () => {
   try {
     await adminStore.loadOrders(filters)
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const resetFilters = async () => {
+  filters.page = 1
+  filters.pageSize = 10
+  filters.status = ''
+  await loadOrders()
 }
 
 const handleCancel = async (row) => {
@@ -90,6 +109,7 @@ onMounted(loadOrders)
     </div>
 
     <PageSection title="订单管理" description="先收口订单筛选、详情查看和后台取消这一条治理链路。">
+      <p class="muted-text">{{ summaryText }}</p>
       <div class="toolbar-row">
         <el-select v-model="filters.status" placeholder="按状态筛选" clearable>
           <el-option label="招募中" value="OPEN" />
@@ -100,6 +120,13 @@ onMounted(loadOrders)
           <el-option label="已取消" value="CANCELED" />
         </el-select>
         <el-button type="primary" @click="loadOrders">查询</el-button>
+      </div>
+
+      <div class="table-toolbar">
+        <span class="table-caption">共 {{ adminStore.ordersPage.total }} 条订单，优先处理待送达和待收货状态。</span>
+        <div class="page-actions">
+          <el-button @click="resetFilters">恢复默认筛选</el-button>
+        </div>
       </div>
 
       <div v-if="adminStore.ordersPage.list.length" class="table-stack">
@@ -120,7 +147,7 @@ onMounted(loadOrders)
           </el-table-column>
           <el-table-column label="操作" width="220">
             <template #default="{ row }">
-              <div class="page-actions">
+              <div class="row-action-group">
                 <el-button link type="primary" @click="router.push(`/admin/orders/${row.orderId}`)">
                   查看详情
                 </el-button>

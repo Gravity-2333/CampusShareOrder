@@ -556,6 +556,26 @@
   gap: var(--space-sm);
 }
 
+.table-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: space-between;
+}
+
+.table-caption {
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+.row-action-group {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.65rem;
+}
+
 .table-stack .el-table {
   border-radius: var(--radius-medium);
   overflow: hidden;
@@ -653,6 +673,11 @@
   .admin-quick-grid,
   .action-summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .table-toolbar {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .detail-list li {

@@ -48,6 +48,13 @@ export const complaintTypeTextMap = {
   NOT_PURCHASED: '未购买',
 }
 
+export const capitalRecordTypeTextMap = {
+  PAY: '支付',
+  REFUND_CANCEL: '取消退款',
+  REFUND_DIFF: '差额退款',
+  SETTLE_TO_CREATOR: '发起人结算',
+}
+
 export const statusToneMap = {
   ACTIVE: 'success',
   AUTO_RECEIVED: 'success',

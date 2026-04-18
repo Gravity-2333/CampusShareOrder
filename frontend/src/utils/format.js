@@ -1,4 +1,5 @@
 import {
+  capitalRecordTypeTextMap,
   complaintStatusTextMap,
   complaintTypeTextMap,
   joinStatusTextMap,
@@ -45,5 +46,7 @@ export const formatReceiveStatus = (value) => receiveStatusTextMap[value] || val
 export const formatComplaintStatus = (value) => complaintStatusTextMap[value] || value || '--'
 
 export const formatComplaintType = (value) => complaintTypeTextMap[value] || value || '--'
+
+export const formatCapitalRecordType = (value) => capitalRecordTypeTextMap[value] || value || '--'
 
 export const getStatusTone = (value) => statusToneMap[value] || 'info'

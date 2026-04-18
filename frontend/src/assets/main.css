@@ -608,11 +608,19 @@
   line-height: 1.7;
 }
 
+.table-caption strong {
+  color: var(--color-text);
+}
+
 .row-action-group {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 0.2rem 0.65rem;
+}
+
+.row-action-group .el-button + .el-button {
+  margin-left: 0;
 }
 
 .table-stack .el-table {

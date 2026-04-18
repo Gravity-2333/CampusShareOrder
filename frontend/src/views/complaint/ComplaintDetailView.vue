@@ -117,6 +117,12 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="table-toolbar">
+          <span class="table-caption">
+            当前投诉状态为 <strong>{{ formatComplaintStatus(complaint.status) }}</strong>，处理结果会在这里同步更新。
+          </span>
+        </div>
+
         <div class="page-actions wrap-actions">
           <el-button @click="router.push('/complaints')">返回我的投诉</el-button>
           <el-button type="primary" plain @click="router.push(`/orders/${complaint.orderId}`)">查看关联订单</el-button>

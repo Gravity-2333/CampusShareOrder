@@ -410,6 +410,21 @@
   min-height: 100%;
 }
 
+.detail-hero-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 252, 247, 0.94), rgba(255, 248, 239, 0.88)),
+    var(--color-surface);
+}
+
+.detail-primary-actions {
+  border-top: 1px solid rgba(216, 208, 194, 0.65);
+  padding-top: var(--space-sm);
+}
+
+.detail-primary-actions .el-button {
+  min-width: 156px;
+}
+
 .order-card:hover,
 .detail-panel:hover,
 .stat-card:hover,
@@ -536,6 +551,14 @@
 
 .empty-state > p {
   max-width: 42ch;
+}
+
+.detail-actions-bar {
+  backdrop-filter: blur(calc(var(--surface-blur) - 2px));
+  background: rgba(255, 250, 243, 0.76);
+  border: 1px solid rgba(216, 208, 194, 0.6);
+  border-radius: var(--radius-medium);
+  padding: 0.9rem;
 }
 
 .pagination-bar {

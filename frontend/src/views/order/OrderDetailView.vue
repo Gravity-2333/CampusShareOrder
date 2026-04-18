@@ -996,14 +996,14 @@ onMounted(() => {
           />
         </div>
 
-        <div class="surface-card detail-panel">
+        <div class="surface-card detail-panel detail-hero-panel">
           <h3>当前引导</h3>
           <ul class="detail-list">
             <li><span>下一步建议</span><strong>{{ nextStepHint }}</strong></li>
             <li><span>投诉状态</span><strong>{{ complaintActionText }}</strong></li>
             <li><span>凭证状态</span><strong>{{ receiptStatusText }}</strong></li>
           </ul>
-          <div v-if="primaryAction" class="page-actions">
+          <div v-if="primaryAction" class="page-actions detail-primary-actions">
             <el-button
               :type="primaryAction.type"
               :plain="primaryAction.type !== 'primary'"
@@ -1350,7 +1350,7 @@ onMounted(() => {
           </PageSection>
         </div>
 
-        <div class="page-actions wrap-actions">
+        <div class="page-actions wrap-actions detail-actions-bar">
           <el-button @click="router.push('/orders')">返回大厅</el-button>
           <el-button plain @click="router.push('/my-orders')">我的拼单</el-button>
           <el-button plain :loading="orderStore.detailLoading" @click="loadDetail()">刷新详情</el-button>

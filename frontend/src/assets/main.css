@@ -584,6 +584,47 @@
     grid-template-columns: 1fr;
   }
 
+  .app-shell {
+    padding: 0.75rem;
+  }
+
+  .app-header,
+  .card-header-row,
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-header {
+    padding: 1rem 1.1rem;
+  }
+
+  .app-header h2 {
+    font-size: 1.45rem;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .welcome-text {
+    width: 100%;
+  }
+
+  .auth-page {
+    min-height: auto;
+    padding: 1.1rem 0.2rem 1.4rem;
+  }
+
+  .auth-hero {
+    padding: 1.35rem 1.1rem;
+  }
+
+  .auth-hero h1 {
+    font-size: clamp(2rem, 7vw, 3rem);
+    max-width: 12ch;
+  }
+
   .toolbar-row {
     grid-template-columns: 1fr;
   }
@@ -595,6 +636,23 @@
   .pagination-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .page-actions {
+    width: 100%;
+  }
+
+  .page-actions .el-button {
+    flex: 1 1 160px;
+    width: 100%;
+  }
+
+  .stats-grid,
+  .order-grid,
+  .detail-grid,
+  .admin-quick-grid,
+  .action-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .detail-list li {

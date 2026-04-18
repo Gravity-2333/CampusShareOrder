@@ -1208,36 +1208,61 @@ onMounted(() => {
           title="成员列表"
           description="成员信息展示加入、支付、收货及最近事件，方便联调时核对状态流转。"
         >
-          <el-table :data="detail.memberList" stripe>
-            <el-table-column prop="nickname" label="成员" />
-            <el-table-column label="角色">
-              <template #default="{ row }">{{ formatRole(row.role) }}</template>
-            </el-table-column>
-            <el-table-column label="加入状态">
-              <template #default="{ row }">
-                <StatusTag :value="row.joinStatus" :text="formatJoinStatus(row.joinStatus)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="支付状态">
-              <template #default="{ row }">
+          <div class="desktop-table">
+            <el-table :data="detail.memberList" stripe>
+              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="角色">
+                <template #default="{ row }">{{ formatRole(row.role) }}</template>
+              </el-table-column>
+              <el-table-column label="加入状态">
+                <template #default="{ row }">
+                  <StatusTag :value="row.joinStatus" :text="formatJoinStatus(row.joinStatus)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="支付状态">
+                <template #default="{ row }">
+                  <StatusTag :value="row.payStatus" :text="formatPayStatus(row.payStatus)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="收货状态">
+                <template #default="{ row }">
+                  <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                </template>
+              </el-table-column>
+              <el-table-column label="应付金额">
+                <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
+              </el-table-column>
+              <el-table-column label="退款合计">
+                <template #default="{ row }">{{ formatCurrency(row.refundAmountTotal) }}</template>
+              </el-table-column>
+              <el-table-column label="最近事件">
+                <template #default="{ row }">{{ getMemberLatestEvent(row) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="mobile-record-list">
+            <article
+              v-for="(row, index) in detail.memberList"
+              :key="`${row.nickname}-${index}`"
+              class="surface-card mobile-record-card"
+            >
+              <div class="mobile-record-header">
+                <div class="mobile-record-title">
+                  <span>{{ formatRole(row.role) }}</span>
+                  <strong>{{ row.nickname || '--' }}</strong>
+                </div>
                 <StatusTag :value="row.payStatus" :text="formatPayStatus(row.payStatus)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="收货状态">
-              <template #default="{ row }">
-                <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
-              </template>
-            </el-table-column>
-            <el-table-column label="应付金额">
-              <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
-            </el-table-column>
-            <el-table-column label="退款合计">
-              <template #default="{ row }">{{ formatCurrency(row.refundAmountTotal) }}</template>
-            </el-table-column>
-            <el-table-column label="最近事件">
-              <template #default="{ row }">{{ getMemberLatestEvent(row) }}</template>
-            </el-table-column>
-          </el-table>
+              </div>
+              <ul class="mobile-record-fields">
+                <li><span>加入状态</span><strong>{{ formatJoinStatus(row.joinStatus) }}</strong></li>
+                <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.receiveStatus) }}</strong></li>
+                <li><span>应付金额</span><strong>{{ formatCurrency(row.payAmount) }}</strong></li>
+                <li><span>退款合计</span><strong>{{ formatCurrency(row.refundAmountTotal) }}</strong></li>
+                <li><span>最近事件</span><strong>{{ getMemberLatestEvent(row) }}</strong></li>
+              </ul>
+            </article>
+          </div>
         </PageSection>
 
         <div class="detail-grid">
@@ -1322,17 +1347,38 @@ onMounted(() => {
               </li>
             </ul>
 
-            <el-table :data="detail.receiveInfo.receiveStatusSummary" stripe>
-              <el-table-column prop="nickname" label="成员" />
-              <el-table-column label="收货状态">
-                <template #default="{ row }">
+            <div class="desktop-table">
+              <el-table :data="detail.receiveInfo.receiveStatusSummary" stripe>
+                <el-table-column prop="nickname" label="成员" />
+                <el-table-column label="收货状态">
+                  <template #default="{ row }">
+                    <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="收货时间">
+                  <template #default="{ row }">{{ formatDateTime(row.receivedAt) }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <div class="mobile-record-list">
+              <article
+                v-for="(row, index) in detail.receiveInfo.receiveStatusSummary"
+                :key="`${row.nickname}-${index}`"
+                class="surface-card mobile-record-card"
+              >
+                <div class="mobile-record-header">
+                  <div class="mobile-record-title">
+                    <span>收货汇总</span>
+                    <strong>{{ row.nickname || '--' }}</strong>
+                  </div>
                   <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
-                </template>
-              </el-table-column>
-              <el-table-column label="收货时间">
-                <template #default="{ row }">{{ formatDateTime(row.receivedAt) }}</template>
-              </el-table-column>
-            </el-table>
+                </div>
+                <ul class="mobile-record-fields">
+                  <li><span>收货时间</span><strong>{{ formatDateTime(row.receivedAt) }}</strong></li>
+                </ul>
+              </article>
+            </div>
           </PageSection>
 
           <PageSection title="时间线" description="展示订单内关键事件的时间顺序。">

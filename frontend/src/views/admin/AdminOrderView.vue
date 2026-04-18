@@ -130,39 +130,70 @@ onMounted(loadOrders)
       </div>
 
       <div v-if="adminStore.ordersPage.list.length" class="table-stack">
-        <el-table v-loading="adminStore.ordersLoading" :data="adminStore.ordersPage.list" stripe>
-          <el-table-column prop="orderNo" label="订单号" />
-          <el-table-column prop="productName" label="商品" />
-          <el-table-column prop="creatorNickname" label="发起人" />
-          <el-table-column label="成员进度">
-            <template #default="{ row }">{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</template>
-          </el-table-column>
-          <el-table-column label="状态">
-            <template #default="{ row }">
-              <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="截止时间">
-            <template #default="{ row }">{{ formatDateTime(row.deadlineAt) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="220">
-            <template #default="{ row }">
-              <div class="row-action-group">
-                <el-button link type="primary" @click="router.push(`/admin/orders/${row.orderId}`)">
-                  查看详情
-                </el-button>
-                <el-button
-                  v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
-                  link
-                  type="danger"
-                  @click="handleCancel(row)"
-                >
-                  取消订单
-                </el-button>
+        <div class="desktop-table">
+          <el-table v-loading="adminStore.ordersLoading" :data="adminStore.ordersPage.list" stripe>
+            <el-table-column prop="orderNo" label="订单号" />
+            <el-table-column prop="productName" label="商品" />
+            <el-table-column prop="creatorNickname" label="发起人" />
+            <el-table-column label="成员进度">
+              <template #default="{ row }">{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</template>
+            </el-table-column>
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="截止时间">
+              <template #default="{ row }">{{ formatDateTime(row.deadlineAt) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="220">
+              <template #default="{ row }">
+                <div class="row-action-group">
+                  <el-button link type="primary" @click="router.push(`/admin/orders/${row.orderId}`)">
+                    查看详情
+                  </el-button>
+                  <el-button
+                    v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
+                    link
+                    type="danger"
+                    @click="handleCancel(row)"
+                  >
+                    取消订单
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article v-for="row in adminStore.ordersPage.list" :key="row.orderId" class="surface-card mobile-record-card">
+            <div class="mobile-record-header">
+              <div class="mobile-record-title">
+                <span>{{ row.orderNo }}</span>
+                <strong>{{ row.productName }}</strong>
               </div>
-            </template>
-          </el-table-column>
-        </el-table>
+              <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>发起人</span><strong>{{ row.creatorNickname || '--' }}</strong></li>
+              <li><span>成员进度</span><strong>{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</strong></li>
+              <li><span>截止时间</span><strong>{{ formatDateTime(row.deadlineAt) }}</strong></li>
+            </ul>
+            <div class="page-actions">
+              <el-button type="primary" plain @click="router.push(`/admin/orders/${row.orderId}`)">查看详情</el-button>
+              <el-button
+                v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
+                type="danger"
+                plain
+                @click="handleCancel(row)"
+              >
+                取消订单
+              </el-button>
+            </div>
+          </article>
+        </div>
+
         <AppPagination
           :page="adminStore.ordersPage.page"
           :page-size="adminStore.ordersPage.pageSize"

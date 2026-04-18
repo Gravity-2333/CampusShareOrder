@@ -112,14 +112,34 @@ onMounted(loadLogs)
       </div>
 
       <div v-if="adminStore.logsPage.list.length" class="table-stack">
-        <el-table v-loading="adminStore.logsLoading" :data="adminStore.logsPage.list" stripe>
-          <el-table-column prop="action" label="动作" />
-          <el-table-column prop="operatorName" label="操作人" />
-          <el-table-column prop="targetNo" label="目标编号" />
-          <el-table-column label="时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-        </el-table>
+        <div class="desktop-table">
+          <el-table v-loading="adminStore.logsLoading" :data="adminStore.logsPage.list" stripe>
+            <el-table-column prop="action" label="动作" />
+            <el-table-column prop="operatorName" label="操作人" />
+            <el-table-column prop="targetNo" label="目标编号" />
+            <el-table-column label="时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article
+            v-for="(row, index) in adminStore.logsPage.list"
+            :key="`${row.action}-${row.createdAt}-${index}`"
+            class="surface-card mobile-record-card"
+          >
+            <div class="mobile-record-title">
+              <span>{{ formatDateTime(row.createdAt) }}</span>
+              <strong>{{ row.action || '--' }}</strong>
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>操作人</span><strong>{{ row.operatorName || '--' }}</strong></li>
+              <li><span>目标编号</span><strong>{{ row.targetNo || '--' }}</strong></li>
+            </ul>
+          </article>
+        </div>
+
         <AppPagination
           :page="adminStore.logsPage.page"
           :page-size="adminStore.logsPage.pageSize"

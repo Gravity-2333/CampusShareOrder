@@ -96,39 +96,67 @@ onMounted(loadComplaints)
       </div>
 
       <div v-if="adminStore.complaintsPage.list.length" class="table-stack">
-        <el-table v-loading="adminStore.complaintsLoading" :data="adminStore.complaintsPage.list" stripe>
-          <el-table-column prop="complaintNo" label="投诉单号" />
-          <el-table-column label="类型">
-            <template #default="{ row }">{{ formatComplaintType(row.type) }}</template>
-          </el-table-column>
-          <el-table-column prop="productName" label="商品" />
-          <el-table-column prop="accusedNickname" label="被投诉人" />
-          <el-table-column label="状态">
-            <template #default="{ row }">
-              <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="提交时间">
-            <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="220">
-            <template #default="{ row }">
-              <div class="row-action-group">
-                <el-button link type="primary" @click="router.push(`/admin/complaints/${row.complaintId}`)">
-                  查看详情
-                </el-button>
-                <el-button
-                  v-if="row.status === 'PENDING'"
-                  link
-                  type="danger"
-                  @click="handleComplaint(row)"
-                >
-                  标记处理
-                </el-button>
+        <div class="desktop-table">
+          <el-table v-loading="adminStore.complaintsLoading" :data="adminStore.complaintsPage.list" stripe>
+            <el-table-column prop="complaintNo" label="投诉单号" />
+            <el-table-column label="类型">
+              <template #default="{ row }">{{ formatComplaintType(row.type) }}</template>
+            </el-table-column>
+            <el-table-column prop="productName" label="商品" />
+            <el-table-column prop="accusedNickname" label="被投诉人" />
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="提交时间">
+              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="220">
+              <template #default="{ row }">
+                <div class="row-action-group">
+                  <el-button link type="primary" @click="router.push(`/admin/complaints/${row.complaintId}`)">
+                    查看详情
+                  </el-button>
+                  <el-button
+                    v-if="row.status === 'PENDING'"
+                    link
+                    type="danger"
+                    @click="handleComplaint(row)"
+                  >
+                    标记处理
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article
+            v-for="row in adminStore.complaintsPage.list"
+            :key="row.complaintId"
+            class="surface-card mobile-record-card"
+          >
+            <div class="mobile-record-header">
+              <div class="mobile-record-title">
+                <span>{{ row.complaintNo }}</span>
+                <strong>{{ row.productName }}</strong>
               </div>
-            </template>
-          </el-table-column>
-        </el-table>
+              <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>投诉类型</span><strong>{{ formatComplaintType(row.type) }}</strong></li>
+              <li><span>被投诉人</span><strong>{{ row.accusedNickname || '--' }}</strong></li>
+              <li><span>提交时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
+            </ul>
+            <div class="page-actions">
+              <el-button type="primary" plain @click="router.push(`/admin/complaints/${row.complaintId}`)">查看详情</el-button>
+              <el-button v-if="row.status === 'PENDING'" type="danger" plain @click="handleComplaint(row)">处理投诉</el-button>
+            </div>
+          </article>
+        </div>
+
         <AppPagination
           :page="adminStore.complaintsPage.page"
           :page-size="adminStore.complaintsPage.pageSize"

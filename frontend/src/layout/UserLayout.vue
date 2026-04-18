@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { useAppStore } from '../stores/app'
@@ -28,25 +28,47 @@ const navItems = computed(() => {
 })
 
 const activePath = computed(() => route.path)
+const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
+const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '切换导航'))
+
+const handleNavSelect = () => {
+  appStore.closeMobileNav()
+}
 
 const handleLogout = async () => {
+  appStore.closeMobileNav()
   await userStore.logoutCurrent()
   router.push('/login')
 }
+
+watch(
+  () => route.fullPath,
+  () => {
+    appStore.closeMobileNav()
+  },
+)
+
+onMounted(() => {
+  appStore.initializeViewportTracking()
+})
+
+onBeforeUnmount(() => {
+  appStore.releaseViewportTracking()
+})
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'is-collapsed': appStore.sidebarCollapsed }">
-    <aside class="app-sidebar" :class="{ collapsed: appStore.sidebarCollapsed }">
+  <div class="app-shell" :class="{ 'is-collapsed': isDesktopCollapsed, 'is-mobile': appStore.isMobileViewport }">
+    <aside v-if="!appStore.isMobileViewport" class="app-sidebar" :class="{ collapsed: isDesktopCollapsed }">
       <div class="brand-block">
-        <div class="brand-mark">{{ appStore.sidebarCollapsed ? '拼' : 'CSO' }}</div>
+        <div class="brand-mark">{{ isDesktopCollapsed ? '拼' : 'CSO' }}</div>
         <span class="brand-kicker">CampusShareOrder</span>
         <h1>校园拼单平台</h1>
       </div>
 
       <el-menu
         :default-active="activePath"
-        :collapse="appStore.sidebarCollapsed"
+        :collapse="isDesktopCollapsed"
         :collapse-transition="false"
         router
         class="shell-menu"
@@ -56,6 +78,28 @@ const handleLogout = async () => {
         </el-menu-item>
       </el-menu>
     </aside>
+
+    <el-drawer
+      v-model="appStore.mobileNavOpen"
+      :with-header="false"
+      direction="ltr"
+      size="280px"
+      class="mobile-nav-drawer"
+    >
+      <div class="app-sidebar mobile-drawer-sidebar">
+        <div class="brand-block">
+          <div class="brand-mark">CSO</div>
+          <span class="brand-kicker">CampusShareOrder</span>
+          <h1>校园拼单平台</h1>
+        </div>
+
+        <el-menu :default-active="activePath" router class="shell-menu" @select="handleNavSelect">
+          <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+            {{ item.label }}
+          </el-menu-item>
+        </el-menu>
+      </div>
+    </el-drawer>
 
     <div class="app-main">
       <header class="app-header">
@@ -74,7 +118,7 @@ const handleLogout = async () => {
           >
             去认证
           </el-button>
-          <el-button text @click="appStore.toggleSidebar()">切换导航</el-button>
+          <el-button text class="mobile-nav-trigger" @click="appStore.toggleSidebar()">{{ navButtonText }}</el-button>
           <el-button type="primary" plain @click="handleLogout">退出登录</el-button>
         </div>
       </header>

@@ -9,7 +9,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
-import { formatOrderStatus, formatPayStatus, formatReceiveStatus, formatRole } from '../../utils/format'
+import { formatJoinStatus, formatOrderStatus, formatPayStatus, formatReceiveStatus, formatRole } from '../../utils/format'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -77,34 +77,60 @@ onMounted(loadOrders)
       </div>
 
       <div v-if="orderStore.myOrdersPage.list.length" class="table-stack">
-      <el-table
-        v-loading="orderStore.myOrdersLoading"
-        :data="orderStore.myOrdersPage.list"
-        stripe
-      >
-        <el-table-column prop="orderNo" label="订单号" />
-        <el-table-column prop="productName" label="商品" />
-        <el-table-column label="我的角色">
-          <template #default="{ row }">{{ formatRole(row.myRole) }}</template>
-        </el-table-column>
-        <el-table-column prop="myJoinStatus" label="参与状态" />
-        <el-table-column label="支付状态">
-          <template #default="{ row }">{{ formatPayStatus(row.myPayStatus) }}</template>
-        </el-table-column>
-        <el-table-column label="收货状态">
-          <template #default="{ row }">{{ formatReceiveStatus(row.myReceiveStatus) }}</template>
-        </el-table-column>
-        <el-table-column label="订单状态">
-          <template #default="{ row }">
-            <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作">
-          <template #default="{ row }">
-            <el-button link type="primary" @click="router.push(`/orders/${row.orderId}`)">查看详情</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+        <div class="desktop-table">
+          <el-table
+            v-loading="orderStore.myOrdersLoading"
+            :data="orderStore.myOrdersPage.list"
+            stripe
+          >
+            <el-table-column prop="orderNo" label="订单号" />
+            <el-table-column prop="productName" label="商品" />
+            <el-table-column label="我的角色">
+              <template #default="{ row }">{{ formatRole(row.myRole) }}</template>
+            </el-table-column>
+            <el-table-column label="参与状态">
+              <template #default="{ row }">{{ formatJoinStatus(row.myJoinStatus) }}</template>
+            </el-table-column>
+            <el-table-column label="支付状态">
+              <template #default="{ row }">{{ formatPayStatus(row.myPayStatus) }}</template>
+            </el-table-column>
+            <el-table-column label="收货状态">
+              <template #default="{ row }">{{ formatReceiveStatus(row.myReceiveStatus) }}</template>
+            </el-table-column>
+            <el-table-column label="订单状态">
+              <template #default="{ row }">
+                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+              </template>
+            </el-table-column>
+            <el-table-column label="操作">
+              <template #default="{ row }">
+                <el-button link type="primary" @click="router.push(`/orders/${row.orderId}`)">查看详情</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="mobile-record-list">
+          <article v-for="row in orderStore.myOrdersPage.list" :key="row.orderId" class="surface-card mobile-record-card">
+            <div class="mobile-record-header">
+              <div class="mobile-record-title">
+                <span>{{ row.orderNo }}</span>
+                <strong>{{ row.productName }}</strong>
+              </div>
+              <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+            </div>
+            <ul class="mobile-record-fields">
+              <li><span>我的角色</span><strong>{{ formatRole(row.myRole) }}</strong></li>
+              <li><span>参与状态</span><strong>{{ formatJoinStatus(row.myJoinStatus) }}</strong></li>
+              <li><span>支付状态</span><strong>{{ formatPayStatus(row.myPayStatus) }}</strong></li>
+              <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.myReceiveStatus) }}</strong></li>
+            </ul>
+            <div class="page-actions">
+              <el-button type="primary" plain @click="router.push(`/orders/${row.orderId}`)">查看详情</el-button>
+            </div>
+          </article>
+        </div>
+
         <AppPagination
           :page="orderStore.myOrdersPage.page"
           :page-size="orderStore.myOrdersPage.pageSize"

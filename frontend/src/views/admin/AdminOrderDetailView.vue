@@ -10,6 +10,7 @@ import { useAdminStore } from '../../stores/admin'
 import {
   formatCurrency,
   formatDateTime,
+  formatJoinStatus,
   formatOrderStatus,
   formatPayStatus,
   formatReceiveStatus,
@@ -152,19 +153,41 @@ onMounted(() => {
         </div>
 
         <PageSection title="成员列表" description="后台可直接查看角色、支付和收货状态。">
-          <el-table :data="detail.memberList" stripe>
-            <el-table-column prop="nickname" label="成员" />
-            <el-table-column label="角色">
-              <template #default="{ row }">{{ formatRole(row.role) }}</template>
-            </el-table-column>
-            <el-table-column prop="joinStatus" label="加入状态" />
-            <el-table-column label="支付状态">
-              <template #default="{ row }">{{ formatPayStatus(row.payStatus) }}</template>
-            </el-table-column>
-            <el-table-column label="收货状态">
-              <template #default="{ row }">{{ formatReceiveStatus(row.receiveStatus) }}</template>
-            </el-table-column>
-          </el-table>
+          <div class="desktop-table">
+            <el-table :data="detail.memberList" stripe>
+              <el-table-column prop="nickname" label="成员" />
+              <el-table-column label="角色">
+                <template #default="{ row }">{{ formatRole(row.role) }}</template>
+              </el-table-column>
+              <el-table-column label="加入状态">
+                <template #default="{ row }">{{ formatJoinStatus(row.joinStatus) }}</template>
+              </el-table-column>
+              <el-table-column label="支付状态">
+                <template #default="{ row }">{{ formatPayStatus(row.payStatus) }}</template>
+              </el-table-column>
+              <el-table-column label="收货状态">
+                <template #default="{ row }">{{ formatReceiveStatus(row.receiveStatus) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <div class="mobile-record-list">
+            <article
+              v-for="(row, index) in detail.memberList"
+              :key="`${row.nickname}-${index}`"
+              class="surface-card mobile-record-card"
+            >
+              <div class="mobile-record-title">
+                <span>{{ formatRole(row.role) }}</span>
+                <strong>{{ row.nickname || '--' }}</strong>
+              </div>
+              <ul class="mobile-record-fields">
+                <li><span>加入状态</span><strong>{{ formatJoinStatus(row.joinStatus) }}</strong></li>
+                <li><span>支付状态</span><strong>{{ formatPayStatus(row.payStatus) }}</strong></li>
+                <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.receiveStatus) }}</strong></li>
+              </ul>
+            </article>
+          </div>
         </PageSection>
 
         <div class="detail-grid">

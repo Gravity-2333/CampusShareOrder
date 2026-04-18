@@ -20,6 +20,8 @@ const form = reactive({
 })
 
 const previewRows = computed(() => [
+  { label: '请求对象', value: 'CreateComplaintRequest' },
+  { label: '接口路径', value: 'POST /api/complaints' },
   { label: 'orderId', value: form.orderId || '--' },
   { label: 'type', value: form.type },
   { label: 'content', value: form.content || '--' },
@@ -68,6 +70,11 @@ const handleSubmit = async () => {
         :closable="false"
       />
 
+      <div class="form-intro surface-card">
+        <strong>投诉说明</strong>
+        <p>当前阶段投诉类型只允许“未购买”或“伪造凭证”，是否能发起投诉仍以订单详情里的 actionFlags 为准。</p>
+      </div>
+
       <el-form label-position="top" :model="form" class="form-grid">
         <el-form-item label="订单 ID">
           <el-input-number v-model="form.orderId" :min="1" />
@@ -79,7 +86,7 @@ const handleSubmit = async () => {
           </el-select>
         </el-form-item>
         <el-form-item class="full-span" label="投诉内容">
-          <el-input v-model="form.content" type="textarea" :rows="4" />
+          <el-input v-model="form.content" type="textarea" :rows="5" placeholder="请简要描述订单异常、发生时间和你希望平台介入处理的原因" />
         </el-form-item>
       </el-form>
 

@@ -84,6 +84,11 @@ onMounted(loadProfile)
         :closable="false"
       />
 
+      <div class="form-intro surface-card">
+        <strong>认证说明</strong>
+        <p>当前阶段仅提交学号字段，认证完成后会同步刷新登录态和个人资料中的认证状态。</p>
+      </div>
+
       <el-form label-position="top" :model="form" class="form-grid">
         <el-form-item label="学号">
           <el-input v-model="form.studentNo" placeholder="请输入学号" />

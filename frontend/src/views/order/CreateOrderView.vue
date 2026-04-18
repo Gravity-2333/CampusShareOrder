@@ -25,6 +25,11 @@ const form = reactive({
   totalMemberCount: 3,
 })
 
+const previewRows = [
+  { label: '请求对象', value: 'CreateOrderRequest' },
+  { label: '接口路径', value: 'POST /api/orders' },
+]
+
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
     requireValue(form.productName, '请填写商品名称'),
@@ -65,12 +70,17 @@ const handleSubmit = async () => {
     </div>
 
     <PageSection title="发起拼单" description="CreateOrderRequest 字段严格对齐冻结契约。">
+      <div class="form-intro surface-card">
+        <strong>创建前提示</strong>
+        <p>发起人创建成功后会自动成为首位成员，后续招募、支付、上传凭证和确认送达都从详情页继续推进。</p>
+      </div>
+
       <el-form label-position="top" :model="form" class="form-grid">
         <el-form-item label="商品名称">
-          <el-input v-model="form.productName" />
+          <el-input v-model="form.productName" placeholder="例如：晚饭拼单、奶茶拼单" />
         </el-form-item>
         <el-form-item label="商品描述">
-          <el-input v-model="form.productDesc" type="textarea" />
+          <el-input v-model="form.productDesc" type="textarea" :rows="4" placeholder="可补充口味、备注、配送说明等" />
         </el-form-item>
         <el-form-item label="拼单人数">
           <el-input-number v-model="form.totalMemberCount" :min="2" :max="6" />
@@ -79,10 +89,10 @@ const handleSubmit = async () => {
           <el-input-number v-model="form.estimatedTotalAmount" :min="1" :precision="2" />
         </el-form-item>
         <el-form-item label="取货点">
-          <el-input v-model="form.pickupPoint" />
+          <el-input v-model="form.pickupPoint" placeholder="例如：东区宿舍门口、图书馆南门" />
         </el-form-item>
         <el-form-item label="截止时间">
-          <el-input v-model="form.deadlineAt" />
+          <el-input v-model="form.deadlineAt" placeholder="yyyy-MM-dd HH:mm:ss" />
         </el-form-item>
       </el-form>
 
@@ -93,6 +103,10 @@ const handleSubmit = async () => {
 
     <PageSection title="提交预览" description="这里用于在前端阶段先核对请求字段是否符合冻结契约。">
       <ul class="detail-list">
+        <li v-for="row in previewRows" :key="row.label">
+          <span>{{ row.label }}</span>
+          <strong>{{ row.value }}</strong>
+        </li>
         <li><span>productName</span><strong>{{ form.productName || '--' }}</strong></li>
         <li><span>productDesc</span><strong>{{ form.productDesc || '--' }}</strong></li>
         <li><span>totalMemberCount</span><strong>{{ form.totalMemberCount }}</strong></li>

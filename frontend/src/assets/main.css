@@ -385,6 +385,12 @@
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
+.form-grid .el-input-number,
+.form-grid .el-select,
+.form-grid .el-date-editor {
+  width: 100%;
+}
+
 .form-intro {
   display: grid;
   gap: 0.35rem;
@@ -739,6 +745,15 @@
     padding: 1rem 1.1rem;
   }
 
+  .page-section {
+    padding: 1.05rem;
+  }
+
+  .surface-card,
+  .auth-card {
+    border-radius: 22px;
+  }
+
   .app-header h2 {
     font-size: 1.45rem;
   }
@@ -760,6 +775,12 @@
     padding: 1.35rem 1.1rem;
   }
 
+  .auth-card .el-card__body,
+  .auth-card .el-card__header {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
   .auth-hero h1 {
     font-size: clamp(2rem, 7vw, 3rem);
     max-width: 12ch;
@@ -776,6 +797,7 @@
   .pagination-bar {
     align-items: stretch;
     flex-direction: column;
+    padding: 0.85rem 1rem;
   }
 
   .page-actions {
@@ -793,6 +815,18 @@
 
   .mobile-record-list {
     display: grid;
+  }
+
+  .mobile-record-card {
+    padding: 0.95rem;
+  }
+
+  .mobile-record-header {
+    flex-direction: column;
+  }
+
+  .mobile-record-header .status-tag {
+    align-self: flex-start;
   }
 
   .stats-grid,
@@ -815,5 +849,72 @@
 
   .detail-list strong {
     text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 15px;
+  }
+
+  .app-shell {
+    padding: 0.45rem;
+  }
+
+  .app-header {
+    padding: 0.9rem 0.95rem;
+    top: 0.45rem;
+  }
+
+  .app-header h2 {
+    font-size: 1.28rem;
+  }
+
+  .page-section {
+    padding: 0.95rem;
+  }
+
+  .stats-grid {
+    gap: 0.75rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.7rem;
+  }
+
+  .mobile-nav-trigger {
+    width: 100%;
+  }
+
+  .auth-page {
+    padding: 0.8rem 0 1.1rem;
+  }
+
+  .auth-hero {
+    gap: 0.75rem;
+    padding: 1.1rem 0.95rem;
+  }
+
+  .auth-hero h1 {
+    font-size: clamp(1.8rem, 8vw, 2.5rem);
+    max-width: 100%;
+  }
+
+  .auth-card .page-actions .el-button,
+  .table-toolbar .page-actions .el-button,
+  .pagination-bar .el-pagination {
+    width: 100%;
+  }
+
+  .pagination-bar .el-pagination {
+    justify-content: center;
+  }
+
+  .detail-actions-bar {
+    padding: 0.75rem;
   }
 }

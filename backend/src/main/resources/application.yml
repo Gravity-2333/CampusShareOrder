@@ -1,1 +1,20 @@
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      url: jdbc:mysql://localhost:3306/campus_share_order?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      driver-class-name: com.mysql.cj.jdbc.Driver
+      username: root
+      password: 123mysql
+  
+mybatis-plus:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.campusshareorder.backend.entity
+  configuration:
+    map-underscore-to-camel-case: true
 
+# JWT配置
+jwt:
+  secret: campus_share_order_secret_key
+  expire: 86400 # 24小时
+  header: Authorization

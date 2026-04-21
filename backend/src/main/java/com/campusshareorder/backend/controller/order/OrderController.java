@@ -4,6 +4,7 @@ import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.service.OrderService;
+import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.order.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -19,8 +20,7 @@ public class OrderController {
 
     @PostMapping
     public ApiResponse<CreateOrderVO> createOrder(@RequestBody CreateOrderRequest request) {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         CreateOrderVO vo = orderService.createOrder(request, userId);
         return ApiResponse.success(vo);
     }
@@ -33,32 +33,28 @@ public class OrderController {
 
     @GetMapping("/{orderId}")
     public ApiResponse<OrderDetailVO> getOrderDetail(@PathVariable Long orderId) {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         OrderDetailVO detail = orderService.getOrderDetail(orderId, userId);
         return ApiResponse.success(detail);
     }
 
     @PostMapping("/{orderId}/join")
     public ApiResponse<Void> joinOrder(@PathVariable Long orderId, @RequestBody JoinOrderRequest request) {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         orderService.joinOrder(orderId, request, userId);
         return ApiResponse.success();
     }
 
     @PostMapping("/{orderId}/pay")
     public ApiResponse<Void> payOrder(@PathVariable Long orderId) {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         orderService.payOrder(orderId, userId);
         return ApiResponse.success();
     }
 
     @PostMapping("/{orderId}/exit")
     public ApiResponse<Void> exitOrder(@PathVariable Long orderId) {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         orderService.exitOrder(orderId, userId);
         return ApiResponse.success();
     }

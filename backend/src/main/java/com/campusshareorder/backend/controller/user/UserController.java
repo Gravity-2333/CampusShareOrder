@@ -1,12 +1,15 @@
 package com.campusshareorder.backend.controller.user;
 
 import com.campusshareorder.backend.common.response.ApiResponse;
+import com.campusshareorder.backend.dto.user.VerifyStudentRequest;
+import com.campusshareorder.backend.entity.UserAccount;
+import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
+import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.order.MyOrderListItemVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -16,12 +19,27 @@ import java.util.List;
 public class UserController {
 
     private final OrderService orderService;
+    private final UserAccountMapper userAccountMapper;
 
     @GetMapping("/my-orders")
     public ApiResponse<List<MyOrderListItemVO>> getMyOrders() {
-        // 暂时硬编码用户ID，实际应该从JWT中获取
-        Long userId = 1L;
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
         List<MyOrderListItemVO> list = orderService.getMyOrders(userId);
         return ApiResponse.success(list);
+    }
+
+    @PostMapping("/verify-student")
+    public ApiResponse<Void> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
+        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        UserAccount user = userAccountMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        user.setStudentNo(request.getStudentNo());
+        user.setIsVerified(true);
+        userAccountMapper.updateById(user);
+        
+        return ApiResponse.success();
     }
 }

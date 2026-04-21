@@ -4,11 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
+import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
+import com.campusshareorder.backend.entity.OrderReceipt;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
+import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
 import com.campusshareorder.backend.vo.order.*;
@@ -31,6 +34,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final GroupOrderMapper groupOrderMapper;
     private final GroupOrderMemberMapper groupOrderMemberMapper;
     private final UserAccountMapper userAccountMapper;
+    private final OrderReceiptMapper orderReceiptMapper;
 
     @Override
     @Transactional
@@ -75,7 +79,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setEstimatedPerAmount(estimatedPerAmount);
         order.setPickupPoint(request.getPickupPoint());
         order.setDeadlineAt(LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss"));
-        order.setStatus("拼单中");
+        order.setStatus("OPEN");
         order.setComplaintOpened(false);
         groupOrderMapper.insert(order);
 
@@ -84,9 +88,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setGroupOrderId(order.getId());
         member.setUserId(userId);
         member.setIsCreator(true);
-        member.setJoinStatus("待支付");
-        member.setPayStatus("待支付");
-        member.setReceiveStatus("待收货");
+        member.setJoinStatus("ACTIVE");
+        member.setPayStatus("UNPAID");
+        member.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(member);
 
         CreateOrderVO vo = new CreateOrderVO();
@@ -101,7 +105,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public List<OrderListItemVO> getOrderList() {
         // 查询所有拼单中状态的订单
         LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupOrder::getStatus, "拼单中")
+        wrapper.eq(GroupOrder::getStatus, "OPEN")
                 .orderByDesc(GroupOrder::getCreatedAt);
         List<GroupOrder> orders = groupOrderMapper.selectList(wrapper);
 
@@ -259,14 +263,34 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         complaintInfo.setComplaintOpened(order.getComplaintOpened());
         detailVO.setComplaintInfo(complaintInfo);
 
+        // 购买凭证信息
+        LambdaQueryWrapper<OrderReceipt> receiptWrapper = new LambdaQueryWrapper<>();
+        receiptWrapper.eq(OrderReceipt::getGroupOrderId, orderId);
+        OrderReceipt receipt = orderReceiptMapper.selectOne(receiptWrapper);
+        if (receipt != null) {
+            ReceiptInfoVO receiptInfoVO = new ReceiptInfoVO();
+            receiptInfoVO.setReceiptId(receipt.getId());
+            receiptInfoVO.setImageUrl(receipt.getImageUrl());
+            receiptInfoVO.setActualTotalAmount(receipt.getActualTotalAmount());
+            receiptInfoVO.setExpectedDeliveryStartAt(receipt.getExpectedDeliveryStartAt());
+            receiptInfoVO.setExpectedDeliveryEndAt(receipt.getExpectedDeliveryEndAt());
+            receiptInfoVO.setUploadedAt(receipt.getUploadedAt());
+            
+            UserAccount uploader = userAccountMapper.selectById(receipt.getUploaderUserId());
+            if (uploader != null) {
+                receiptInfoVO.setUploaderNickname(uploader.getNickname());
+            }
+            detailVO.setReceiptInfo(receiptInfoVO);
+        }
+
         // 操作标志
         ActionFlagsVO actionFlags = new ActionFlagsVO();
-        actionFlags.setCanJoin("拼单中".equals(order.getStatus()) && currentMember == null);
-        actionFlags.setCanExit("拼单中".equals(order.getStatus()) && currentMember != null && "待支付".equals(currentMember.getJoinStatus()));
-        actionFlags.setCanPay(currentMember != null && "待支付".equals(currentMember.getPayStatus()));
-        actionFlags.setCanUploadReceipt("已成团".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
-        actionFlags.setCanMarkDelivered("待送达".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
-        actionFlags.setCanConfirmReceived("待收货".equals(order.getStatus()) && currentMember != null && "待收货".equals(currentMember.getReceiveStatus()));
+        actionFlags.setCanJoin("OPEN".equals(order.getStatus()) && currentMember == null);
+        actionFlags.setCanExit("OPEN".equals(order.getStatus()) && currentMember != null && "ACTIVE".equals(currentMember.getJoinStatus()));
+        actionFlags.setCanPay(currentMember != null && "UNPAID".equals(currentMember.getPayStatus()));
+        actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
+        actionFlags.setCanMarkDelivered("DELIVERING".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
+        actionFlags.setCanConfirmReceived("SHIPPED".equals(order.getStatus()) && currentMember != null && "NOT_READY".equals(currentMember.getReceiveStatus()));
         actionFlags.setCanComplaint(order.getComplaintOpened() && currentMember != null && !order.getCreatorUserId().equals(userId));
         detailVO.setActionFlags(actionFlags);
 
@@ -278,6 +302,44 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         createItem.setTime(order.getCreatedAt());
         createItem.setOperator(creator != null ? creator.getNickname() : "系统");
         timeline.add(createItem);
+
+        if ("GROUPED".equals(order.getStatus()) || "DELIVERING".equals(order.getStatus()) || "SHIPPED".equals(order.getStatus()) || "COMPLETED".equals(order.getStatus())) {
+            TimelineItemVO groupItem = new TimelineItemVO();
+            groupItem.setAction("ORDER_GROUPED");
+            groupItem.setDescription("拼单成功");
+            groupItem.setTime(order.getUpdatedAt()); // 简化处理，实际应该记录状态变更时间
+            groupItem.setOperator("系统");
+            timeline.add(groupItem);
+        }
+
+        if (receipt != null) {
+            TimelineItemVO receiptItem = new TimelineItemVO();
+            receiptItem.setAction("RECEIPT_UPLOAD");
+            receiptItem.setDescription("上传凭证");
+            receiptItem.setTime(receipt.getUploadedAt());
+            UserAccount uploader = userAccountMapper.selectById(receipt.getUploaderUserId());
+            receiptItem.setOperator(uploader != null ? uploader.getNickname() : "发起人");
+            timeline.add(receiptItem);
+        }
+
+        if (order.getDeliveredAt() != null) {
+            TimelineItemVO deliverItem = new TimelineItemVO();
+            deliverItem.setAction("ORDER_DELIVERED");
+            deliverItem.setDescription("商品已送达");
+            deliverItem.setTime(order.getDeliveredAt());
+            deliverItem.setOperator(creator != null ? creator.getNickname() : "发起人");
+            timeline.add(deliverItem);
+        }
+
+        if ("COMPLETED".equals(order.getStatus())) {
+            TimelineItemVO completeItem = new TimelineItemVO();
+            completeItem.setAction("ORDER_COMPLETED");
+            completeItem.setDescription("订单完成");
+            completeItem.setTime(order.getUpdatedAt());
+            completeItem.setOperator("系统");
+            timeline.add(completeItem);
+        }
+
         detailVO.setTimeline(timeline);
 
         return detailVO;
@@ -322,7 +384,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 验证订单状态
-        if (!"拼单中".equals(order.getStatus())) {
+        if (!"OPEN".equals(order.getStatus())) {
             throw new RuntimeException("订单已关闭，无法加入");
         }
 
@@ -346,9 +408,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setUserId(userId);
         member.setIsCreator(false);
         member.setRemark(request.getRemark());
-        member.setJoinStatus("待支付");
-        member.setPayStatus("待支付");
-        member.setReceiveStatus("待收货");
+        member.setJoinStatus("ACTIVE");
+        member.setPayStatus("UNPAID");
+        member.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(member);
 
         // 更新订单当前人数
@@ -366,7 +428,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 验证订单状态
-        if (!"拼单中".equals(order.getStatus())) {
+        if (!"OPEN".equals(order.getStatus())) {
             throw new RuntimeException("订单已关闭，无法支付");
         }
 
@@ -380,13 +442,13 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 验证支付状态
-        if (!"待支付".equals(member.getPayStatus())) {
+        if (!"UNPAID".equals(member.getPayStatus())) {
             throw new RuntimeException("您已经支付过了");
         }
 
         // 更新支付状态
-        member.setPayStatus("已支付");
-        member.setJoinStatus("已支付");
+        member.setPayStatus("PAID");
+        member.setJoinStatus("PAID");
         member.setPayAmount(order.getEstimatedPerAmount());
         member.setPaidAt(LocalDateTime.now());
         groupOrderMemberMapper.updateById(member);
@@ -395,12 +457,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         LambdaQueryWrapper<GroupOrderMember> allMemberWrapper = new LambdaQueryWrapper<>();
         allMemberWrapper.eq(GroupOrderMember::getGroupOrderId, orderId);
         List<GroupOrderMember> allMembers = groupOrderMemberMapper.selectList(allMemberWrapper);
-        boolean allPaid = allMembers.stream().allMatch(m -> "已支付".equals(m.getPayStatus()));
+        boolean allPaid = allMembers.stream().allMatch(m -> "PAID".equals(m.getPayStatus()));
 
         // 检查是否满员且全部支付
         if (allPaid && order.getCurrentMemberCount() >= order.getTotalMemberCount()) {
             // 自动成团
-            order.setStatus("已成团");
+            order.setStatus("GROUPED");
             // 设置凭证上传截止时间（30分钟后）
             order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(30));
             groupOrderMapper.updateById(order);
@@ -417,7 +479,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 验证订单状态
-        if (!"拼单中".equals(order.getStatus())) {
+        if (!"OPEN".equals(order.getStatus())) {
             throw new RuntimeException("只有拼单中状态的订单可以退出");
         }
 
@@ -431,7 +493,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 验证是否可以退出
-        if (!"待支付".equals(member.getJoinStatus())) {
+        if (!"ACTIVE".equals(member.getJoinStatus())) {
             throw new RuntimeException("您已经支付，无法退出");
         }
 
@@ -448,7 +510,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void processAutoGroup() {
         // 查询所有拼单中状态的订单
         LambdaQueryWrapper<GroupOrder> orderWrapper = new LambdaQueryWrapper<>();
-        orderWrapper.eq(GroupOrder::getStatus, "拼单中");
+        orderWrapper.eq(GroupOrder::getStatus, "OPEN");
         List<GroupOrder> orders = groupOrderMapper.selectList(orderWrapper);
 
         for (GroupOrder order : orders) {
@@ -458,11 +520,11 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
                 memberWrapper.eq(GroupOrderMember::getGroupOrderId, order.getId());
                 List<GroupOrderMember> members = groupOrderMemberMapper.selectList(memberWrapper);
-                boolean allPaid = members.stream().allMatch(m -> "已支付".equals(m.getPayStatus()));
+                boolean allPaid = members.stream().allMatch(m -> "PAID".equals(m.getPayStatus()));
 
                 if (allPaid) {
                     // 自动成团
-                    order.setStatus("已成团");
+                    order.setStatus("GROUPED");
                     order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(30));
                     groupOrderMapper.updateById(order);
                 }
@@ -475,26 +537,26 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void processTimeoutCancel() {
         // 查询所有拼单中状态且已过截止时间的订单
         LambdaQueryWrapper<GroupOrder> orderWrapper = new LambdaQueryWrapper<>();
-        orderWrapper.eq(GroupOrder::getStatus, "拼单中")
+        orderWrapper.eq(GroupOrder::getStatus, "OPEN")
                 .lt(GroupOrder::getDeadlineAt, LocalDateTime.now());
         List<GroupOrder> orders = groupOrderMapper.selectList(orderWrapper);
 
         for (GroupOrder order : orders) {
             // 取消订单
-            order.setStatus("已取消");
+            order.setStatus("CANCELLED");
             order.setCancelReason("未成团超时取消");
             groupOrderMapper.updateById(order);
 
             // 处理已支付成员的退款
             LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
             memberWrapper.eq(GroupOrderMember::getGroupOrderId, order.getId())
-                    .eq(GroupOrderMember::getPayStatus, "已支付");
+                    .eq(GroupOrderMember::getPayStatus, "PAID");
             List<GroupOrderMember> paidMembers = groupOrderMemberMapper.selectList(memberWrapper);
 
             for (GroupOrderMember member : paidMembers) {
                 // 更新成员状态为已退款
-                member.setPayStatus("已退款");
-                member.setJoinStatus("已退款");
+                member.setPayStatus("REFUNDED");
+                member.setJoinStatus("REFUNDED");
                 member.setRefundAmountTotal(member.getPayAmount());
                 groupOrderMemberMapper.updateById(member);
             }
@@ -502,13 +564,13 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
 
         // 处理已成团但发起人未上传凭证的订单
         LambdaQueryWrapper<GroupOrder> receiptWrapper = new LambdaQueryWrapper<>();
-        receiptWrapper.eq(GroupOrder::getStatus, "已成团")
+        receiptWrapper.eq(GroupOrder::getStatus, "GROUPED")
                 .lt(GroupOrder::getReceiptUploadDeadlineAt, LocalDateTime.now());
         List<GroupOrder> receiptOrders = groupOrderMapper.selectList(receiptWrapper);
 
         for (GroupOrder order : receiptOrders) {
             // 取消订单
-            order.setStatus("已取消");
+            order.setStatus("CANCELLED");
             order.setCancelReason("发起人未上传凭证");
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
@@ -516,16 +578,102 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             // 处理已支付成员的退款
             LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
             memberWrapper.eq(GroupOrderMember::getGroupOrderId, order.getId())
-                    .eq(GroupOrderMember::getPayStatus, "已支付");
+                    .eq(GroupOrderMember::getPayStatus, "PAID");
             List<GroupOrderMember> paidMembers = groupOrderMemberMapper.selectList(memberWrapper);
 
             for (GroupOrderMember member : paidMembers) {
                 // 更新成员状态为已退款
-                member.setPayStatus("已退款");
-                member.setJoinStatus("已退款");
+                member.setPayStatus("REFUNDED");
+                member.setJoinStatus("REFUNDED");
                 member.setRefundAmountTotal(member.getPayAmount());
                 groupOrderMemberMapper.updateById(member);
             }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId) {
+        GroupOrder order = groupOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (!"GROUPED".equals(order.getStatus())) {
+            throw new RuntimeException("只有已成团状态的订单可以上传凭证");
+        }
+        if (!order.getCreatorUserId().equals(userId)) {
+            throw new RuntimeException("只有发起人可以上传凭证");
+        }
+
+        OrderReceipt receipt = new OrderReceipt();
+        receipt.setGroupOrderId(orderId);
+        receipt.setUploaderUserId(userId);
+        receipt.setImageUrl(request.getImageUrl());
+        receipt.setActualTotalAmount(request.getActualTotalAmount());
+        receipt.setExpectedDeliveryStartAt(request.getExpectedDeliveryStartAt());
+        receipt.setExpectedDeliveryEndAt(request.getExpectedDeliveryEndAt());
+        receipt.setUploadedAt(LocalDateTime.now());
+        orderReceiptMapper.insert(receipt);
+
+        order.setActualTotalAmount(request.getActualTotalAmount());
+        order.setExpectedDeliveryStartAt(request.getExpectedDeliveryStartAt());
+        order.setExpectedDeliveryEndAt(request.getExpectedDeliveryEndAt());
+        order.setReceiptUploadDeadlineAt(null);
+        order.setStatus("DELIVERING");
+        groupOrderMapper.updateById(order);
+    }
+
+    @Override
+    @Transactional
+    public void markDelivered(Long orderId, Long userId) {
+        GroupOrder order = groupOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (!"DELIVERING".equals(order.getStatus())) {
+            throw new RuntimeException("只有待送达状态的订单可以确认送达");
+        }
+        if (!order.getCreatorUserId().equals(userId)) {
+            throw new RuntimeException("只有发起人可以确认送达");
+        }
+
+        order.setStatus("SHIPPED");
+        order.setDeliveredAt(LocalDateTime.now());
+        groupOrderMapper.updateById(order);
+    }
+
+    @Override
+    @Transactional
+    public void confirmReceived(Long orderId, Long userId) {
+        GroupOrder order = groupOrderMapper.selectById(orderId);
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+        if (!"SHIPPED".equals(order.getStatus())) {
+            throw new RuntimeException("只有待收货状态的订单可以确认收货");
+        }
+
+        LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
+        memberWrapper.eq(GroupOrderMember::getGroupOrderId, orderId)
+                .eq(GroupOrderMember::getUserId, userId);
+        GroupOrderMember member = groupOrderMemberMapper.selectOne(memberWrapper);
+        if (member == null) {
+            throw new RuntimeException("您不是该订单的成员");
+        }
+
+        member.setReceiveStatus("RECEIVED");
+        member.setReceivedAt(LocalDateTime.now());
+        groupOrderMemberMapper.updateById(member);
+
+        LambdaQueryWrapper<GroupOrderMember> allWrapper = new LambdaQueryWrapper<>();
+        allWrapper.eq(GroupOrderMember::getGroupOrderId, orderId);
+        List<GroupOrderMember> allMembers = groupOrderMemberMapper.selectList(allWrapper);
+        boolean allReceived = allMembers.stream()
+                .allMatch(m -> "RECEIVED".equals(m.getReceiveStatus()) || "RECEIVED".equals(m.getReceiveStatus()));
+
+        if (allReceived) {
+            order.setStatus("COMPLETED");
+            groupOrderMapper.updateById(order);
         }
     }
 

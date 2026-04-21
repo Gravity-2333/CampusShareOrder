@@ -3,6 +3,7 @@ package com.campusshareorder.backend.service;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
+import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.vo.order.*;
 
@@ -14,10 +15,12 @@ public interface OrderService extends IService<GroupOrder> {
     OrderDetailVO getOrderDetail(Long orderId, Long userId);
     List<MyOrderListItemVO> getMyOrders(Long userId);
     void joinOrder(Long orderId, JoinOrderRequest request, Long userId);
-    
-    // 第二部分功能
+
     void payOrder(Long orderId, Long userId);
     void exitOrder(Long orderId, Long userId);
+    void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId);
+    void markDelivered(Long orderId, Long userId);
+    void confirmReceived(Long orderId, Long userId);
     void processAutoGroup();
     void processTimeoutCancel();
 }

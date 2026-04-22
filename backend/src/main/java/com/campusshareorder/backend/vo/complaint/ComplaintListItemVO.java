@@ -5,8 +5,10 @@ import java.time.LocalDateTime;
 
 @Data
 public class ComplaintListItemVO {
-    private Long id;
+    private Long complaintId;
     private String complaintNo;
+    private String productName;
+    private String accusedNickname;
     private String type;
     private String status;
     private LocalDateTime createdAt;

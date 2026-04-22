@@ -2,14 +2,14 @@ package com.campusshareorder.backend.controller.complaint;
 
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
+import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.service.ComplaintService;
 import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
+import com.campusshareorder.backend.vo.common.PageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/complaints")
@@ -26,10 +26,10 @@ public class ComplaintController {
     }
 
     @GetMapping("/my")
-    public ApiResponse<List<ComplaintListItemVO>> getMyComplaints() {
+    public ApiResponse<PageVO<ComplaintListItemVO>> getMyComplaints(MyComplaintQueryRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        List<ComplaintListItemVO> list = complaintService.getMyComplaints(userId);
-        return ApiResponse.success(list);
+        PageVO<ComplaintListItemVO> page = complaintService.getMyComplaints(request, userId);
+        return ApiResponse.success(page);
     }
 
     @GetMapping("/{id}")

@@ -1,8 +1,12 @@
 package com.campusshareorder.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
+import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.UserAccount;
@@ -12,6 +16,7 @@ import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.ComplaintService;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
+import com.campusshareorder.backend.vo.common.PageVO;
 import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -43,20 +48,33 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
     }
 
     @Override
-    public List<ComplaintListItemVO> getMyComplaints(Long userId) {
-        LambdaQueryWrapper<Complaint> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Complaint::getComplainantUserId, userId)
-                .orderByDesc(Complaint::getCreatedAt);
-        
-        return complaintMapper.selectList(wrapper).stream().map(c -> {
+    public PageVO<ComplaintListItemVO> getMyComplaints(MyComplaintQueryRequest request, Long userId) {
+        Page<Complaint> page = this.page(
+                new Page<>(request.getPage(), request.getPageSize()),
+                new LambdaQueryWrapper<Complaint>()
+                        .eq(Complaint::getComplainantUserId, userId)
+                        .orderByDesc(Complaint::getCreatedAt)
+        );
+
+        List<ComplaintListItemVO> list = page.getRecords().stream().map(c -> {
             ComplaintListItemVO vo = new ComplaintListItemVO();
-            vo.setId(c.getId());
+            vo.setComplaintId(c.getId());
             vo.setComplaintNo(c.getComplaintNo());
             vo.setType(c.getType());
             vo.setStatus(c.getStatus());
             vo.setCreatedAt(c.getCreatedAt());
+            UserAccount accusedUser = userAccountMapper.selectById(c.getAccusedUserId());
+            if (accusedUser != null) {
+                vo.setAccusedNickname(accusedUser.getNickname());
+            }
+            GroupOrder order = groupOrderMapper.selectById(c.getGroupOrderId());
+            if (order != null) {
+                vo.setProductName(order.getProductName());
+            }
             return vo;
         }).collect(Collectors.toList());
+
+        return PageVO.of(list, page.getTotal(), (long) request.getPage(), (long) request.getPageSize());
     }
 
     @Override
@@ -70,18 +88,18 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         }
 
         ComplaintDetailVO vo = new ComplaintDetailVO();
-        vo.setId(complaint.getId());
+        vo.setComplaintId(complaint.getId());
         vo.setComplaintNo(complaint.getComplaintNo());
         vo.setOrderId(complaint.getGroupOrderId());
         
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
         if (order != null) {
-            vo.setOrderNo(order.getOrderNo());
+            vo.setProductName(order.getProductName());
         }
 
         UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
         if (accusedUser != null) {
-            vo.setAccusedUserName(accusedUser.getNickname());
+            vo.setAccusedNickname(accusedUser.getNickname());
         }
 
         vo.setType(complaint.getType());

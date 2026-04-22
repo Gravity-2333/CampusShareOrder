@@ -24,7 +24,7 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll() // 允许登录注册
-                        .anyRequest().permitAll() // 暂时允许所有，但在 controller 中通过 SecurityContext 获取 ID
+                        .anyRequest().authenticated() // 其他接口需要认证
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

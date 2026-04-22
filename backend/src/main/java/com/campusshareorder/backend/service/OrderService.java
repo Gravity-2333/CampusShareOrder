@@ -5,15 +5,18 @@ import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.GroupOrder;
+import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
+import com.campusshareorder.backend.dto.order.OrderQueryRequest;
+import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.*;
 
 import java.util.List;
 
 public interface OrderService extends IService<GroupOrder> {
     CreateOrderVO createOrder(CreateOrderRequest request, Long userId);
-    List<OrderListItemVO> getOrderList();
+    PageVO<OrderListItemVO> getOrderList(OrderQueryRequest request);
     OrderDetailVO getOrderDetail(Long orderId, Long userId);
-    List<MyOrderListItemVO> getMyOrders(Long userId);
+    PageVO<MyOrderListItemVO> getMyOrders(MyOrderQueryRequest request, Long userId);
     void joinOrder(Long orderId, JoinOrderRequest request, Long userId);
 
     void payOrder(Long orderId, Long userId);

@@ -1,8 +1,11 @@
 package com.campusshareorder.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
+import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
+import com.campusshareorder.backend.dto.order.OrderQueryRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.GroupOrder;
@@ -14,6 +17,7 @@ import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
+import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.*;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.IdUtil;
@@ -22,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -63,8 +68,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         // 计算预估人均金额
+        BigDecimal totalMemberCountDec = new BigDecimal(request.getTotalMemberCount());
         BigDecimal estimatedPerAmount = request.getEstimatedTotalAmount().divide(
-                new BigDecimal(request.getTotalMemberCount()), 2, BigDecimal.ROUND_HALF_UP
+                totalMemberCountDec, 2, RoundingMode.HALF_UP
         );
 
         // 创建订单
@@ -77,6 +83,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setCurrentMemberCount(1); // 发起人算一个
         order.setEstimatedTotalAmount(request.getEstimatedTotalAmount());
         order.setEstimatedPerAmount(estimatedPerAmount);
+        order.setActualTotalAmount(request.getEstimatedTotalAmount()); // 初始实际金额等于预估金额
+        order.setActualPerAmount(estimatedPerAmount); // 初始实际人均等于预估人均
         order.setPickupPoint(request.getPickupPoint());
         order.setDeadlineAt(LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss"));
         order.setStatus("OPEN");
@@ -88,8 +96,10 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setGroupOrderId(order.getId());
         member.setUserId(userId);
         member.setIsCreator(true);
+        member.setRole("CREATOR");
         member.setJoinStatus("ACTIVE");
         member.setPayStatus("UNPAID");
+        member.setPayAmount(estimatedPerAmount); // 设置初始支付金额
         member.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(member);
 
@@ -102,14 +112,26 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     }
 
     @Override
-    public List<OrderListItemVO> getOrderList() {
-        // 查询所有拼单中状态的订单
+    public PageVO<OrderListItemVO> getOrderList(OrderQueryRequest request) {
+        Page<GroupOrder> page = new Page<>(request.getPage(), request.getPageSize());
         LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupOrder::getStatus, "OPEN")
-                .orderByDesc(GroupOrder::getCreatedAt);
-        List<GroupOrder> orders = groupOrderMapper.selectList(wrapper);
-
-        return orders.stream().map(order -> {
+        
+        // 过滤关键字
+        if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
+            wrapper.and(w -> w.like(GroupOrder::getProductName, request.getKeyword())
+                    .or().like(GroupOrder::getOrderNo, request.getKeyword()));
+        }
+        
+        // 过滤状态
+        if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
+            wrapper.eq(GroupOrder::getStatus, request.getStatus());
+        }
+        
+        wrapper.orderByDesc(GroupOrder::getCreatedAt);
+        
+        Page<GroupOrder> orderPage = groupOrderMapper.selectPage(page, wrapper);
+        
+        List<OrderListItemVO> list = orderPage.getRecords().stream().map(order -> {
             OrderListItemVO vo = new OrderListItemVO();
             vo.setOrderId(order.getId());
             vo.setOrderNo(order.getOrderNo());
@@ -117,6 +139,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             vo.setProductDesc(order.getProductDesc());
             vo.setTotalMemberCount(order.getTotalMemberCount());
             vo.setCurrentMemberCount(order.getCurrentMemberCount());
+            vo.setRemainingCount(order.getTotalMemberCount() - order.getCurrentMemberCount());
             vo.setEstimatedPerAmount(order.getEstimatedPerAmount());
             vo.setPickupPoint(order.getPickupPoint());
             vo.setStatus(order.getStatus());
@@ -130,6 +153,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             }
             return vo;
         }).collect(Collectors.toList());
+
+        return new PageVO<>(list, orderPage.getTotal(), orderPage.getCurrent(), orderPage.getSize(), orderPage.getPages());
     }
 
     @Override
@@ -287,11 +312,11 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         ActionFlagsVO actionFlags = new ActionFlagsVO();
         actionFlags.setCanJoin("OPEN".equals(order.getStatus()) && currentMember == null);
         actionFlags.setCanExit("OPEN".equals(order.getStatus()) && currentMember != null && "ACTIVE".equals(currentMember.getJoinStatus()));
-        actionFlags.setCanPay(currentMember != null && "UNPAID".equals(currentMember.getPayStatus()));
+        actionFlags.setCanPay(currentMember != null && "ACTIVE".equals(currentMember.getJoinStatus()) && "UNPAID".equals(currentMember.getPayStatus()));
         actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
         actionFlags.setCanMarkDelivered("DELIVERING".equals(order.getStatus()) && order.getCreatorUserId().equals(userId));
         actionFlags.setCanConfirmReceived("SHIPPED".equals(order.getStatus()) && currentMember != null && "NOT_READY".equals(currentMember.getReceiveStatus()));
-        actionFlags.setCanComplaint(order.getComplaintOpened() && currentMember != null && !order.getCreatorUserId().equals(userId));
+        actionFlags.setCanCreateComplaint(order.getComplaintOpened() && currentMember != null && !order.getCreatorUserId().equals(userId));
         detailVO.setActionFlags(actionFlags);
 
         // 时间线
@@ -346,13 +371,15 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     }
 
     @Override
-    public List<MyOrderListItemVO> getMyOrders(Long userId) {
-        // 查询用户参与的所有订单
+    public PageVO<MyOrderListItemVO> getMyOrders(MyOrderQueryRequest request, Long userId) {
+        Page<GroupOrderMember> page = new Page<>(request.getPage(), request.getPageSize());
         LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
-        memberWrapper.eq(GroupOrderMember::getUserId, userId);
-        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(memberWrapper);
+        memberWrapper.eq(GroupOrderMember::getUserId, userId)
+                .orderByDesc(GroupOrderMember::getCreatedAt);
+        
+        Page<GroupOrderMember> memberPage = groupOrderMemberMapper.selectPage(page, memberWrapper);
 
-        return members.stream().map(member -> {
+        List<MyOrderListItemVO> list = memberPage.getRecords().stream().map(member -> {
             GroupOrder order = groupOrderMapper.selectById(member.getGroupOrderId());
             if (order == null) {
                 return null;
@@ -372,6 +399,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             vo.setCreatedAt(order.getCreatedAt());
             return vo;
         }).filter(java.util.Objects::nonNull).collect(Collectors.toList());
+
+        return new PageVO<>(list, memberPage.getTotal(), memberPage.getCurrent(), memberPage.getSize(), memberPage.getPages());
     }
 
     @Override
@@ -410,7 +439,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setRemark(request.getRemark());
         member.setJoinStatus("ACTIVE");
         member.setPayStatus("UNPAID");
+        member.setPayAmount(order.getEstimatedPerAmount()); // 设置初始支付金额为订单的预估人均金额
         member.setReceiveStatus("NOT_READY");
+        member.setRole("MEMBER"); // 设置角色为成员
         groupOrderMemberMapper.insert(member);
 
         // 更新订单当前人数
@@ -669,7 +700,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         allWrapper.eq(GroupOrderMember::getGroupOrderId, orderId);
         List<GroupOrderMember> allMembers = groupOrderMemberMapper.selectList(allWrapper);
         boolean allReceived = allMembers.stream()
-                .allMatch(m -> "RECEIVED".equals(m.getReceiveStatus()) || "RECEIVED".equals(m.getReceiveStatus()));
+                .allMatch(m -> "RECEIVED".equals(m.getReceiveStatus()));
 
         if (allReceived) {
             order.setStatus("COMPLETED");

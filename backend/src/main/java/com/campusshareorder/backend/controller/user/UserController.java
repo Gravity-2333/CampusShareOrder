@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.user.UpdateProfileRequest;
 import com.campusshareorder.backend.dto.user.VerifyStudentRequest;
+import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
 import com.campusshareorder.backend.utils.SecurityUtils;
+import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.MyOrderListItemVO;
 import com.campusshareorder.backend.vo.user.CreditRecordVO;
 import com.campusshareorder.backend.vo.user.UserProfileVO;
@@ -30,10 +32,10 @@ public class UserController {
     private final CreditChangeRecordMapper creditChangeRecordMapper;
 
     @GetMapping("/my-orders")
-    public ApiResponse<List<MyOrderListItemVO>> getMyOrders() {
+    public ApiResponse<PageVO<MyOrderListItemVO>> getMyOrders(MyOrderQueryRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        List<MyOrderListItemVO> list = orderService.getMyOrders(userId);
-        return ApiResponse.success(list);
+        PageVO<MyOrderListItemVO> page = orderService.getMyOrders(request, userId);
+        return ApiResponse.success(page);
     }
 
     @PostMapping("/verify-student")

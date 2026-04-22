@@ -1,5 +1,6 @@
 -- 创建数据库
-CREATE DATABASE IF NOT EXISTS campus_share_order CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS campus_share_order;
+CREATE DATABASE campus_share_order CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE campus_share_order;
 
@@ -82,6 +83,7 @@ CREATE TABLE IF NOT EXISTS group_order_member (
     refund_amount_total DECIMAL(10,2) NOT NULL DEFAULT 0,
     receive_status VARCHAR(32) NOT NULL DEFAULT 'NOT_READY',
     received_at DATETIME,
+    role VARCHAR(32) NOT NULL DEFAULT 'MEMBER',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (group_order_id) REFERENCES group_order(id),
@@ -220,10 +222,39 @@ CREATE INDEX idx_operation_log_action_created_at ON operation_log(action, create
 
 -- 插入初始管理员账户（密码：admin123）
 INSERT INTO admin_account (username, password_hash, status) 
-VALUES ('admin', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 'NORMAL')
-ON DUPLICATE KEY UPDATE username = username;
+VALUES ('admin', '$2a$10$A35/9HNjAr9kHlPV5qFrNu0w49EJkqQgHyA2wT5J/L4BClhQ1F3VS', 'NORMAL')
+ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 -- 插入初始用户（密码：123456）
-INSERT INTO user_account (phone, password_hash, nickname, status) 
-VALUES ('13800138000', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', '测试用户', 'NORMAL')
-ON DUPLICATE KEY UPDATE phone = phone;
+-- BCrypt: $2a$10$PfhUK8XWBKL8Bms/OwbAHO8Kqub8UbigAJVnjQVFOh871KZCHAxA2
+INSERT INTO user_account (id, phone, password_hash, nickname, student_no, is_verified, credit_score, status, contact_info) 
+VALUES 
+(1, '13800000001', '$2a$10$PfhUK8XWBKL8Bms/OwbAHO8Kqub8UbigAJVnjQVFOh871KZCHAxA2', '张三', '20240001', 1, 100, 'NORMAL', '微信 zhangsan_01'),
+(2, '13800000002', '$2a$10$PfhUK8XWBKL8Bms/OwbAHO8Kqub8UbigAJVnjQVFOh871KZCHAxA2', '李四', '20240002', 1, 96, 'NORMAL', '微信 lisi_02'),
+(3, '13800000003', '$2a$10$PfhUK8XWBKL8Bms/OwbAHO8Kqub8UbigAJVnjQVFOh871KZCHAxA2', '王五', NULL, 0, 88, 'NORMAL', '微信 wangwu_03')
+ON DUPLICATE KEY UPDATE phone = VALUES(phone);
+
+-- 插入初始拼单订单
+INSERT INTO group_order (id, order_no, creator_user_id, product_name, product_desc, total_member_count, current_member_count, estimated_total_amount, estimated_per_amount, pickup_point, deadline_at, status)
+VALUES 
+(1, 'GO20260417001', 1, '晚饭拼单', '三个人一起点晚饭，均摊配送费。', 3, 2, 48.00, 16.00, '东区宿舍门口', '2026-04-21 21:00:00', 'OPEN'),
+(2, 'GO20260417002', 2, '奶茶拼单', '奶茶加小料拼单。', 3, 3, 60.00, 20.00, '图书馆南门', '2026-04-21 10:00:00', 'WAIT_DELIVERY')
+ON DUPLICATE KEY UPDATE order_no = VALUES(order_no);
+
+-- 插入订单成员
+INSERT INTO group_order_member (group_order_id, user_id, is_creator, pay_status, pay_amount, paid_at, receive_status, role)
+VALUES 
+(1, 1, 1, 'PAID', 16.00, '2026-04-21 08:35:00', 'NOT_READY', 'INITIATOR'),
+(1, 2, 0, 'UNPAID', 16.00, NULL, 'NOT_READY', 'MEMBER'),
+(2, 2, 1, 'PAID', 20.00, '2026-04-21 09:01:00', 'NOT_READY', 'INITIATOR'),
+(2, 1, 0, 'PAID', 20.00, '2026-04-21 09:05:00', 'NOT_READY', 'MEMBER'),
+(2, 3, 0, 'PAID', 20.00, '2026-04-21 09:10:00', 'NOT_READY', 'MEMBER')
+ON DUPLICATE KEY UPDATE group_order_id = VALUES(group_order_id), user_id = VALUES(user_id);
+
+-- 插入信用分记录
+INSERT INTO credit_change_record (user_id, change_value, reason_type, remark)
+VALUES 
+(1, 100, 'INITIAL', '初始信用分'),
+(2, 96, 'INITIAL', '初始信用分'),
+(3, 88, 'INITIAL', '初始信用分')
+ON DUPLICATE KEY UPDATE user_id = VALUES(user_id);

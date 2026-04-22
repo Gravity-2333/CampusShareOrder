@@ -13,6 +13,7 @@ public class OrderListItemVO {
     private String productDesc;
     private Integer totalMemberCount;
     private Integer currentMemberCount;
+    private Integer remainingCount;
     private BigDecimal estimatedPerAmount;
     private String pickupPoint;
     private String status;

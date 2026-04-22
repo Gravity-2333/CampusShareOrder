@@ -23,6 +23,7 @@ public class GroupOrderMember {
     private BigDecimal refundAmountTotal;
     private String receiveStatus;
     private LocalDateTime receivedAt;
+    private String role;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

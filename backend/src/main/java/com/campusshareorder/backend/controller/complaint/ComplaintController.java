@@ -7,9 +7,15 @@ import com.campusshareorder.backend.service.ComplaintService;
 import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
+import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
 import com.campusshareorder.backend.vo.common.PageVO;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/complaints")
@@ -19,10 +25,9 @@ public class ComplaintController {
     private final ComplaintService complaintService;
 
     @PostMapping
-    public ApiResponse<Void> createComplaint(@RequestBody CreateComplaintRequest request) {
+    public ApiResponse<CreateComplaintVO> createComplaint(@RequestBody CreateComplaintRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        complaintService.createComplaint(request, userId);
-        return ApiResponse.success();
+        return ApiResponse.success(complaintService.createComplaint(request, userId));
     }
 
     @GetMapping("/my")

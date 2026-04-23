@@ -5,15 +5,15 @@ spring:
       url: jdbc:mysql://localhost:3306/campus_share_order?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
       driver-class-name: com.mysql.cj.jdbc.Driver
       username: root
-      password: Mysql@4399
-  
+      password: 123456
+
 mybatis-plus:
   mapper-locations: classpath:mapper/**/*.xml
   type-aliases-package: com.campusshareorder.backend.entity
   configuration:
     map-underscore-to-camel-case: true
 
-# JWT配置
+# JWT 配置
 jwt:
   secret: campus_share_order_secret_key
   expire: 86400 # 24小时

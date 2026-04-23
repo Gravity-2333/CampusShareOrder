@@ -1,16 +1,23 @@
 package com.campusshareorder.backend.controller.auth;
 
 import com.campusshareorder.backend.common.response.ApiResponse;
+import com.campusshareorder.backend.dto.auth.AdminLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserRegisterRequest;
 import com.campusshareorder.backend.service.AuthService;
 import com.campusshareorder.backend.utils.SecurityUtils;
+import com.campusshareorder.backend.vo.auth.AdminLoginVO;
 import com.campusshareorder.backend.vo.auth.CurrentLoginInfoVO;
 import com.campusshareorder.backend.vo.auth.RegisterResultVO;
 import com.campusshareorder.backend.vo.auth.UserLoginVO;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -29,15 +36,20 @@ public class AuthController {
         return ApiResponse.success(authService.login(request));
     }
 
+    @PostMapping("/admin/login")
+    public ApiResponse<AdminLoginVO> adminLogin(@Valid @RequestBody AdminLoginRequest request) {
+        return ApiResponse.success(authService.adminLogin(request));
+    }
+
     @GetMapping("/me")
-    public ApiResponse<CurrentLoginInfoVO> getCurrentInfo() {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
-        return ApiResponse.success(authService.getCurrentInfo(userId));
+    public ApiResponse<CurrentLoginInfoVO> getCurrentInfo(HttpServletRequest request) {
+        Long currentId = SecurityUtils.getRequiredCurrentUserId();
+        String role = request.getAttribute("role") == null ? "USER" : String.valueOf(request.getAttribute("role"));
+        return ApiResponse.success(authService.getCurrentInfo(currentId, role));
     }
 
     @PostMapping("/logout")
     public ApiResponse<Void> logout() {
-        // JWT 是无状态的，登出主要由前端清除 Token 实现
         return ApiResponse.success();
     }
 }

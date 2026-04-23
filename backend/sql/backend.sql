@@ -220,9 +220,9 @@ CREATE INDEX idx_operation_log_operator_created_at ON operation_log(operator_typ
 CREATE INDEX idx_operation_log_biz_created_at ON operation_log(biz_type, biz_id, created_at);
 CREATE INDEX idx_operation_log_action_created_at ON operation_log(action, created_at);
 
--- 插入初始管理员账户（密码：admin123）
+-- 插入初始管理员账户（密码：123456）
 INSERT INTO admin_account (username, password_hash, status) 
-VALUES ('admin', '$2a$10$A35/9HNjAr9kHlPV5qFrNu0w49EJkqQgHyA2wT5J/L4BClhQ1F3VS', 'NORMAL')
+VALUES ('admin', '$2a$10$PfhUK8XWBKL8Bms/OwbAHO8Kqub8UbigAJVnjQVFOh871KZCHAxA2', 'NORMAL')
 ON DUPLICATE KEY UPDATE username = VALUES(username);
 
 -- 插入初始用户（密码：123456）

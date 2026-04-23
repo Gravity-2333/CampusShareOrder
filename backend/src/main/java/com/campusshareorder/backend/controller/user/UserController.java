@@ -2,9 +2,9 @@ package com.campusshareorder.backend.controller.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campusshareorder.backend.common.response.ApiResponse;
+import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.dto.user.UpdateProfileRequest;
 import com.campusshareorder.backend.dto.user.VerifyStudentRequest;
-import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
@@ -13,11 +13,18 @@ import com.campusshareorder.backend.service.OrderService;
 import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.MyOrderListItemVO;
-import com.campusshareorder.backend.vo.user.CreditRecordVO;
+import com.campusshareorder.backend.vo.user.UserCreditItemVO;
+import com.campusshareorder.backend.vo.user.UserCreditVO;
 import com.campusshareorder.backend.vo.user.UserProfileVO;
+import com.campusshareorder.backend.vo.user.VerifyStudentVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,7 +46,7 @@ public class UserController {
     }
 
     @PostMapping("/verify-student")
-    public ApiResponse<Void> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
+    public ApiResponse<VerifyStudentVO> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
         UserAccount user = userAccountMapper.selectById(userId);
         if (user == null) {
@@ -50,7 +57,10 @@ public class UserController {
         user.setIsVerified(true);
         userAccountMapper.updateById(user);
 
-        return ApiResponse.success();
+        VerifyStudentVO vo = new VerifyStudentVO();
+        vo.setIsVerified(true);
+        vo.setStudentNo(user.getStudentNo());
+        return ApiResponse.success(vo);
     }
 
     @GetMapping("/profile")
@@ -94,31 +104,35 @@ public class UserController {
     }
 
     @GetMapping("/credit")
-    public ApiResponse<List<CreditRecordVO>> getCreditRecords() {
+    public ApiResponse<UserCreditVO> getCreditRecords() {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
+        UserAccount user = userAccountMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, userId)
                 .orderByDesc(CreditChangeRecord::getCreatedAt);
         List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
 
-        List<CreditRecordVO> voList = records.stream().map(record -> {
-            CreditRecordVO vo = new CreditRecordVO();
+        List<UserCreditItemVO> items = records.stream().map(record -> {
+            UserCreditItemVO vo = new UserCreditItemVO();
             vo.setRecordId(record.getId());
-            vo.setChangeValue(record.getChangeValue());
+            vo.setDelta(record.getChangeValue());
+            vo.setCurrentScore(user.getCreditScore());
+            vo.setChangeReason(record.getRemark());
             vo.setReasonType(record.getReasonType());
             vo.setRemark(record.getRemark());
             vo.setRelatedOrderId(record.getRelatedOrderId());
             vo.setRelatedComplaintId(record.getRelatedComplaintId());
             vo.setCreatedAt(record.getCreatedAt());
-
-            UserAccount user = userAccountMapper.selectById(userId);
-            if (user != null) {
-                vo.setCurrentScore(user.getCreditScore());
-            }
             return vo;
         }).collect(Collectors.toList());
 
-        return ApiResponse.success(voList);
+        UserCreditVO creditVO = new UserCreditVO();
+        creditVO.setCreditScore(user.getCreditScore());
+        creditVO.setRecords(items);
+        return ApiResponse.success(creditVO);
     }
 }

@@ -24,5 +24,6 @@ public class OrderBasicInfoVO {
     private LocalDateTime expectedDeliveryStartAt;
     private LocalDateTime expectedDeliveryEndAt;
     private LocalDateTime deliveredAt;
+    private Boolean complaintOpened;
     private LocalDateTime createdAt;
 }

@@ -8,8 +8,11 @@ import java.time.LocalDateTime;
 public class ComplaintInfoVO {
     private Boolean complaintOpened;
     private Long complaintId;
+    private Long myComplaintId;
     private String complaintNo;
     private String type;
     private String status;
+    private String myComplaintStatus;
+    private Integer complaintCount;
     private LocalDateTime created_at;
 }

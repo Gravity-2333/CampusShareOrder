@@ -10,6 +10,7 @@ public class OrderMemberVO {
     private Long userId;
     private String nickname;
     private Boolean isCreator;
+    private String role;
     private String remark;
     private String joinStatus;
     private String payStatus;
@@ -18,4 +19,6 @@ public class OrderMemberVO {
     private BigDecimal refundAmountTotal;
     private String receiveStatus;
     private LocalDateTime receivedAt;
+    private LocalDateTime joinedAt;
+    private LocalDateTime exitedAt;
 }

@@ -52,30 +52,57 @@ onMounted(loadCredit)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="信用分记录" description="对应 GET /api/users/credit。">
-      <p class="muted-text">{{ summaryText }}</p>
+    <PageSection
+      title="信用分记录"
+      description="对应 GET /api/users/credit。"
+    >
+      <p class="muted-text">
+        {{ summaryText }}
+      </p>
 
       <div class="table-toolbar">
         <span class="table-caption">
           当前信用分 <strong>{{ userStore.credit.creditScore }}</strong>，共 {{ userStore.credit.records.length }} 条变更记录。
         </span>
         <div class="page-actions">
-        <el-button @click="router.push('/profile')">返回个人资料</el-button>
+          <el-button @click="router.push('/profile')">
+            返回个人资料
+          </el-button>
         </div>
       </div>
 
-      <div v-if="userStore.credit.records.length" class="table-stack">
+      <div
+        v-if="userStore.credit.records.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
-          <el-table v-loading="userStore.creditLoading" :data="userStore.credit.records" stripe>
+          <el-table
+            v-loading="userStore.creditLoading"
+            :data="userStore.credit.records"
+            stripe
+          >
             <el-table-column label="时间">
-              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              <template #default="{ row }">
+                {{ formatDateTime(row.createdAt) }}
+              </template>
             </el-table-column>
-            <el-table-column prop="changeReason" label="变更原因" />
+            <el-table-column
+              prop="changeReason"
+              label="变更原因"
+            />
             <el-table-column label="变更值">
-              <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
+              <template #default="{ row }">
+                {{ formatSignedNumber(row.delta) }}
+              </template>
             </el-table-column>
           </el-table>
         </div>

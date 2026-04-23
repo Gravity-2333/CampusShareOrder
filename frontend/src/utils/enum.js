@@ -22,6 +22,7 @@ export const orderStatusTextMap = {
 
 export const payStatusTextMap = {
   PAID: '已支付',
+  REFUNDED: '已退款',
   UNPAID: '未支付',
 }
 
@@ -29,6 +30,7 @@ export const joinStatusTextMap = {
   ACTIVE: '已参与',
   CANCELED: '已取消',
   EXITED: '已退出',
+  REFUNDED: '已退款',
 }
 
 export const receiveStatusTextMap = {
@@ -70,6 +72,7 @@ export const statusToneMap = {
   PENDING: 'warning',
   PROCESSED: 'info',
   RECEIVED: 'success',
+  REFUNDED: 'info',
   UNPAID: 'warning',
   WAIT_CONFIRM: 'warning',
   WAIT_DELIVERY: 'primary',

@@ -60,15 +60,20 @@ const handleSubmit = async () => {
 <template>
   <div class="auth-page">
     <section class="auth-hero">
-      <p class="section-kicker">契约优先前端</p>
+      <p class="section-kicker">
+        契约优先前端
+      </p>
       <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
       <p>
-        当前运行模式为 <strong>{{ appStore.apiMode }}</strong
-        >，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
+        当前运行模式为 <strong>{{ appStore.apiMode }}</strong>，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
       </p>
 
       <div class="auth-metric-grid">
-        <article v-for="item in heroMetrics" :key="item.label" class="auth-metric-card">
+        <article
+          v-for="item in heroMetrics"
+          :key="item.label"
+          class="auth-metric-card"
+        >
           <span>{{ item.label }}</span>
           <strong>{{ item.value }}</strong>
         </article>
@@ -79,7 +84,10 @@ const handleSubmit = async () => {
         <p>先把用户主流程、订单详情闭环和后续联调结构稳定，再逐步切到真实接口。</p>
       </div>
 
-      <div v-if="appStore.apiMode === 'mock'" class="auth-demo-grid">
+      <div
+        v-if="appStore.apiMode === 'mock'"
+        class="auth-demo-grid"
+      >
         <button
           v-for="account in demoAccounts"
           :key="account.phone"
@@ -94,14 +102,24 @@ const handleSubmit = async () => {
       </div>
     </section>
 
-    <el-card class="auth-card" shadow="hover">
+    <el-card
+      class="auth-card"
+      shadow="hover"
+    >
       <template #header>
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">用户入口</p>
+            <p class="section-kicker">
+              用户入口
+            </p>
             <h2>用户登录</h2>
           </div>
-          <el-button link @click="router.push('/admin/login')">管理员入口</el-button>
+          <el-button
+            link
+            @click="router.push('/admin/login')"
+          >
+            管理员入口
+          </el-button>
         </div>
       </template>
 
@@ -110,22 +128,47 @@ const handleSubmit = async () => {
         <p>登录后会先进入拼单大厅，后续创建拼单、参与拼单和投诉流程都从统一路由继续。</p>
       </div>
 
-      <el-form label-position="top" :model="form" @submit.prevent="handleSubmit">
+      <el-form
+        label-position="top"
+        :model="form"
+        @submit.prevent="handleSubmit"
+      >
         <el-form-item label="手机号">
-          <el-input v-model="form.phone" placeholder="请输入手机号" />
+          <el-input
+            v-model="form.phone"
+            placeholder="请输入手机号"
+          />
         </el-form-item>
         <el-form-item label="密码">
-          <el-input v-model="form.password" show-password placeholder="请输入密码" />
+          <el-input
+            v-model="form.password"
+            show-password
+            placeholder="请输入密码"
+          />
         </el-form-item>
         <div class="page-actions">
-          <el-button type="primary" :loading="loading" @click="handleSubmit">登录</el-button>
-          <el-button @click="router.push('/register')">去注册</el-button>
+          <el-button
+            type="primary"
+            :loading="loading"
+            @click="handleSubmit"
+          >
+            登录
+          </el-button>
+          <el-button @click="router.push('/register')">
+            去注册
+          </el-button>
         </div>
       </el-form>
 
       <div class="auth-card-footer">
         <span>普通用户与管理员账号完全分离</span>
-        <button type="button" class="auth-inline-link" @click="router.push('/admin/login')">切换到管理员登录</button>
+        <button
+          type="button"
+          class="auth-inline-link"
+          @click="router.push('/admin/login')"
+        >
+          切换到管理员登录
+        </button>
       </div>
     </el-card>
   </div>

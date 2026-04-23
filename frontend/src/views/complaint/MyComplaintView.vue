@@ -62,44 +62,84 @@ onMounted(loadComplaints)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="我的投诉" description="对应 GET /api/complaints/my。">
-      <p class="muted-text">{{ summaryText }}</p>
+    <PageSection
+      title="我的投诉"
+      description="对应 GET /api/complaints/my。"
+    >
+      <p class="muted-text">
+        {{ summaryText }}
+      </p>
 
       <div class="table-toolbar">
         <span class="table-caption">共 {{ complaintStore.myComplaintsPage.total }} 条投诉记录，建议优先查看待处理项。</span>
         <div class="page-actions">
-          <el-button type="danger" plain @click="router.push('/complaints/create')">发起新投诉</el-button>
+          <el-button
+            type="danger"
+            plain
+            @click="router.push('/complaints/create')"
+          >
+            发起新投诉
+          </el-button>
         </div>
       </div>
 
-      <div v-if="complaintStore.myComplaintsPage.list.length" class="table-stack">
+      <div
+        v-if="complaintStore.myComplaintsPage.list.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
           <el-table
             v-loading="complaintStore.myComplaintsLoading"
             :data="complaintStore.myComplaintsPage.list"
             stripe
           >
-            <el-table-column prop="complaintNo" label="投诉单号" />
+            <el-table-column
+              prop="complaintNo"
+              label="投诉单号"
+            />
             <el-table-column label="投诉类型">
-              <template #default="{ row }">{{ formatComplaintType(row.type) }}</template>
+              <template #default="{ row }">
+                {{ formatComplaintType(row.type) }}
+              </template>
             </el-table-column>
-            <el-table-column prop="productName" label="商品" />
-            <el-table-column prop="accusedNickname" label="被投诉人" />
+            <el-table-column
+              prop="productName"
+              label="商品"
+            />
+            <el-table-column
+              prop="accusedNickname"
+              label="被投诉人"
+            />
             <el-table-column label="状态">
               <template #default="{ row }">
-                <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+                <StatusTag
+                  :value="row.status"
+                  :text="formatComplaintStatus(row.status)"
+                />
               </template>
             </el-table-column>
             <el-table-column label="发起时间">
-              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              <template #default="{ row }">
+                {{ formatDateTime(row.createdAt) }}
+              </template>
             </el-table-column>
             <el-table-column label="操作">
               <template #default="{ row }">
                 <div class="row-action-group">
-                  <el-button link type="primary" @click="router.push(`/complaints/${row.complaintId}`)">
+                  <el-button
+                    link
+                    type="primary"
+                    @click="router.push(`/complaints/${row.complaintId}`)"
+                  >
                     查看详情
                   </el-button>
                 </div>
@@ -119,7 +159,10 @@ onMounted(loadComplaints)
                 <span>{{ row.complaintNo }}</span>
                 <strong>{{ row.productName }}</strong>
               </div>
-              <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+              <StatusTag
+                :value="row.status"
+                :text="formatComplaintStatus(row.status)"
+              />
             </div>
             <ul class="mobile-record-fields">
               <li><span>投诉类型</span><strong>{{ formatComplaintType(row.type) }}</strong></li>
@@ -127,7 +170,13 @@ onMounted(loadComplaints)
               <li><span>发起时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
             </ul>
             <div class="page-actions">
-              <el-button type="primary" plain @click="router.push(`/complaints/${row.complaintId}`)">查看详情</el-button>
+              <el-button
+                type="primary"
+                plain
+                @click="router.push(`/complaints/${row.complaintId}`)"
+              >
+                查看详情
+              </el-button>
             </div>
           </article>
         </div>

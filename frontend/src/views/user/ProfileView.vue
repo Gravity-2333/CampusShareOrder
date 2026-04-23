@@ -87,7 +87,13 @@ onMounted(loadProfile)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
     <PageSection
@@ -105,7 +111,10 @@ onMounted(loadProfile)
             />
           </div>
           <ul class="detail-list">
-            <li v-for="row in profileRows" :key="row.label">
+            <li
+              v-for="row in profileRows"
+              :key="row.label"
+            >
               <span>{{ row.label }}</span>
               <strong>{{ row.value }}</strong>
             </li>
@@ -125,7 +134,10 @@ onMounted(loadProfile)
             </el-button>
           </div>
           <ul class="detail-list">
-            <li v-for="row in businessRows" :key="row.label">
+            <li
+              v-for="row in businessRows"
+              :key="row.label"
+            >
               <span>{{ row.label }}</span>
               <strong>{{ row.value }}</strong>
             </li>
@@ -134,25 +146,54 @@ onMounted(loadProfile)
       </div>
     </PageSection>
 
-    <PageSection title="修改资料" description="对应 GET / PUT /api/users/profile。">
+    <PageSection
+      title="修改资料"
+      description="对应 GET / PUT /api/users/profile。"
+    >
       <div class="form-intro surface-card">
         <strong>修改后会同步更新当前登录上下文和资料页展示。</strong>
         <p>这里仅维护昵称和联系方式，不改动契约外字段，后续切换真实接口时只需继续对接统一的资料接口。</p>
       </div>
 
-      <el-form label-position="top" :model="form" class="form-grid">
+      <el-form
+        label-position="top"
+        :model="form"
+        class="form-grid"
+      >
         <el-form-item label="昵称">
-          <el-input v-model="form.nickname" maxlength="20" show-word-limit placeholder="例如：宿舍拼单小队长" />
+          <el-input
+            v-model="form.nickname"
+            maxlength="20"
+            show-word-limit
+            placeholder="例如：宿舍拼单小队长"
+          />
         </el-form-item>
         <el-form-item label="联系方式">
-          <el-input v-model="form.contactInfo" placeholder="例如：微信 zhangsan_01" />
+          <el-input
+            v-model="form.contactInfo"
+            placeholder="例如：微信 zhangsan_01"
+          />
         </el-form-item>
       </el-form>
 
       <div class="page-actions">
-        <el-button v-if="!userStore.profile?.isVerified" plain @click="router.push('/verify-student')">去完成认证</el-button>
-        <el-button @click="router.push('/credit')">查看信用分</el-button>
-        <el-button type="primary" :loading="userStore.savingProfile" @click="handleSubmit">保存修改</el-button>
+        <el-button
+          v-if="!userStore.profile?.isVerified"
+          plain
+          @click="router.push('/verify-student')"
+        >
+          去完成认证
+        </el-button>
+        <el-button @click="router.push('/credit')">
+          查看信用分
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="userStore.savingProfile"
+          @click="handleSubmit"
+        >
+          保存修改
+        </el-button>
       </div>
     </PageSection>
   </div>

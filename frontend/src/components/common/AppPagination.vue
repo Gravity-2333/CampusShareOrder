@@ -58,7 +58,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="total > 0" class="pagination-bar surface-card">
+  <div
+    v-if="total > 0"
+    class="pagination-bar surface-card"
+  >
     <p class="pagination-summary">
       共 <strong>{{ total }}</strong> 条，当前第 <strong>{{ page }}</strong> / {{ pages || 1 }} 页
     </p>

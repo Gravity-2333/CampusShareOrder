@@ -177,11 +177,22 @@ onMounted(loadOrders)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="拼单大厅" description="页面只使用统一 API 服务，不直接拼接接口地址。">
-      <p class="muted-text">{{ hallTips }}</p>
+    <PageSection
+      title="拼单大厅"
+      description="页面只使用统一 API 服务，不直接拼接接口地址。"
+    >
+      <p class="muted-text">
+        {{ hallTips }}
+      </p>
 
       <div class="toolbar-row">
         <el-input
@@ -190,26 +201,69 @@ onMounted(loadOrders)
           clearable
           @keyup.enter="submitFilters"
         />
-        <el-select v-model="filters.status" placeholder="全部状态" clearable>
-          <el-option label="招募中" value="OPEN" />
-          <el-option label="已成团" value="GROUPED" />
-          <el-option label="待送达" value="WAIT_DELIVERY" />
-          <el-option label="待收货" value="WAIT_RECEIVE" />
-          <el-option label="已完成" value="COMPLETED" />
-          <el-option label="已取消" value="CANCELED" />
+        <el-select
+          v-model="filters.status"
+          placeholder="全部状态"
+          clearable
+        >
+          <el-option
+            label="招募中"
+            value="OPEN"
+          />
+          <el-option
+            label="已成团"
+            value="GROUPED"
+          />
+          <el-option
+            label="待送达"
+            value="WAIT_DELIVERY"
+          />
+          <el-option
+            label="待收货"
+            value="WAIT_RECEIVE"
+          />
+          <el-option
+            label="已完成"
+            value="COMPLETED"
+          />
+          <el-option
+            label="已取消"
+            value="CANCELED"
+          />
         </el-select>
-        <el-button type="primary" :loading="orderStore.hallLoading" @click="submitFilters">查询</el-button>
+        <el-button
+          type="primary"
+          :loading="orderStore.hallLoading"
+          @click="submitFilters"
+        >
+          查询
+        </el-button>
       </div>
 
       <div class="page-actions wrap-actions">
-        <el-button @click="resetFilters">重置筛选</el-button>
-        <el-button type="primary" plain @click="goCreateOrder">
+        <el-button @click="resetFilters">
+          重置筛选
+        </el-button>
+        <el-button
+          type="primary"
+          plain
+          @click="goCreateOrder"
+        >
           {{ canCreateOrder ? '发起拼单' : '先去认证再发起' }}
         </el-button>
-        <el-button v-if="canResetMock" :loading="appStore.mockResetting" @click="handleResetMock">
+        <el-button
+          v-if="canResetMock"
+          :loading="appStore.mockResetting"
+          @click="handleResetMock"
+        >
           重置演示数据
         </el-button>
-        <el-button plain @click="router.push('/my-orders')">查看我的拼单</el-button>
+        <el-button
+          plain
+          @click="router.push('/my-orders')"
+        >
+          查看我的拼单
+        </el-button>
       </div>
 
       <template v-if="visibleOrders.length">
@@ -221,10 +275,15 @@ onMounted(loadOrders)
           >
             <div class="card-header-row">
               <div>
-                <p class="section-kicker">{{ order.orderNo }}</p>
+                <p class="section-kicker">
+                  {{ order.orderNo }}
+                </p>
                 <h3>{{ order.productName }}</h3>
               </div>
-              <StatusTag :value="order.status" :text="formatOrderStatus(order.status)" />
+              <StatusTag
+                :value="order.status"
+                :text="formatOrderStatus(order.status)"
+              />
             </div>
             <ul class="detail-list">
               <li><span>取货点</span><strong>{{ order.pickupPoint }}</strong></li>
@@ -244,7 +303,9 @@ onMounted(loadOrders)
               </li>
             </ul>
             <div class="page-actions">
-              <el-button @click="router.push(`/orders/${order.orderId}`)">查看详情</el-button>
+              <el-button @click="router.push(`/orders/${order.orderId}`)">
+                查看详情
+              </el-button>
               <el-button
                 type="primary"
                 plain
@@ -279,8 +340,14 @@ onMounted(loadOrders)
         description="可以调整筛选条件，或在完成实名认证后自己发起一个新的拼单。"
       >
         <div class="page-actions">
-          <el-button @click="resetFilters">恢复默认筛选</el-button>
-          <el-button type="primary" plain @click="goCreateOrder">
+          <el-button @click="resetFilters">
+            恢复默认筛选
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="goCreateOrder"
+          >
             {{ canCreateOrder ? '去发起拼单' : '去完成认证' }}
           </el-button>
         </div>

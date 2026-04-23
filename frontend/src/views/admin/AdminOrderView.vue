@@ -105,51 +105,121 @@ onMounted(loadOrders)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="订单管理" description="先收口订单筛选、详情查看和后台取消这一条治理链路。">
-      <p class="muted-text">{{ summaryText }}</p>
+    <PageSection
+      title="订单管理"
+      description="先收口订单筛选、详情查看和后台取消这一条治理链路。"
+    >
+      <p class="muted-text">
+        {{ summaryText }}
+      </p>
       <div class="toolbar-row">
-        <el-select v-model="filters.status" placeholder="按状态筛选" clearable>
-          <el-option label="招募中" value="OPEN" />
-          <el-option label="已成团" value="GROUPED" />
-          <el-option label="待送达" value="WAIT_DELIVERY" />
-          <el-option label="待收货" value="WAIT_RECEIVE" />
-          <el-option label="已完成" value="COMPLETED" />
-          <el-option label="已取消" value="CANCELED" />
+        <el-select
+          v-model="filters.status"
+          placeholder="按状态筛选"
+          clearable
+        >
+          <el-option
+            label="招募中"
+            value="OPEN"
+          />
+          <el-option
+            label="已成团"
+            value="GROUPED"
+          />
+          <el-option
+            label="待送达"
+            value="WAIT_DELIVERY"
+          />
+          <el-option
+            label="待收货"
+            value="WAIT_RECEIVE"
+          />
+          <el-option
+            label="已完成"
+            value="COMPLETED"
+          />
+          <el-option
+            label="已取消"
+            value="CANCELED"
+          />
         </el-select>
-        <el-button type="primary" @click="loadOrders">查询</el-button>
+        <el-button
+          type="primary"
+          @click="loadOrders"
+        >
+          查询
+        </el-button>
       </div>
 
       <div class="table-toolbar">
         <span class="table-caption">共 {{ adminStore.ordersPage.total }} 条订单，优先处理待送达和待收货状态。</span>
         <div class="page-actions">
-          <el-button @click="resetFilters">恢复默认筛选</el-button>
+          <el-button @click="resetFilters">
+            恢复默认筛选
+          </el-button>
         </div>
       </div>
 
-      <div v-if="adminStore.ordersPage.list.length" class="table-stack">
+      <div
+        v-if="adminStore.ordersPage.list.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
-          <el-table v-loading="adminStore.ordersLoading" :data="adminStore.ordersPage.list" stripe>
-            <el-table-column prop="orderNo" label="订单号" />
-            <el-table-column prop="productName" label="商品" />
-            <el-table-column prop="creatorNickname" label="发起人" />
+          <el-table
+            v-loading="adminStore.ordersLoading"
+            :data="adminStore.ordersPage.list"
+            stripe
+          >
+            <el-table-column
+              prop="orderNo"
+              label="订单号"
+            />
+            <el-table-column
+              prop="productName"
+              label="商品"
+            />
+            <el-table-column
+              prop="creatorNickname"
+              label="发起人"
+            />
             <el-table-column label="成员进度">
-              <template #default="{ row }">{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</template>
+              <template #default="{ row }">
+                {{ row.currentMemberCount }}/{{ row.totalMemberCount }}
+              </template>
             </el-table-column>
             <el-table-column label="状态">
               <template #default="{ row }">
-                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+                <StatusTag
+                  :value="row.status"
+                  :text="formatOrderStatus(row.status)"
+                />
               </template>
             </el-table-column>
             <el-table-column label="截止时间">
-              <template #default="{ row }">{{ formatDateTime(row.deadlineAt) }}</template>
+              <template #default="{ row }">
+                {{ formatDateTime(row.deadlineAt) }}
+              </template>
             </el-table-column>
-            <el-table-column label="操作" width="220">
+            <el-table-column
+              label="操作"
+              width="220"
+            >
               <template #default="{ row }">
                 <div class="row-action-group">
-                  <el-button link type="primary" @click="router.push(`/admin/orders/${row.orderId}`)">
+                  <el-button
+                    link
+                    type="primary"
+                    @click="router.push(`/admin/orders/${row.orderId}`)"
+                  >
                     查看详情
                   </el-button>
                   <el-button
@@ -167,13 +237,20 @@ onMounted(loadOrders)
         </div>
 
         <div class="mobile-record-list">
-          <article v-for="row in adminStore.ordersPage.list" :key="row.orderId" class="surface-card mobile-record-card">
+          <article
+            v-for="row in adminStore.ordersPage.list"
+            :key="row.orderId"
+            class="surface-card mobile-record-card"
+          >
             <div class="mobile-record-header">
               <div class="mobile-record-title">
                 <span>{{ row.orderNo }}</span>
                 <strong>{{ row.productName }}</strong>
               </div>
-              <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+              <StatusTag
+                :value="row.status"
+                :text="formatOrderStatus(row.status)"
+              />
             </div>
             <ul class="mobile-record-fields">
               <li><span>发起人</span><strong>{{ row.creatorNickname || '--' }}</strong></li>
@@ -181,7 +258,13 @@ onMounted(loadOrders)
               <li><span>截止时间</span><strong>{{ formatDateTime(row.deadlineAt) }}</strong></li>
             </ul>
             <div class="page-actions">
-              <el-button type="primary" plain @click="router.push(`/admin/orders/${row.orderId}`)">查看详情</el-button>
+              <el-button
+                type="primary"
+                plain
+                @click="router.push(`/admin/orders/${row.orderId}`)"
+              >
+                查看详情
+              </el-button>
               <el-button
                 v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
                 type="danger"

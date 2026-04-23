@@ -10,6 +10,14 @@ export default defineConfig({
     vue(),
     vueDevTools(),
   ],
+  server: {
+    proxy: {
+      '/api': {
+        changeOrigin: true,
+        target: 'http://localhost:8080',
+      },
+    },
+  },
   build: {
     rollupOptions: {
       output: {

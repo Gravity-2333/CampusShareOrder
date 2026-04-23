@@ -17,7 +17,9 @@ defineProps({
 
 <template>
   <article class="stat-card surface-card">
-    <p class="stat-label">{{ label }}</p>
+    <p class="stat-label">
+      {{ label }}
+    </p>
     <strong class="stat-value">{{ value }}</strong>
     <span class="stat-hint">{{ hint }}</span>
   </article>

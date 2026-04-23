@@ -104,7 +104,13 @@ onMounted(() => {
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
     <PageSection
@@ -115,10 +121,15 @@ onMounted(() => {
       <template v-if="user">
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">用户 #{{ user.userId }}</p>
+            <p class="section-kicker">
+              用户 #{{ user.userId }}
+            </p>
             <h2>{{ user.nickname }}</h2>
           </div>
-          <StatusTag :value="user.status" :text="formatUserStatus(user.status)" />
+          <StatusTag
+            :value="user.status"
+            :text="formatUserStatus(user.status)"
+          />
         </div>
 
         <div class="detail-grid">
@@ -142,15 +153,28 @@ onMounted(() => {
           </div>
         </div>
 
-        <PageSection title="信用记录" description="便于后台查看该用户过往信用变化。">
+        <PageSection
+          title="信用记录"
+          description="便于后台查看该用户过往信用变化。"
+        >
           <div class="desktop-table">
-            <el-table :data="user.creditRecords || []" stripe>
+            <el-table
+              :data="user.creditRecords || []"
+              stripe
+            >
               <el-table-column label="时间">
-                <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+                <template #default="{ row }">
+                  {{ formatDateTime(row.createdAt) }}
+                </template>
               </el-table-column>
-              <el-table-column prop="changeReason" label="变更原因" />
+              <el-table-column
+                prop="changeReason"
+                label="变更原因"
+              />
               <el-table-column label="变更值">
-                <template #default="{ row }">{{ formatSignedNumber(row.delta) }}</template>
+                <template #default="{ row }">
+                  {{ formatSignedNumber(row.delta) }}
+                </template>
               </el-table-column>
             </el-table>
           </div>
@@ -173,8 +197,13 @@ onMounted(() => {
         </PageSection>
 
         <div class="page-actions wrap-actions">
-          <el-button @click="router.push('/admin/users')">返回用户管理</el-button>
-          <el-button :type="user.status === 'NORMAL' ? 'danger' : 'primary'" @click="toggleStatus">
+          <el-button @click="router.push('/admin/users')">
+            返回用户管理
+          </el-button>
+          <el-button
+            :type="user.status === 'NORMAL' ? 'danger' : 'primary'"
+            @click="toggleStatus"
+          >
             {{ user.status === 'NORMAL' ? '封禁用户' : '解封用户' }}
           </el-button>
         </div>

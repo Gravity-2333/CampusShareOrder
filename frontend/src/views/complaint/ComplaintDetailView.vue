@@ -68,7 +68,13 @@ onMounted(() => {
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
     <PageSection
@@ -79,10 +85,15 @@ onMounted(() => {
       <template v-if="complaint">
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">{{ complaint.complaintNo }}</p>
+            <p class="section-kicker">
+              {{ complaint.complaintNo }}
+            </p>
             <h2>{{ complaint.productName }}</h2>
           </div>
-          <StatusTag :value="complaint.status" :text="formatComplaintStatus(complaint.status)" />
+          <StatusTag
+            :value="complaint.status"
+            :text="formatComplaintStatus(complaint.status)"
+          />
         </div>
 
         <div class="detail-grid">
@@ -124,8 +135,16 @@ onMounted(() => {
         </div>
 
         <div class="page-actions wrap-actions">
-          <el-button @click="router.push('/complaints')">返回我的投诉</el-button>
-          <el-button type="primary" plain @click="router.push(`/orders/${complaint.orderId}`)">查看关联订单</el-button>
+          <el-button @click="router.push('/complaints')">
+            返回我的投诉
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="router.push(`/orders/${complaint.orderId}`)"
+          >
+            查看关联订单
+          </el-button>
         </div>
       </template>
     </PageSection>

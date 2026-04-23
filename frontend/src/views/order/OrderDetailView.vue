@@ -987,7 +987,9 @@ onMounted(() => {
       <template v-if="detail">
         <div class="card-header-row">
           <div>
-            <p class="section-kicker">{{ detail.basicInfo.orderNo }}</p>
+            <p class="section-kicker">
+              {{ detail.basicInfo.orderNo }}
+            </p>
             <h2>{{ detail.basicInfo.productName }}</h2>
           </div>
           <StatusTag
@@ -1003,7 +1005,10 @@ onMounted(() => {
             <li><span>投诉状态</span><strong>{{ complaintActionText }}</strong></li>
             <li><span>凭证状态</span><strong>{{ receiptStatusText }}</strong></li>
           </ul>
-          <div v-if="primaryAction" class="page-actions detail-primary-actions">
+          <div
+            v-if="primaryAction"
+            class="page-actions detail-primary-actions"
+          >
             <el-button
               :type="primaryAction.type"
               :plain="primaryAction.type !== 'primary'"
@@ -1039,7 +1044,10 @@ onMounted(() => {
 
           <div class="surface-card detail-panel">
             <h3>当前成员信息</h3>
-            <ul v-if="detail.currentUserMember" class="detail-list">
+            <ul
+              v-if="detail.currentUserMember"
+              class="detail-list"
+            >
               <li><span>我的角色</span><strong>{{ formatRole(detail.currentUserMember.myRole) }}</strong></li>
               <li>
                 <span>加入状态</span>
@@ -1072,7 +1080,12 @@ onMounted(() => {
                 <strong>{{ formatCurrency(detail.currentUserMember.refundAmountTotal) }}</strong>
               </li>
             </ul>
-            <p v-else class="muted-text">当前账号尚未加入该订单。</p>
+            <p
+              v-else
+              class="muted-text"
+            >
+              当前账号尚未加入该订单。
+            </p>
           </div>
         </div>
 
@@ -1114,7 +1127,9 @@ onMounted(() => {
               <strong>{{ item.hint }}</strong>
             </div>
           </div>
-          <p class="muted-text">{{ phaseSummaryText }}</p>
+          <p class="muted-text">
+            {{ phaseSummaryText }}
+          </p>
         </PageSection>
 
         <PageSection
@@ -1177,7 +1192,11 @@ onMounted(() => {
               :key="item.key"
               class="surface-card action-summary-card is-enabled"
             >
-              <el-tag :type="riskTagTypeMap[item.tone] || 'info'" effect="light" round>
+              <el-tag
+                :type="riskTagTypeMap[item.tone] || 'info'"
+                effect="light"
+                round
+              >
                 {{ formatRiskToneText(item.tone) }}
               </el-tag>
               <strong>{{ item.text }}</strong>
@@ -1196,7 +1215,11 @@ onMounted(() => {
               class="surface-card action-summary-card is-enabled"
             >
               <span>{{ item.label }}</span>
-              <el-tag :type="milestoneTagTypeMap[item.tag] || 'info'" effect="light" round>
+              <el-tag
+                :type="milestoneTagTypeMap[item.tag] || 'info'"
+                effect="light"
+                round
+              >
                 {{ item.statusText }}
               </el-tag>
               <strong>{{ item.timeText }}</strong>
@@ -1209,34 +1232,57 @@ onMounted(() => {
           description="成员信息展示加入、支付、收货及最近事件，方便联调时核对状态流转。"
         >
           <div class="desktop-table">
-            <el-table :data="detail.memberList" stripe>
-              <el-table-column prop="nickname" label="成员" />
+            <el-table
+              :data="detail.memberList"
+              stripe
+            >
+              <el-table-column
+                prop="nickname"
+                label="成员"
+              />
               <el-table-column label="角色">
-                <template #default="{ row }">{{ formatRole(row.role) }}</template>
+                <template #default="{ row }">
+                  {{ formatRole(row.role) }}
+                </template>
               </el-table-column>
               <el-table-column label="加入状态">
                 <template #default="{ row }">
-                  <StatusTag :value="row.joinStatus" :text="formatJoinStatus(row.joinStatus)" />
+                  <StatusTag
+                    :value="row.joinStatus"
+                    :text="formatJoinStatus(row.joinStatus)"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="支付状态">
                 <template #default="{ row }">
-                  <StatusTag :value="row.payStatus" :text="formatPayStatus(row.payStatus)" />
+                  <StatusTag
+                    :value="row.payStatus"
+                    :text="formatPayStatus(row.payStatus)"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="收货状态">
                 <template #default="{ row }">
-                  <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                  <StatusTag
+                    :value="row.receiveStatus"
+                    :text="formatReceiveStatus(row.receiveStatus)"
+                  />
                 </template>
               </el-table-column>
               <el-table-column label="应付金额">
-                <template #default="{ row }">{{ formatCurrency(row.payAmount) }}</template>
+                <template #default="{ row }">
+                  {{ formatCurrency(row.payAmount) }}
+                </template>
               </el-table-column>
               <el-table-column label="退款合计">
-                <template #default="{ row }">{{ formatCurrency(row.refundAmountTotal) }}</template>
+                <template #default="{ row }">
+                  {{ formatCurrency(row.refundAmountTotal) }}
+                </template>
               </el-table-column>
               <el-table-column label="最近事件">
-                <template #default="{ row }">{{ getMemberLatestEvent(row) }}</template>
+                <template #default="{ row }">
+                  {{ getMemberLatestEvent(row) }}
+                </template>
               </el-table-column>
             </el-table>
           </div>
@@ -1252,7 +1298,10 @@ onMounted(() => {
                   <span>{{ formatRole(row.role) }}</span>
                   <strong>{{ row.nickname || '--' }}</strong>
                 </div>
-                <StatusTag :value="row.payStatus" :text="formatPayStatus(row.payStatus)" />
+                <StatusTag
+                  :value="row.payStatus"
+                  :text="formatPayStatus(row.payStatus)"
+                />
               </div>
               <ul class="mobile-record-fields">
                 <li><span>加入状态</span><strong>{{ formatJoinStatus(row.joinStatus) }}</strong></li>
@@ -1266,7 +1315,10 @@ onMounted(() => {
         </PageSection>
 
         <div class="detail-grid">
-          <PageSection title="支付汇总" description="对应 paymentSummary 聚合字段。">
+          <PageSection
+            title="支付汇总"
+            description="对应 paymentSummary 聚合字段。"
+          >
             <ul class="detail-list">
               <li>
                 <span>预计总额</span>
@@ -1295,7 +1347,10 @@ onMounted(() => {
             </ul>
           </PageSection>
 
-          <PageSection title="投诉与凭证" description="对应 complaintInfo 与 receiptInfo。">
+          <PageSection
+            title="投诉与凭证"
+            description="对应 complaintInfo 与 receiptInfo。"
+          >
             <ul class="detail-list">
               <li>
                 <span>投诉通道</span>
@@ -1327,7 +1382,10 @@ onMounted(() => {
         </div>
 
         <div class="detail-grid">
-          <PageSection title="收货信息" description="对应 receiveInfo 聚合字段。">
+          <PageSection
+            title="收货信息"
+            description="对应 receiveInfo 聚合字段。"
+          >
             <ul class="detail-list">
               <li>
                 <span>送达时间</span>
@@ -1348,15 +1406,26 @@ onMounted(() => {
             </ul>
 
             <div class="desktop-table">
-              <el-table :data="detail.receiveInfo.receiveStatusSummary" stripe>
-                <el-table-column prop="nickname" label="成员" />
+              <el-table
+                :data="detail.receiveInfo.receiveStatusSummary"
+                stripe
+              >
+                <el-table-column
+                  prop="nickname"
+                  label="成员"
+                />
                 <el-table-column label="收货状态">
                   <template #default="{ row }">
-                    <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                    <StatusTag
+                      :value="row.receiveStatus"
+                      :text="formatReceiveStatus(row.receiveStatus)"
+                    />
                   </template>
                 </el-table-column>
                 <el-table-column label="收货时间">
-                  <template #default="{ row }">{{ formatDateTime(row.receivedAt) }}</template>
+                  <template #default="{ row }">
+                    {{ formatDateTime(row.receivedAt) }}
+                  </template>
                 </el-table-column>
               </el-table>
             </div>
@@ -1372,7 +1441,10 @@ onMounted(() => {
                     <span>收货汇总</span>
                     <strong>{{ row.nickname || '--' }}</strong>
                   </div>
-                  <StatusTag :value="row.receiveStatus" :text="formatReceiveStatus(row.receiveStatus)" />
+                  <StatusTag
+                    :value="row.receiveStatus"
+                    :text="formatReceiveStatus(row.receiveStatus)"
+                  />
                 </div>
                 <ul class="mobile-record-fields">
                   <li><span>收货时间</span><strong>{{ formatDateTime(row.receivedAt) }}</strong></li>
@@ -1381,7 +1453,10 @@ onMounted(() => {
             </div>
           </PageSection>
 
-          <PageSection title="时间线" description="展示订单内关键事件的时间顺序。">
+          <PageSection
+            title="时间线"
+            description="展示订单内关键事件的时间顺序。"
+          >
             <el-timeline>
               <el-timeline-item
                 v-for="item in detail.timeline"
@@ -1397,9 +1472,22 @@ onMounted(() => {
         </div>
 
         <div class="page-actions wrap-actions detail-actions-bar">
-          <el-button @click="router.push('/orders')">返回大厅</el-button>
-          <el-button plain @click="router.push('/my-orders')">我的拼单</el-button>
-          <el-button plain :loading="orderStore.detailLoading" @click="loadDetail()">刷新详情</el-button>
+          <el-button @click="router.push('/orders')">
+            返回大厅
+          </el-button>
+          <el-button
+            plain
+            @click="router.push('/my-orders')"
+          >
+            我的拼单
+          </el-button>
+          <el-button
+            plain
+            :loading="orderStore.detailLoading"
+            @click="loadDetail()"
+          >
+            刷新详情
+          </el-button>
           <el-button
             v-if="detail.actionFlags.canJoin"
             type="primary"
@@ -1484,15 +1572,26 @@ onMounted(() => {
         :description="detailErrorText"
       >
         <div class="page-actions">
-          <el-button @click="router.push('/orders')">返回大厅</el-button>
-          <el-button type="primary" plain :disabled="!isValidOrderId" @click="loadDetail()">
+          <el-button @click="router.push('/orders')">
+            返回大厅
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            :disabled="!isValidOrderId"
+            @click="loadDetail()"
+          >
             重新加载
           </el-button>
         </div>
       </EmptyState>
     </PageSection>
 
-    <el-dialog v-model="receiptDialogVisible" title="订单凭证" width="680px">
+    <el-dialog
+      v-model="receiptDialogVisible"
+      title="订单凭证"
+      width="680px"
+    >
       <div class="receipt-preview">
         <ElImage
           v-if="activeReceiptUrl"

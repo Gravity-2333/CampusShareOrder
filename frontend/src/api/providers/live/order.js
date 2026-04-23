@@ -17,4 +17,5 @@ export const uploadReceipt = (orderId, payload) =>
 
 export const markDelivered = (orderId) => request.post(`/api/orders/${orderId}/mark-delivered`)
 
-export const confirmReceived = (orderId) => request.post(`/api/orders/${orderId}/confirm-received`)
+export const confirmReceived = (orderId) =>
+  request.post(`/api/orders/${orderId}/confirm-received`)

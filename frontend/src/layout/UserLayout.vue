@@ -58,10 +58,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'is-collapsed': isDesktopCollapsed, 'is-mobile': appStore.isMobileViewport }">
-    <aside v-if="!appStore.isMobileViewport" class="app-sidebar" :class="{ collapsed: isDesktopCollapsed }">
+  <div
+    class="app-shell"
+    :class="{ 'is-collapsed': isDesktopCollapsed, 'is-mobile': appStore.isMobileViewport }"
+  >
+    <aside
+      v-if="!appStore.isMobileViewport"
+      class="app-sidebar"
+      :class="{ collapsed: isDesktopCollapsed }"
+    >
       <div class="brand-block">
-        <div class="brand-mark">{{ isDesktopCollapsed ? '拼' : 'CSO' }}</div>
+        <div class="brand-mark">
+          {{ isDesktopCollapsed ? '拼' : 'CSO' }}
+        </div>
         <span class="brand-kicker">CampusShareOrder</span>
         <h1>校园拼单平台</h1>
       </div>
@@ -73,7 +82,11 @@ onBeforeUnmount(() => {
         router
         class="shell-menu"
       >
-        <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+        <el-menu-item
+          v-for="item in navItems"
+          :key="item.path"
+          :index="item.path"
+        >
           {{ item.label }}
         </el-menu-item>
       </el-menu>
@@ -88,13 +101,24 @@ onBeforeUnmount(() => {
     >
       <div class="app-sidebar mobile-drawer-sidebar">
         <div class="brand-block">
-          <div class="brand-mark">CSO</div>
+          <div class="brand-mark">
+            CSO
+          </div>
           <span class="brand-kicker">CampusShareOrder</span>
           <h1>校园拼单平台</h1>
         </div>
 
-        <el-menu :default-active="activePath" router class="shell-menu" @select="handleNavSelect">
-          <el-menu-item v-for="item in navItems" :key="item.path" :index="item.path">
+        <el-menu
+          :default-active="activePath"
+          router
+          class="shell-menu"
+          @select="handleNavSelect"
+        >
+          <el-menu-item
+            v-for="item in navItems"
+            :key="item.path"
+            :index="item.path"
+          >
             {{ item.label }}
           </el-menu-item>
         </el-menu>
@@ -104,7 +128,9 @@ onBeforeUnmount(() => {
     <div class="app-main">
       <header class="app-header">
         <div>
-          <div class="mode-chip">模式：{{ appStore.apiMode }}</div>
+          <div class="mode-chip">
+            模式：{{ appStore.apiMode }}
+          </div>
           <h2>{{ route.meta.title || '校园拼单平台' }}</h2>
         </div>
 
@@ -118,8 +144,20 @@ onBeforeUnmount(() => {
           >
             去认证
           </el-button>
-          <el-button text class="mobile-nav-trigger" @click="appStore.toggleSidebar()">{{ navButtonText }}</el-button>
-          <el-button type="primary" plain @click="handleLogout">退出登录</el-button>
+          <el-button
+            text
+            class="mobile-nav-trigger"
+            @click="appStore.toggleSidebar()"
+          >
+            {{ navButtonText }}
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="handleLogout"
+          >
+            退出登录
+          </el-button>
         </div>
       </header>
 

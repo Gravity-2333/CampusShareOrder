@@ -17,7 +17,12 @@ defineProps({
 
 <template>
   <div class="empty-state surface-card">
-    <p v-if="kicker" class="section-kicker">{{ kicker }}</p>
+    <p
+      v-if="kicker"
+      class="section-kicker"
+    >
+      {{ kicker }}
+    </p>
     <h3>{{ title }}</h3>
     <p>{{ description }}</p>
     <slot />

@@ -85,11 +85,22 @@ onMounted(loadLogs)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="操作日志" description="对应 GET /api/admin/records/logs。">
-      <p class="muted-text">{{ summaryText }}</p>
+    <PageSection
+      title="操作日志"
+      description="对应 GET /api/admin/records/logs。"
+    >
+      <p class="muted-text">
+        {{ summaryText }}
+      </p>
 
       <div class="toolbar-row">
         <el-input
@@ -99,7 +110,12 @@ onMounted(loadLogs)
           @keyup.enter="submitFilters"
         />
         <div />
-        <el-button type="primary" @click="submitFilters">查询</el-button>
+        <el-button
+          type="primary"
+          @click="submitFilters"
+        >
+          查询
+        </el-button>
       </div>
 
       <div class="table-toolbar">
@@ -107,18 +123,38 @@ onMounted(loadLogs)
           共 {{ adminStore.logsPage.total }} 条日志{{ filters.action ? `，当前关键字：${filters.action}` : '' }}。
         </span>
         <div class="page-actions">
-          <el-button @click="resetFilters">恢复默认筛选</el-button>
+          <el-button @click="resetFilters">
+            恢复默认筛选
+          </el-button>
         </div>
       </div>
 
-      <div v-if="adminStore.logsPage.list.length" class="table-stack">
+      <div
+        v-if="adminStore.logsPage.list.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
-          <el-table v-loading="adminStore.logsLoading" :data="adminStore.logsPage.list" stripe>
-            <el-table-column prop="action" label="动作" />
-            <el-table-column prop="operatorName" label="操作人" />
-            <el-table-column prop="targetNo" label="目标编号" />
+          <el-table
+            v-loading="adminStore.logsLoading"
+            :data="adminStore.logsPage.list"
+            stripe
+          >
+            <el-table-column
+              prop="action"
+              label="动作"
+            />
+            <el-table-column
+              prop="operatorName"
+              label="操作人"
+            />
+            <el-table-column
+              prop="targetNo"
+              label="目标编号"
+            />
             <el-table-column label="时间">
-              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              <template #default="{ row }">
+                {{ formatDateTime(row.createdAt) }}
+              </template>
             </el-table-column>
           </el-table>
         </div>

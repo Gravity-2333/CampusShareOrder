@@ -12,7 +12,7 @@ public class OrderTask {
     private final OrderService orderService;
 
     /**
-     * 每5分钟执行一次自动成团处理
+     * 每 5 分钟执行一次自动成团处理
      */
     @Scheduled(cron = "0 */5 * * * ?")
     public void processAutoGroup() {
@@ -20,7 +20,7 @@ public class OrderTask {
     }
 
     /**
-     * 每3分钟执行一次超时取消处理
+     * 每 3 分钟执行一次超时取消处理
      */
     @Scheduled(cron = "0 */3 * * * ?")
     public void processTimeoutCancel() {

@@ -18,5 +18,11 @@ const type = computed(() => getStatusTone(props.value))
 </script>
 
 <template>
-  <el-tag :type="type" effect="light" round>{{ text }}</el-tag>
+  <el-tag
+    :type="type"
+    effect="light"
+    round
+  >
+    {{ text }}
+  </el-tag>
 </template>

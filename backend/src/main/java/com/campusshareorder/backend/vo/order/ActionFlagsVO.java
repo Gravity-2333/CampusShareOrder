@@ -11,4 +11,5 @@ public class ActionFlagsVO {
     private boolean canMarkDelivered;
     private boolean canConfirmReceived;
     private boolean canCreateComplaint;
+    private boolean canViewReceipt;
 }

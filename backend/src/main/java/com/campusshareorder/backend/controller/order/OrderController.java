@@ -6,11 +6,18 @@ import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.OrderQueryRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.service.OrderService;
-import com.campusshareorder.backend.vo.order.*;
 import com.campusshareorder.backend.vo.common.PageVO;
+import com.campusshareorder.backend.vo.order.CreateOrderVO;
+import com.campusshareorder.backend.vo.order.OrderDetailVO;
+import com.campusshareorder.backend.vo.order.OrderListItemVO;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -21,36 +28,29 @@ public class OrderController {
 
     @PostMapping
     public ApiResponse<CreateOrderVO> createOrder(@RequestBody CreateOrderRequest request, HttpServletRequest httpRequest) {
-        // 从 JWT 中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(401, "请先登录");
         }
-        CreateOrderVO vo = orderService.createOrder(request, userId);
-        return ApiResponse.success(vo);
+        return ApiResponse.success(orderService.createOrder(request, userId));
     }
 
     @GetMapping
-    public ApiResponse<PageVO<OrderListItemVO>> getOrderList(OrderQueryRequest request, HttpServletRequest httpRequest) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
-        PageVO<OrderListItemVO> page = orderService.getOrderList(request);
-        return ApiResponse.success(page);
+    public ApiResponse<PageVO<OrderListItemVO>> getOrderList(OrderQueryRequest request) {
+        return ApiResponse.success(orderService.getOrderList(request));
     }
 
     @GetMapping("/{orderId}")
     public ApiResponse<OrderDetailVO> getOrderDetail(@PathVariable Long orderId, HttpServletRequest httpRequest) {
-        // 从 JWT 中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(401, "请先登录");
         }
-        OrderDetailVO detail = orderService.getOrderDetail(orderId, userId);
-        return ApiResponse.success(detail);
+        return ApiResponse.success(orderService.getOrderDetail(orderId, userId));
     }
 
     @PostMapping("/{orderId}/join")
     public ApiResponse<Void> joinOrder(@PathVariable Long orderId, @RequestBody JoinOrderRequest request, HttpServletRequest httpRequest) {
-        // 从 JWT 中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(401, "请先登录");
@@ -61,7 +61,6 @@ public class OrderController {
 
     @PostMapping("/{orderId}/pay")
     public ApiResponse<Void> payOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
-        // 从 JWT 中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(401, "请先登录");
@@ -72,7 +71,6 @@ public class OrderController {
 
     @PostMapping("/{orderId}/exit")
     public ApiResponse<Void> exitOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
-        // 从 JWT 中获取用户ID
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(401, "请先登录");
@@ -81,7 +79,7 @@ public class OrderController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{orderId}/receipt")
+    @PostMapping("/{orderId}/upload-receipt")
     public ApiResponse<Void> uploadReceipt(@PathVariable Long orderId, @RequestBody UploadReceiptRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
@@ -91,7 +89,7 @@ public class OrderController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{orderId}/deliver")
+    @PostMapping("/{orderId}/mark-delivered")
     public ApiResponse<Void> markDelivered(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
@@ -101,7 +99,7 @@ public class OrderController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{orderId}/receive")
+    @PostMapping("/{orderId}/confirm-received")
     public ApiResponse<Void> confirmReceived(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {

@@ -2,13 +2,21 @@ package com.campusshareorder.backend.service.impl;
 
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.campusshareorder.backend.dto.auth.AdminLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserRegisterRequest;
+import com.campusshareorder.backend.entity.AdminAccount;
 import com.campusshareorder.backend.entity.UserAccount;
+import com.campusshareorder.backend.mapper.AdminAccountMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.AuthService;
 import com.campusshareorder.backend.utils.JwtUtil;
-import com.campusshareorder.backend.vo.auth.*;
+import com.campusshareorder.backend.vo.auth.AdminLoginInfoVO;
+import com.campusshareorder.backend.vo.auth.AdminLoginVO;
+import com.campusshareorder.backend.vo.auth.CurrentLoginInfoVO;
+import com.campusshareorder.backend.vo.auth.LoginUserInfoVO;
+import com.campusshareorder.backend.vo.auth.RegisterResultVO;
+import com.campusshareorder.backend.vo.auth.UserLoginVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,27 +24,25 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
+    private final AdminAccountMapper adminAccountMapper;
     private final UserAccountMapper userAccountMapper;
     private final JwtUtil jwtUtil;
 
     @Override
     public RegisterResultVO register(UserRegisterRequest request) {
-        // 检查手机号是否已存在
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserAccount::getPhone, request.getPhone());
         if (userAccountMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("该手机号已注册");
         }
 
-        // 创建新用户
         UserAccount user = new UserAccount();
         user.setPhone(request.getPhone());
         user.setPasswordHash(BCrypt.hashpw(request.getPassword()));
         user.setNickname(request.getNickname());
-        user.setCreditScore(80); // 默认信用分
+        user.setCreditScore(80);
         user.setIsVerified(false);
         user.setStatus("NORMAL");
-        
         userAccountMapper.insert(user);
 
         RegisterResultVO vo = new RegisterResultVO();
@@ -52,7 +58,6 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserLoginVO login(UserLoginRequest request) {
-        // 查找用户
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserAccount::getPhone, request.getPhone());
         UserAccount user = userAccountMapper.selectOne(wrapper);
@@ -65,12 +70,8 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("账号已被封禁，请联系管理员");
         }
 
-        // 生成 Token
         String token = jwtUtil.generateToken(user.getId(), user.getPhone(), "USER");
 
-        UserLoginVO vo = new UserLoginVO();
-        vo.setToken(token);
-        
         LoginUserInfoVO userInfo = new LoginUserInfoVO();
         userInfo.setUserId(user.getId());
         userInfo.setPhone(user.getPhone());
@@ -81,14 +82,58 @@ public class AuthServiceImpl implements AuthService {
         userInfo.setStatus(user.getStatus());
         userInfo.setCreditScore(user.getCreditScore());
         userInfo.setContactInfo(user.getContactInfo());
-        vo.setUserInfo(userInfo);
 
+        UserLoginVO vo = new UserLoginVO();
+        vo.setToken(token);
+        vo.setUserInfo(userInfo);
         return vo;
     }
 
     @Override
-    public CurrentLoginInfoVO getCurrentInfo(Long userId) {
-        UserAccount user = userAccountMapper.selectById(userId);
+    public AdminLoginVO adminLogin(AdminLoginRequest request) {
+        LambdaQueryWrapper<AdminAccount> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(AdminAccount::getUsername, request.getUsername());
+        AdminAccount admin = adminAccountMapper.selectOne(wrapper);
+
+        if (admin == null || !BCrypt.checkpw(request.getPassword(), admin.getPasswordHash())) {
+            throw new RuntimeException("管理员账号或密码错误");
+        }
+
+        if ("BANNED".equals(admin.getStatus())) {
+            throw new RuntimeException("管理员账号已被禁用");
+        }
+
+        String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
+
+        AdminLoginInfoVO adminInfo = new AdminLoginInfoVO();
+        adminInfo.setAdminId(admin.getId());
+        adminInfo.setUsername(admin.getUsername());
+        adminInfo.setRole("ADMIN");
+        adminInfo.setStatus(admin.getStatus());
+
+        AdminLoginVO vo = new AdminLoginVO();
+        vo.setToken(token);
+        vo.setAdminInfo(adminInfo);
+        return vo;
+    }
+
+    @Override
+    public CurrentLoginInfoVO getCurrentInfo(Long currentId, String role) {
+        if ("ADMIN".equals(role)) {
+            AdminAccount admin = adminAccountMapper.selectById(currentId);
+            if (admin == null) {
+                throw new RuntimeException("管理员不存在");
+            }
+
+            CurrentLoginInfoVO vo = new CurrentLoginInfoVO();
+            vo.setRole("ADMIN");
+            vo.setAdminId(admin.getId());
+            vo.setUsername(admin.getUsername());
+            vo.setStatus(admin.getStatus());
+            return vo;
+        }
+
+        UserAccount user = userAccountMapper.selectById(currentId);
         if (user == null) {
             throw new RuntimeException("用户不存在");
         }

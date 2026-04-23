@@ -14,6 +14,7 @@ public class OrderListItemVO {
     private Integer totalMemberCount;
     private Integer currentMemberCount;
     private Integer remainingCount;
+    private BigDecimal estimatedTotalAmount;
     private BigDecimal estimatedPerAmount;
     private String pickupPoint;
     private String status;

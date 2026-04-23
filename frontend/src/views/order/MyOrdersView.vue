@@ -62,62 +62,114 @@ onMounted(loadOrders)
 <template>
   <div class="stack-page">
     <div class="stats-grid">
-      <StatCard v-for="item in stats" :key="item.label" :label="item.label" :value="item.value" :hint="item.hint" />
+      <StatCard
+        v-for="item in stats"
+        :key="item.label"
+        :label="item.label"
+        :value="item.value"
+        :hint="item.hint"
+      />
     </div>
 
-    <PageSection title="我的拼单" description="对应 GET /api/users/my-orders。">
-      <p class="muted-text">{{ summaryText }}</p>
+    <PageSection
+      title="我的拼单"
+      description="对应 GET /api/users/my-orders。"
+    >
+      <p class="muted-text">
+        {{ summaryText }}
+      </p>
 
       <div class="table-toolbar">
         <span class="table-caption">共 {{ orderStore.myOrdersPage.total }} 条参与记录，可从这里继续进入订单详情。</span>
         <div class="page-actions">
-          <el-button @click="router.push('/orders')">返回拼单大厅</el-button>
-          <el-button type="primary" plain @click="router.push('/orders/create')">发起新拼单</el-button>
+          <el-button @click="router.push('/orders')">
+            返回拼单大厅
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="router.push('/orders/create')"
+          >
+            发起新拼单
+          </el-button>
         </div>
       </div>
 
-      <div v-if="orderStore.myOrdersPage.list.length" class="table-stack">
+      <div
+        v-if="orderStore.myOrdersPage.list.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
           <el-table
             v-loading="orderStore.myOrdersLoading"
             :data="orderStore.myOrdersPage.list"
             stripe
           >
-            <el-table-column prop="orderNo" label="订单号" />
-            <el-table-column prop="productName" label="商品" />
+            <el-table-column
+              prop="orderNo"
+              label="订单号"
+            />
+            <el-table-column
+              prop="productName"
+              label="商品"
+            />
             <el-table-column label="我的角色">
-              <template #default="{ row }">{{ formatRole(row.myRole) }}</template>
+              <template #default="{ row }">
+                {{ formatRole(row.myRole) }}
+              </template>
             </el-table-column>
             <el-table-column label="参与状态">
-              <template #default="{ row }">{{ formatJoinStatus(row.myJoinStatus) }}</template>
+              <template #default="{ row }">
+                {{ formatJoinStatus(row.myJoinStatus) }}
+              </template>
             </el-table-column>
             <el-table-column label="支付状态">
-              <template #default="{ row }">{{ formatPayStatus(row.myPayStatus) }}</template>
+              <template #default="{ row }">
+                {{ formatPayStatus(row.myPayStatus) }}
+              </template>
             </el-table-column>
             <el-table-column label="收货状态">
-              <template #default="{ row }">{{ formatReceiveStatus(row.myReceiveStatus) }}</template>
+              <template #default="{ row }">
+                {{ formatReceiveStatus(row.myReceiveStatus) }}
+              </template>
             </el-table-column>
             <el-table-column label="订单状态">
               <template #default="{ row }">
-                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+                <StatusTag
+                  :value="row.status"
+                  :text="formatOrderStatus(row.status)"
+                />
               </template>
             </el-table-column>
             <el-table-column label="操作">
               <template #default="{ row }">
-                <el-button link type="primary" @click="router.push(`/orders/${row.orderId}`)">查看详情</el-button>
+                <el-button
+                  link
+                  type="primary"
+                  @click="router.push(`/orders/${row.orderId}`)"
+                >
+                  查看详情
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
         </div>
 
         <div class="mobile-record-list">
-          <article v-for="row in orderStore.myOrdersPage.list" :key="row.orderId" class="surface-card mobile-record-card">
+          <article
+            v-for="row in orderStore.myOrdersPage.list"
+            :key="row.orderId"
+            class="surface-card mobile-record-card"
+          >
             <div class="mobile-record-header">
               <div class="mobile-record-title">
                 <span>{{ row.orderNo }}</span>
                 <strong>{{ row.productName }}</strong>
               </div>
-              <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+              <StatusTag
+                :value="row.status"
+                :text="formatOrderStatus(row.status)"
+              />
             </div>
             <ul class="mobile-record-fields">
               <li><span>我的角色</span><strong>{{ formatRole(row.myRole) }}</strong></li>
@@ -126,7 +178,13 @@ onMounted(loadOrders)
               <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.myReceiveStatus) }}</strong></li>
             </ul>
             <div class="page-actions">
-              <el-button type="primary" plain @click="router.push(`/orders/${row.orderId}`)">查看详情</el-button>
+              <el-button
+                type="primary"
+                plain
+                @click="router.push(`/orders/${row.orderId}`)"
+              >
+                查看详情
+              </el-button>
             </div>
           </article>
         </div>
@@ -134,19 +192,27 @@ onMounted(loadOrders)
         <AppPagination
           :page="orderStore.myOrdersPage.page"
           :page-size="orderStore.myOrdersPage.pageSize"
-        :pages="orderStore.myOrdersPage.pages"
-        :total="orderStore.myOrdersPage.total"
-        @change="handlePageChange"
-      />
-    </div>
+          :pages="orderStore.myOrdersPage.pages"
+          :total="orderStore.myOrdersPage.total"
+          @change="handlePageChange"
+        />
+      </div>
       <EmptyState
         v-else
         title="还没有参与的拼单"
         description="加入或创建拼单后，这里会按分页结构展示。"
       >
         <div class="page-actions">
-          <el-button @click="router.push('/orders')">先去浏览大厅</el-button>
-          <el-button type="primary" plain @click="router.push('/orders/create')">直接发起拼单</el-button>
+          <el-button @click="router.push('/orders')">
+            先去浏览大厅
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="router.push('/orders/create')"
+          >
+            直接发起拼单
+          </el-button>
         </div>
       </EmptyState>
     </PageSection>

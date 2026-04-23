@@ -4,19 +4,20 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
 import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.GroupOrder;
+import com.campusshareorder.backend.entity.GroupOrderMember;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
+import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.ComplaintService;
+import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
-import com.campusshareorder.backend.vo.common.PageVO;
+import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
 import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,20 +32,56 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
 
     private final ComplaintMapper complaintMapper;
     private final GroupOrderMapper groupOrderMapper;
+    private final GroupOrderMemberMapper groupOrderMemberMapper;
     private final UserAccountMapper userAccountMapper;
 
     @Override
     @Transactional
-    public void createComplaint(CreateComplaintRequest request, Long userId) {
+    public CreateComplaintVO createComplaint(CreateComplaintRequest request, Long userId) {
+        GroupOrder order = groupOrderMapper.selectById(request.getOrderId());
+        if (order == null) {
+            throw new RuntimeException("订单不存在");
+        }
+
+        Long accusedUserId = request.getAccusedUserId();
+        if (accusedUserId == null) {
+            accusedUserId = order.getCreatorUserId();
+        }
+
+        if (userId.equals(accusedUserId)) {
+            throw new RuntimeException("不能投诉自己");
+        }
+
+        LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
+        memberWrapper.eq(GroupOrderMember::getGroupOrderId, request.getOrderId())
+                .eq(GroupOrderMember::getUserId, accusedUserId);
+        if (groupOrderMemberMapper.selectCount(memberWrapper) == 0) {
+            throw new RuntimeException("被投诉人不在该订单中");
+        }
+
+        LambdaQueryWrapper<Complaint> duplicateWrapper = new LambdaQueryWrapper<>();
+        duplicateWrapper.eq(Complaint::getGroupOrderId, request.getOrderId())
+                .eq(Complaint::getComplainantUserId, userId)
+                .eq(Complaint::getAccusedUserId, accusedUserId);
+        if (complaintMapper.selectCount(duplicateWrapper) > 0) {
+            throw new RuntimeException("请勿重复投诉");
+        }
+
         Complaint complaint = new Complaint();
         complaint.setComplaintNo("CMP" + IdUtil.fastSimpleUUID().substring(0, 12).toUpperCase());
         complaint.setGroupOrderId(request.getOrderId());
         complaint.setComplainantUserId(userId);
-        complaint.setAccusedUserId(request.getAccusedUserId());
+        complaint.setAccusedUserId(accusedUserId);
         complaint.setType(request.getType());
         complaint.setContent(request.getContent());
         complaint.setStatus("PENDING");
         complaintMapper.insert(complaint);
+
+        CreateComplaintVO vo = new CreateComplaintVO();
+        vo.setComplaintId(complaint.getId());
+        vo.setComplaintNo(complaint.getComplaintNo());
+        vo.setStatus(complaint.getStatus());
+        return vo;
     }
 
     @Override
@@ -63,10 +100,12 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
             vo.setType(c.getType());
             vo.setStatus(c.getStatus());
             vo.setCreatedAt(c.getCreatedAt());
+
             UserAccount accusedUser = userAccountMapper.selectById(c.getAccusedUserId());
             if (accusedUser != null) {
                 vo.setAccusedNickname(accusedUser.getNickname());
             }
+
             GroupOrder order = groupOrderMapper.selectById(c.getGroupOrderId());
             if (order != null) {
                 vo.setProductName(order.getProductName());
@@ -91,9 +130,10 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         vo.setComplaintId(complaint.getId());
         vo.setComplaintNo(complaint.getComplaintNo());
         vo.setOrderId(complaint.getGroupOrderId());
-        
+
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
         if (order != null) {
+            vo.setOrderNo(order.getOrderNo());
             vo.setProductName(order.getProductName());
         }
 
@@ -108,7 +148,6 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         vo.setHandleResult(complaint.getHandleResult());
         vo.setHandledAt(complaint.getHandledAt());
         vo.setCreatedAt(complaint.getCreatedAt());
-        
         return vo;
     }
 }

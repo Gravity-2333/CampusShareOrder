@@ -103,12 +103,18 @@ onMounted(loadDashboard)
         <div class="surface-card detail-panel">
           <h3>当前上下文</h3>
           <ul class="detail-list">
-            <li v-for="item in overviewRows" :key="item.label">
+            <li
+              v-for="item in overviewRows"
+              :key="item.label"
+            >
               <span>{{ item.label }}</span>
               <strong>{{ item.value }}</strong>
             </li>
           </ul>
-          <div v-if="appStore.apiMode === 'mock'" class="page-actions">
+          <div
+            v-if="appStore.apiMode === 'mock'"
+            class="page-actions"
+          >
             <el-button
               type="warning"
               plain
@@ -149,21 +155,45 @@ onMounted(loadDashboard)
     </div>
 
     <div class="detail-grid">
-      <PageSection title="近期订单" description="帮助后台快速定位当前需要关注的订单流转。">
+      <PageSection
+        title="近期订单"
+        description="帮助后台快速定位当前需要关注的订单流转。"
+      >
         <div class="table-toolbar">
           <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentOrders.length }} 条订单摘要。</span>
           <div class="page-actions">
-            <el-button link type="primary" @click="router.push('/admin/orders')">前往订单治理</el-button>
+            <el-button
+              link
+              type="primary"
+              @click="router.push('/admin/orders')"
+            >
+              前往订单治理
+            </el-button>
           </div>
         </div>
-        <div v-if="adminStore.dashboardOverview.recentOrders.length" class="table-stack">
+        <div
+          v-if="adminStore.dashboardOverview.recentOrders.length"
+          class="table-stack"
+        >
           <div class="desktop-table">
-            <el-table :data="adminStore.dashboardOverview.recentOrders" stripe>
-              <el-table-column prop="orderNo" label="订单号" />
-              <el-table-column prop="productName" label="商品" />
+            <el-table
+              :data="adminStore.dashboardOverview.recentOrders"
+              stripe
+            >
+              <el-table-column
+                prop="orderNo"
+                label="订单号"
+              />
+              <el-table-column
+                prop="productName"
+                label="商品"
+              />
               <el-table-column label="状态">
                 <template #default="{ row }">
-                  <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+                  <StatusTag
+                    :value="row.status"
+                    :text="formatOrderStatus(row.status)"
+                  />
                 </template>
               </el-table-column>
             </el-table>
@@ -180,29 +210,61 @@ onMounted(loadDashboard)
                   <span>{{ row.orderNo }}</span>
                   <strong>{{ row.productName }}</strong>
                 </div>
-                <StatusTag :value="row.status" :text="formatOrderStatus(row.status)" />
+                <StatusTag
+                  :value="row.status"
+                  :text="formatOrderStatus(row.status)"
+                />
               </div>
             </article>
           </div>
         </div>
-        <p v-else class="muted-text">暂无订单数据。</p>
+        <p
+          v-else
+          class="muted-text"
+        >
+          暂无订单数据。
+        </p>
       </PageSection>
 
-      <PageSection title="近期投诉" description="帮助后台优先处理待响应投诉。">
+      <PageSection
+        title="近期投诉"
+        description="帮助后台优先处理待响应投诉。"
+      >
         <div class="table-toolbar">
           <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentComplaints.length }} 条投诉摘要。</span>
           <div class="page-actions">
-            <el-button link type="primary" @click="router.push('/admin/complaints')">前往投诉处理</el-button>
+            <el-button
+              link
+              type="primary"
+              @click="router.push('/admin/complaints')"
+            >
+              前往投诉处理
+            </el-button>
           </div>
         </div>
-        <div v-if="adminStore.dashboardOverview.recentComplaints.length" class="table-stack">
+        <div
+          v-if="adminStore.dashboardOverview.recentComplaints.length"
+          class="table-stack"
+        >
           <div class="desktop-table">
-            <el-table :data="adminStore.dashboardOverview.recentComplaints" stripe>
-              <el-table-column prop="complaintNo" label="投诉单号" />
-              <el-table-column prop="productName" label="商品" />
+            <el-table
+              :data="adminStore.dashboardOverview.recentComplaints"
+              stripe
+            >
+              <el-table-column
+                prop="complaintNo"
+                label="投诉单号"
+              />
+              <el-table-column
+                prop="productName"
+                label="商品"
+              />
               <el-table-column label="状态">
                 <template #default="{ row }">
-                  <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+                  <StatusTag
+                    :value="row.status"
+                    :text="formatComplaintStatus(row.status)"
+                  />
                 </template>
               </el-table-column>
             </el-table>
@@ -219,30 +281,64 @@ onMounted(loadDashboard)
                   <span>{{ row.complaintNo }}</span>
                   <strong>{{ row.productName }}</strong>
                 </div>
-                <StatusTag :value="row.status" :text="formatComplaintStatus(row.status)" />
+                <StatusTag
+                  :value="row.status"
+                  :text="formatComplaintStatus(row.status)"
+                />
               </div>
             </article>
           </div>
         </div>
-        <p v-else class="muted-text">暂无投诉数据。</p>
+        <p
+          v-else
+          class="muted-text"
+        >
+          暂无投诉数据。
+        </p>
       </PageSection>
     </div>
 
-    <PageSection title="近期日志" description="展示后台最近的关键操作，方便回看治理动作。">
+    <PageSection
+      title="近期日志"
+      description="展示后台最近的关键操作，方便回看治理动作。"
+    >
       <div class="table-toolbar">
         <span class="table-caption">最近 {{ adminStore.dashboardOverview.recentLogs.length }} 条后台日志摘要。</span>
         <div class="page-actions">
-          <el-button link type="primary" @click="router.push('/admin/records/logs')">查看完整日志</el-button>
+          <el-button
+            link
+            type="primary"
+            @click="router.push('/admin/records/logs')"
+          >
+            查看完整日志
+          </el-button>
         </div>
       </div>
-      <div v-if="adminStore.dashboardOverview.recentLogs.length" class="table-stack">
+      <div
+        v-if="adminStore.dashboardOverview.recentLogs.length"
+        class="table-stack"
+      >
         <div class="desktop-table">
-          <el-table :data="adminStore.dashboardOverview.recentLogs" stripe>
-            <el-table-column prop="action" label="动作" />
-            <el-table-column prop="operatorName" label="操作人" />
-            <el-table-column prop="targetNo" label="目标编号" />
+          <el-table
+            :data="adminStore.dashboardOverview.recentLogs"
+            stripe
+          >
+            <el-table-column
+              prop="action"
+              label="动作"
+            />
+            <el-table-column
+              prop="operatorName"
+              label="操作人"
+            />
+            <el-table-column
+              prop="targetNo"
+              label="目标编号"
+            />
             <el-table-column label="时间">
-              <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+              <template #default="{ row }">
+                {{ formatDateTime(row.createdAt) }}
+              </template>
             </el-table-column>
           </el-table>
         </div>
@@ -264,7 +360,12 @@ onMounted(loadDashboard)
           </article>
         </div>
       </div>
-      <p v-else class="muted-text">暂无日志数据。</p>
+      <p
+        v-else
+        class="muted-text"
+      >
+        暂无日志数据。
+      </p>
     </PageSection>
   </div>
 </template>

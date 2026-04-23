@@ -7,6 +7,41 @@ const request = axios.create({
   timeout: 15000,
 })
 
+const latin1Pattern = /[\u00C0-\u00FF]/
+const cjkPattern = /[\u3400-\u9FFF]/
+
+const decodePotentialMojibake = (value) => {
+  if (typeof value !== 'string' || !value || cjkPattern.test(value) || !latin1Pattern.test(value)) {
+    return value
+  }
+
+  try {
+    const bytes = Uint8Array.from([...value].map((char) => char.charCodeAt(0)))
+    const decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    return decoded || value
+  } catch {
+    return value
+  }
+}
+
+const normalizeResponseStrings = (payload) => {
+  if (typeof payload === 'string') {
+    return decodePotentialMojibake(payload)
+  }
+
+  if (Array.isArray(payload)) {
+    return payload.map(normalizeResponseStrings)
+  }
+
+  if (payload && typeof payload === 'object') {
+    return Object.fromEntries(
+      Object.entries(payload).map(([key, value]) => [key, normalizeResponseStrings(value)]),
+    )
+  }
+
+  return payload
+}
+
 request.interceptors.request.use((config) => {
   const token = getAccessToken()
 
@@ -19,14 +54,14 @@ request.interceptors.request.use((config) => {
 
 request.interceptors.response.use(
   (response) => {
-    const payload = response.data
+    const payload = normalizeResponseStrings(response.data)
 
     if (payload && typeof payload === 'object' && 'code' in payload) {
       if (payload.code !== 0) {
         const error = new Error(payload.message || '请求失败')
         error.code = payload.code
 
-        if (payload.code === 40101 || payload.code === 40102) {
+        if (payload.code === 401 || payload.code === 40101 || payload.code === 40102) {
           clearSessionStorage()
         }
 
@@ -39,21 +74,36 @@ request.interceptors.response.use(
     return payload
   },
   (error) => {
-    const responsePayload = error.response?.data
+    const responsePayload = normalizeResponseStrings(error.response?.data)
 
     if (responsePayload?.code) {
       const wrappedError = new Error(responsePayload.message || '请求失败')
       wrappedError.code = responsePayload.code
 
-      if (wrappedError.code === 40101 || wrappedError.code === 40102) {
+      if (wrappedError.code === 401 || wrappedError.code === 40101 || wrappedError.code === 40102) {
         clearSessionStorage()
       }
 
       throw wrappedError
     }
 
-    const networkError = new Error(error.message || '网络异常')
-    networkError.code = error.code || 50000
+    const status = error.response?.status
+
+    if (status === 401) {
+      clearSessionStorage()
+    }
+
+    const fallbackMessageMap = {
+      401: '登录状态已失效，请重新登录',
+      403: '当前账号无权执行该操作',
+      404: '当前接口暂未提供或请求地址不存在',
+      500: '服务器开小差了，请稍后重试',
+    }
+
+    const networkError = new Error(
+      fallbackMessageMap[status] || error.message || '网络异常，请检查服务是否已启动',
+    )
+    networkError.code = status || error.code || 50000
     throw networkError
   },
 )

@@ -473,7 +473,7 @@ public class AdminServiceImpl implements AdminService {
     private UserAccount requireUser(Long userId) {
         UserAccount user = userAccountMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
         }
         return user;
     }
@@ -481,7 +481,7 @@ public class AdminServiceImpl implements AdminService {
     private GroupOrder requireOrder(Long orderId) {
         GroupOrder order = groupOrderMapper.selectById(orderId);
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         return order;
     }
@@ -489,7 +489,7 @@ public class AdminServiceImpl implements AdminService {
     private Complaint requireComplaint(Long complaintId) {
         Complaint complaint = complaintMapper.selectById(complaintId);
         if (complaint == null) {
-            throw new RuntimeException("投诉记录不存在");
+            throw new BusinessException(ErrorCode.COMPLAINT_NOT_FOUND);
         }
         return complaint;
     }

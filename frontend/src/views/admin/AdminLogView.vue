@@ -151,6 +151,10 @@ onMounted(loadLogs)
               prop="targetNo"
               label="目标编号"
             />
+            <el-table-column
+              prop="detail"
+              label="说明"
+            />
             <el-table-column label="时间">
               <template #default="{ row }">
                 {{ formatDateTime(row.createdAt) }}
@@ -172,6 +176,7 @@ onMounted(loadLogs)
             <ul class="mobile-record-fields">
               <li><span>操作人</span><strong>{{ row.operatorName || '--' }}</strong></li>
               <li><span>目标编号</span><strong>{{ row.targetNo || '--' }}</strong></li>
+              <li><span>说明</span><strong>{{ row.detail || '--' }}</strong></li>
             </ul>
           </article>
         </div>

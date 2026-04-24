@@ -302,11 +302,16 @@ public class AdminServiceImpl implements AdminService {
         List<AdminCapitalRecordVO> list = capitalPage.getRecords().stream().map(record -> {
             AdminCapitalRecordVO vo = new AdminCapitalRecordVO();
             vo.setBizNo(record.getBizNo());
+            vo.setOrderId(record.getGroupOrderId());
             vo.setType(record.getType());
             vo.setAmount(record.getAmount());
+            vo.setStatus(record.getStatus());
+            vo.setRemark(record.getRemark());
             vo.setCreatedAt(record.getCreatedAt());
             UserAccount user = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
             vo.setUserNickname(user == null ? "" : user.getNickname());
+            GroupOrder order = record.getGroupOrderId() == null ? null : groupOrderMapper.selectById(record.getGroupOrderId());
+            vo.setOrderNo(order == null ? "" : order.getOrderNo());
             return vo;
         }).collect(Collectors.toList());
 
@@ -328,6 +333,10 @@ public class AdminServiceImpl implements AdminService {
         List<AdminOperationLogVO> list = logPage.getRecords().stream().map(log -> {
             AdminOperationLogVO vo = new AdminOperationLogVO();
             vo.setAction(log.getAction());
+            vo.setOperatorType(log.getOperatorType());
+            vo.setBizType(log.getBizType());
+            vo.setBizId(log.getBizId());
+            vo.setDetail(resolveLogDetail(log));
             vo.setCreatedAt(log.getCreatedAt());
             vo.setTargetNo(buildTargetNo(log));
             vo.setOperatorName(resolveOperatorName(log));
@@ -514,6 +523,17 @@ public class AdminServiceImpl implements AdminService {
             }
             default -> log.getBizType() + "-" + log.getBizId();
         };
+    }
+
+    private String resolveLogDetail(OperationLog log) {
+        if (log.getDetailJson() == null || log.getDetailJson().isBlank()) {
+            return "";
+        }
+        try {
+            return JSONUtil.parseObj(log.getDetailJson()).getStr("detail", "");
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private String resolveOperatorName(OperationLog log) {

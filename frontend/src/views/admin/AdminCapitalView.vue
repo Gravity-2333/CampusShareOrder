@@ -168,11 +168,19 @@ onMounted(loadRecords)
               prop="userNickname"
               label="用户"
             />
+            <el-table-column
+              prop="orderNo"
+              label="关联订单"
+            />
             <el-table-column label="金额">
               <template #default="{ row }">
                 {{ formatCurrency(row.amount) }}
               </template>
             </el-table-column>
+            <el-table-column
+              prop="remark"
+              label="备注"
+            />
             <el-table-column label="时间">
               <template #default="{ row }">
                 {{ formatDateTime(row.createdAt) }}
@@ -193,7 +201,9 @@ onMounted(loadRecords)
             </div>
             <ul class="mobile-record-fields">
               <li><span>用户</span><strong>{{ row.userNickname || '--' }}</strong></li>
+              <li><span>关联订单</span><strong>{{ row.orderNo || '--' }}</strong></li>
               <li><span>金额</span><strong>{{ formatCurrency(row.amount) }}</strong></li>
+              <li><span>备注</span><strong>{{ row.remark || '--' }}</strong></li>
               <li><span>时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
             </ul>
           </article>

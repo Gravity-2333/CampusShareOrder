@@ -8,6 +8,10 @@ import java.time.LocalDateTime;
 public class AdminOperationLogVO {
     private String action;
     private String operatorName;
+    private String operatorType;
+    private String bizType;
+    private Long bizId;
     private String targetNo;
+    private String detail;
     private LocalDateTime createdAt;
 }

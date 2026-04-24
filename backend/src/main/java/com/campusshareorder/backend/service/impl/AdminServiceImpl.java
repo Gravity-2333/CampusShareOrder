@@ -134,11 +134,11 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void banUser(Long userId, BanUserRequest request, Long adminId) {
+        String reason = requireText(request == null ? null : request.getReason(), "封禁原因不能为空");
         UserAccount user = requireUser(userId);
         user.setStatus("BANNED");
         userAccountMapper.updateById(user);
-        insertOperationLog("ADMIN", adminId, "USER", userId, "USER_BANNED",
-                request == null ? null : request.getReason());
+        insertOperationLog("ADMIN", adminId, "USER", userId, "USER_BANNED", reason);
     }
 
     @Override
@@ -213,17 +213,17 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void cancelOrder(Long orderId, CancelOrderRequest request, Long adminId) {
+        String reason = requireText(request == null ? null : request.getReason(), "取消原因不能为空");
         GroupOrder order = requireOrder(orderId);
         if ("COMPLETED".equals(order.getStatus()) || "CANCELED".equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "终态订单不能取消");
         }
 
         order.setStatus("CANCELED");
-        order.setCancelReason(request == null ? null : request.getReason());
+        order.setCancelReason(reason);
         groupOrderMapper.updateById(order);
         refundActiveMembers(orderId, "管理员取消订单退款");
-        insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN",
-                request == null ? null : request.getReason());
+        insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN", reason);
         notifyOrderMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
                 "管理员已取消该订单，系统会按规则处理退款。");
     }
@@ -275,9 +275,10 @@ public class AdminServiceImpl implements AdminService {
         if ("PROCESSED".equals(complaint.getStatus())) {
             throw new BusinessException(ErrorCode.COMPLAINT_ALREADY_PROCESSED);
         }
+        String handleResult = requireText(request == null ? null : request.getHandleResult(), "处理结果不能为空");
 
         complaint.setStatus("PROCESSED");
-        complaint.setHandleResult(request == null ? null : request.getHandleResult());
+        complaint.setHandleResult(handleResult);
         complaint.setHandledAt(LocalDateTime.now());
         complaint.setHandledByAdminId(adminId);
         complaintMapper.updateById(complaint);
@@ -291,8 +292,7 @@ public class AdminServiceImpl implements AdminService {
         }
 
         applyComplaintCreditPenalty(complaint);
-        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED",
-                request == null ? null : request.getHandleResult());
+        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED", handleResult);
         insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED", "投诉已处理",
                 "你的投诉已由管理员处理，请查看处理结果。", complaint.getGroupOrderId(), complaintId);
         insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED", "投诉处理完成",
@@ -654,6 +654,13 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ErrorCode.COMPLAINT_NOT_FOUND);
         }
         return complaint;
+    }
+
+    private String requireText(String value, String message) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+        }
+        return value.trim();
     }
 
     private String normalizeOrderStatus(String status) {

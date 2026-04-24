@@ -3,6 +3,8 @@ package com.campusshareorder.backend.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.exception.BusinessException;
+import com.campusshareorder.backend.dto.admin.BanUserRequest;
+import com.campusshareorder.backend.dto.admin.CancelOrderRequest;
 import com.campusshareorder.backend.dto.admin.HandleComplaintRequest;
 import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.Complaint;
@@ -75,6 +77,44 @@ class AdminServiceImplTest {
                         assertThat(exception.getCode()).isEqualTo(ErrorCode.COMPLAINT_ALREADY_PROCESSED.getCode()));
 
         verify(complaintMapper, never()).updateById(any(Complaint.class));
+    }
+
+    @Test
+    void handleComplaintRejectsBlankResult() {
+        Complaint complaint = complaint("PENDING");
+        HandleComplaintRequest request = new HandleComplaintRequest();
+        request.setHandleResult("   ");
+        when(complaintMapper.selectById(1L)).thenReturn(complaint);
+
+        assertThatThrownBy(() -> adminService.handleComplaint(1L, request, 900L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()));
+
+        verify(complaintMapper, never()).updateById(any(Complaint.class));
+    }
+
+    @Test
+    void cancelOrderRejectsBlankReason() {
+        CancelOrderRequest request = new CancelOrderRequest();
+        request.setReason(" ");
+
+        assertThatThrownBy(() -> adminService.cancelOrder(10L, request, 900L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()));
+
+        verify(groupOrderMapper, never()).updateById(any(GroupOrder.class));
+    }
+
+    @Test
+    void banUserRejectsBlankReason() {
+        BanUserRequest request = new BanUserRequest();
+        request.setReason("");
+
+        assertThatThrownBy(() -> adminService.banUser(100L, request, 900L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()));
+
+        verify(userAccountMapper, never()).updateById(any(UserAccount.class));
     }
 
     @Test

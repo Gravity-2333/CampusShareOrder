@@ -18,6 +18,7 @@ import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
 import com.campusshareorder.backend.vo.order.OrderDetailVO;
 import com.campusshareorder.backend.vo.order.OrderListItemVO;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -58,7 +59,7 @@ public class AdminController {
     }
 
     @PostMapping("/users/{userId}/ban")
-    public ApiResponse<Void> banUser(@PathVariable Long userId, @RequestBody(required = false) BanUserRequest body, HttpServletRequest request) {
+    public ApiResponse<Void> banUser(@PathVariable Long userId, @Valid @RequestBody BanUserRequest body, HttpServletRequest request) {
         Long adminId = requireAdmin(request);
         adminService.banUser(userId, body, adminId);
         return ApiResponse.success();
@@ -89,7 +90,7 @@ public class AdminController {
     }
 
     @PostMapping("/orders/{orderId}/cancel")
-    public ApiResponse<Void> cancelOrder(@PathVariable Long orderId, @RequestBody(required = false) CancelOrderRequest body, HttpServletRequest request) {
+    public ApiResponse<Void> cancelOrder(@PathVariable Long orderId, @Valid @RequestBody CancelOrderRequest body, HttpServletRequest request) {
         Long adminId = requireAdmin(request);
         adminService.cancelOrder(orderId, body, adminId);
         return ApiResponse.success();
@@ -112,7 +113,7 @@ public class AdminController {
     }
 
     @PostMapping("/complaints/{complaintId}/handle")
-    public ApiResponse<Void> handleComplaint(@PathVariable Long complaintId, @RequestBody(required = false) HandleComplaintRequest body, HttpServletRequest request) {
+    public ApiResponse<Void> handleComplaint(@PathVariable Long complaintId, @Valid @RequestBody HandleComplaintRequest body, HttpServletRequest request) {
         Long adminId = requireAdmin(request);
         adminService.handleComplaint(complaintId, body, adminId);
         return ApiResponse.success();

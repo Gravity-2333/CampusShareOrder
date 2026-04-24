@@ -100,8 +100,6 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setCurrentMemberCount(1);
         order.setEstimatedTotalAmount(request.getEstimatedTotalAmount());
         order.setEstimatedPerAmount(estimatedPerAmount);
-        order.setActualTotalAmount(request.getEstimatedTotalAmount());
-        order.setActualPerAmount(estimatedPerAmount);
         order.setPickupPoint(request.getPickupPoint());
         order.setDeadlineAt(deadlineAt);
         order.setStatus("OPEN");

@@ -4,6 +4,9 @@ import { makeFailure } from './database'
 
 export const createOrder = async (payload) => {
   const user = await requireUser()
+  if (!user.isVerified) {
+    makeFailure(40303, '请先完成实名认证')
+  }
 
   let createdOrder = null
 

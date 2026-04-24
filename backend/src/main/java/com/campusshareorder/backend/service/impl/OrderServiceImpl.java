@@ -76,6 +76,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (user == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
         }
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new BusinessException(ErrorCode.USER_NOT_VERIFIED);
+        }
 
         LocalDateTime deadlineAt = LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss");
         if (!deadlineAt.isAfter(LocalDateTime.now())) {

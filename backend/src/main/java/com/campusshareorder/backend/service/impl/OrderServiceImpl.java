@@ -71,7 +71,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public CreateOrderVO createOrder(CreateOrderRequest request, Long userId) {
         UserAccount user = userAccountMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+        }
+
+        LocalDateTime deadlineAt = LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss");
+        if (!deadlineAt.isAfter(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "截止时间必须晚于当前时间");
         }
 
         BigDecimal estimatedPerAmount = request.getEstimatedTotalAmount().divide(
@@ -92,7 +97,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setActualTotalAmount(request.getEstimatedTotalAmount());
         order.setActualPerAmount(estimatedPerAmount);
         order.setPickupPoint(request.getPickupPoint());
-        order.setDeadlineAt(LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss"));
+        order.setDeadlineAt(deadlineAt);
         order.setStatus("OPEN");
         order.setComplaintOpened(false);
         groupOrderMapper.insert(order);
@@ -243,10 +248,10 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void joinOrder(Long orderId, JoinOrderRequest request, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("当前订单状态不允许加入");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
         if (order.getCurrentMemberCount() >= order.getTotalMemberCount()) {
-            throw new RuntimeException("订单已满员");
+            throw new BusinessException(ErrorCode.ORDER_FULL);
         }
 
         GroupOrderMember existingMember = groupOrderMemberMapper.selectOne(
@@ -255,7 +260,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                         .eq(GroupOrderMember::getUserId, userId)
         );
         if (existingMember != null) {
-            throw new RuntimeException("您已经加入该订单");
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_JOINED);
         }
 
         GroupOrderMember member = new GroupOrderMember();
@@ -281,12 +286,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void payOrder(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("当前订单状态不允许支付");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
         if (!"UNPAID".equals(member.getPayStatus())) {
-            throw new RuntimeException("当前账号已完成支付");
+            throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
         }
 
         member.setPayStatus("PAID");
@@ -305,13 +310,13 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         GroupOrderMember member = requireMember(orderId, userId);
 
         if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("只有开放中的订单才能退出");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有开放中的订单才能退出");
         }
         if (Boolean.TRUE.equals(member.getIsCreator())) {
-            throw new RuntimeException("发起人不能退出订单");
+            throw new BusinessException(ErrorCode.INITIATOR_EXIT_NOT_ALLOWED);
         }
         if (!"ACTIVE".equals(member.getJoinStatus()) || !"UNPAID".equals(member.getPayStatus())) {
-            throw new RuntimeException("当前成员状态不允许退出");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许退出");
         }
 
         groupOrderMemberMapper.deleteById(member.getId());
@@ -325,10 +330,19 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"GROUPED".equals(order.getStatus())) {
-            throw new RuntimeException("只有已成团订单才能上传凭证");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有已成团订单才能上传凭证");
         }
         if (!Objects.equals(order.getCreatorUserId(), userId)) {
-            throw new RuntimeException("只有发起人可以上传凭证");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以上传凭证");
+        }
+        if (!request.getExpectedDeliveryEndAt().isAfter(request.getExpectedDeliveryStartAt())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "预计最晚送达时间必须晚于开始送达时间");
+        }
+        Long receiptCount = orderReceiptMapper.selectCount(
+                new LambdaQueryWrapper<OrderReceipt>().eq(OrderReceipt::getGroupOrderId, orderId)
+        );
+        if (receiptCount != null && receiptCount > 0) {
+            throw new BusinessException(ErrorCode.RECEIPT_ALREADY_UPLOADED);
         }
 
         OrderReceipt receipt = new OrderReceipt();
@@ -361,10 +375,10 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void markDelivered(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"WAIT_DELIVERY".equals(order.getStatus())) {
-            throw new RuntimeException("只有待送达订单才能确认送达");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有待送达订单才能确认送达");
         }
         if (!Objects.equals(order.getCreatorUserId(), userId)) {
-            throw new RuntimeException("只有发起人可以确认送达");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以确认送达");
         }
 
         LocalDateTime deliveredAt = LocalDateTime.now();
@@ -395,15 +409,15 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void confirmReceived(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"WAIT_RECEIVE".equals(order.getStatus())) {
-            throw new RuntimeException("只有待收货订单才能确认收货");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有待收货订单才能确认收货");
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
         if (Boolean.TRUE.equals(member.getIsCreator())) {
-            throw new RuntimeException("发起人无需重复确认收货");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "发起人无需重复确认收货");
         }
         if (!"WAIT_CONFIRM".equals(member.getReceiveStatus())) {
-            throw new RuntimeException("当前收货状态不允许确认");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前收货状态不允许确认");
         }
 
         member.setReceiveStatus("RECEIVED");

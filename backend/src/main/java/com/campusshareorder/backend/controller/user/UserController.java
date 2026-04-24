@@ -50,8 +50,20 @@ public class UserController {
     public ApiResponse<VerifyStudentVO> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
         UserAccount user = requireUser(userId);
+        String studentNo = request.getStudentNo().trim();
 
-        user.setStudentNo(request.getStudentNo());
+        if (Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "已完成实名认证，不能重复认证");
+        }
+
+        Long duplicatedCount = userAccountMapper.selectCount(new LambdaQueryWrapper<UserAccount>()
+                .eq(UserAccount::getStudentNo, studentNo)
+                .ne(UserAccount::getId, userId));
+        if (duplicatedCount > 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该学号已被认证");
+        }
+
+        user.setStudentNo(studentNo);
         user.setIsVerified(true);
         userAccountMapper.updateById(user);
 

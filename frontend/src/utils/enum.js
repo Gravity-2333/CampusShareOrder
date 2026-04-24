@@ -57,6 +57,11 @@ export const capitalRecordTypeTextMap = {
   SETTLE_TO_CREATOR: '发起人结算',
 }
 
+export const creditReasonTypeTextMap = {
+  COMPLAINT_PENALTY: '投诉扣分',
+  INITIAL: '初始信用分',
+}
+
 export const statusToneMap = {
   ACTIVE: 'success',
   AUTO_RECEIVED: 'success',

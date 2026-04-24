@@ -49,6 +49,14 @@ export const validateStudentNo = (value) => {
     return '学号长度不能少于 4 位'
   }
 
+  if (String(value).trim().length > 10) {
+    return '学号长度不能超过 10 位'
+  }
+
+  if (!/^[A-Za-z0-9]+$/.test(String(value).trim())) {
+    return '学号只能包含字母和数字'
+  }
+
   return ''
 }
 

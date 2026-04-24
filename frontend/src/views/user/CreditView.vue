@@ -7,6 +7,7 @@ import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useUserStore } from '../../stores/user'
+import { creditReasonTypeTextMap } from '../../utils/enum'
 import { formatDateTime, formatSignedNumber } from '../../utils/format'
 
 const router = useRouter()
@@ -37,6 +38,20 @@ const summaryText = computed(() => {
 
   return '信用分记录页重点展示变化原因和分值波动，便于快速回看信誉历史。'
 })
+
+const formatReasonType = (value) => creditReasonTypeTextMap[value] || value || '--'
+
+const formatRelatedBiz = (row) => {
+  if (row.relatedComplaintId) {
+    return `投诉 #${row.relatedComplaintId}`
+  }
+
+  if (row.relatedOrderId) {
+    return `订单 #${row.relatedOrderId}`
+  }
+
+  return '--'
+}
 
 const loadCredit = async () => {
   try {
@@ -98,10 +113,28 @@ onMounted(loadCredit)
             <el-table-column
               prop="changeReason"
               label="变更原因"
+              min-width="180"
             />
+            <el-table-column label="类型">
+              <template #default="{ row }">
+                <el-tag size="small">
+                  {{ formatReasonType(row.reasonType) }}
+                </el-tag>
+              </template>
+            </el-table-column>
             <el-table-column label="变更值">
               <template #default="{ row }">
                 {{ formatSignedNumber(row.delta) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="当前分">
+              <template #default="{ row }">
+                {{ row.currentScore ?? '--' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="关联业务">
+              <template #default="{ row }">
+                {{ formatRelatedBiz(row) }}
               </template>
             </el-table-column>
           </el-table>
@@ -118,7 +151,10 @@ onMounted(loadCredit)
               <strong>{{ row.changeReason || '信用分变更' }}</strong>
             </div>
             <ul class="mobile-record-fields">
+              <li><span>类型</span><strong>{{ formatReasonType(row.reasonType) }}</strong></li>
               <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+              <li><span>当前分</span><strong>{{ row.currentScore ?? '--' }}</strong></li>
+              <li><span>关联业务</span><strong>{{ formatRelatedBiz(row) }}</strong></li>
             </ul>
           </article>
         </div>

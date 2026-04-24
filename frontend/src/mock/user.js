@@ -4,20 +4,38 @@ import { requireUser, sleep } from './shared'
 
 export const verifyStudent = async (payload) => {
   const user = await requireUser()
+  const studentNo = String(payload.studentNo || '').trim()
 
-  if (!payload.studentNo) {
+  if (!studentNo) {
     makeFailure(42201, '学号不能为空')
+  }
+
+  if (!/^[A-Za-z0-9]+$/.test(studentNo) || studentNo.length > 10) {
+    makeFailure(42201, '学号只能包含字母和数字，且不能超过10位')
+  }
+
+  if (user.isVerified) {
+    makeFailure(42201, '已完成实名认证，不能重复认证')
+  }
+
+  const database = getDatabase()
+  const duplicated = database.users.some(
+    (item) => item.userId !== user.userId && item.studentNo === studentNo,
+  )
+
+  if (duplicated) {
+    makeFailure(42201, '该学号已被认证')
   }
 
   mutateDatabase((draft) => {
     const target = draft.users.find((item) => item.userId === user.userId)
     target.isVerified = true
-    target.studentNo = payload.studentNo
+    target.studentNo = studentNo
   })
 
   return {
     isVerified: true,
-    studentNo: payload.studentNo,
+    studentNo,
   }
 }
 
@@ -58,7 +76,17 @@ export const getUserCredit = async () => {
 
   return {
     creditScore: user.creditScore,
-    records: user.creditRecords,
+    records: user.creditRecords.map((record, index) => ({
+      currentScore: record.currentScore ?? user.creditScore,
+      delta: record.delta,
+      reasonType: record.reasonType || 'INITIAL',
+      recordId: record.recordId || index + 1,
+      relatedComplaintId: record.relatedComplaintId || null,
+      relatedOrderId: record.relatedOrderId || null,
+      remark: record.remark || record.changeReason,
+      changeReason: record.changeReason || record.remark,
+      createdAt: record.createdAt,
+    })),
   }
 }
 

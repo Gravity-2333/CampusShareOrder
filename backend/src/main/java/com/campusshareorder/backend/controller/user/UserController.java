@@ -42,13 +42,13 @@ public class UserController {
 
     @GetMapping("/my-orders")
     public ApiResponse<PageVO<MyOrderListItemVO>> getMyOrders(MyOrderQueryRequest request) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        Long userId = SecurityUtils.getRequiredUserId();
         return ApiResponse.success(orderService.getMyOrders(request, userId));
     }
 
     @PostMapping("/verify-student")
     public ApiResponse<VerifyStudentVO> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        Long userId = SecurityUtils.getRequiredUserId();
         UserAccount user = requireUser(userId);
         String studentNo = request.getStudentNo().trim();
 
@@ -75,7 +75,7 @@ public class UserController {
 
     @GetMapping("/profile")
     public ApiResponse<UserProfileVO> getProfile() {
-        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
+        UserAccount user = requireUser(SecurityUtils.getRequiredUserId());
 
         UserProfileVO vo = new UserProfileVO();
         vo.setUserId(user.getId());
@@ -92,7 +92,7 @@ public class UserController {
 
     @PutMapping("/profile")
     public ApiResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
-        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
+        UserAccount user = requireUser(SecurityUtils.getRequiredUserId());
 
         if (request.getNickname() != null && !request.getNickname().trim().isEmpty()) {
             user.setNickname(request.getNickname().trim());
@@ -107,7 +107,7 @@ public class UserController {
 
     @GetMapping("/credit")
     public ApiResponse<UserCreditVO> getCreditRecords() {
-        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
+        UserAccount user = requireUser(SecurityUtils.getRequiredUserId());
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, user.getId())

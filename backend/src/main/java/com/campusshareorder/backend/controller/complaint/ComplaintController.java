@@ -27,20 +27,20 @@ public class ComplaintController {
 
     @PostMapping
     public ApiResponse<CreateComplaintVO> createComplaint(@Valid @RequestBody CreateComplaintRequest request) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        Long userId = SecurityUtils.getRequiredUserId();
         return ApiResponse.success(complaintService.createComplaint(request, userId));
     }
 
     @GetMapping("/my")
     public ApiResponse<PageVO<ComplaintListItemVO>> getMyComplaints(MyComplaintQueryRequest request) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        Long userId = SecurityUtils.getRequiredUserId();
         PageVO<ComplaintListItemVO> page = complaintService.getMyComplaints(request, userId);
         return ApiResponse.success(page);
     }
 
     @GetMapping("/{id}")
     public ApiResponse<ComplaintDetailVO> getComplaintDetail(@PathVariable Long id) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
+        Long userId = SecurityUtils.getRequiredUserId();
         ComplaintDetailVO detail = complaintService.getComplaintDetail(id, userId);
         return ApiResponse.success(detail);
     }

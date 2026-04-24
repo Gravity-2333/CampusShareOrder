@@ -9,6 +9,7 @@ import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
 import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
 import com.campusshareorder.backend.vo.common.PageVO;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,7 +26,7 @@ public class ComplaintController {
     private final ComplaintService complaintService;
 
     @PostMapping
-    public ApiResponse<CreateComplaintVO> createComplaint(@RequestBody CreateComplaintRequest request) {
+    public ApiResponse<CreateComplaintVO> createComplaint(@Valid @RequestBody CreateComplaintRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
         return ApiResponse.success(complaintService.createComplaint(request, userId));
     }

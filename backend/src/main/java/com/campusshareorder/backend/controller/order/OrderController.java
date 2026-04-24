@@ -12,6 +12,7 @@ import com.campusshareorder.backend.vo.order.CreateOrderVO;
 import com.campusshareorder.backend.vo.order.OrderDetailVO;
 import com.campusshareorder.backend.vo.order.OrderListItemVO;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,7 +29,7 @@ public class OrderController {
     private final OrderService orderService;
 
     @PostMapping
-    public ApiResponse<CreateOrderVO> createOrder(@RequestBody CreateOrderRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<CreateOrderVO> createOrder(@Valid @RequestBody CreateOrderRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
@@ -51,7 +52,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderId}/join")
-    public ApiResponse<Void> joinOrder(@PathVariable Long orderId, @RequestBody JoinOrderRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<Void> joinOrder(@PathVariable Long orderId, @Valid @RequestBody(required = false) JoinOrderRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
@@ -81,7 +82,7 @@ public class OrderController {
     }
 
     @PostMapping("/{orderId}/upload-receipt")
-    public ApiResponse<Void> uploadReceipt(@PathVariable Long orderId, @RequestBody UploadReceiptRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<Void> uploadReceipt(@PathVariable Long orderId, @Valid @RequestBody UploadReceiptRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
             return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());

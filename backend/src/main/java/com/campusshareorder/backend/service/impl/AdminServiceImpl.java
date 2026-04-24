@@ -10,6 +10,7 @@ import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.GroupOrder;
+import com.campusshareorder.backend.entity.GroupOrderMember;
 import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.AdminAccountMapper;
@@ -17,6 +18,7 @@ import com.campusshareorder.backend.mapper.CapitalRecordMapper;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
+import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.AdminService;
@@ -37,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -51,6 +54,7 @@ public class AdminServiceImpl implements AdminService {
     private final ComplaintMapper complaintMapper;
     private final CreditChangeRecordMapper creditChangeRecordMapper;
     private final GroupOrderMapper groupOrderMapper;
+    private final GroupOrderMemberMapper groupOrderMemberMapper;
     private final OperationLogMapper operationLogMapper;
     private final OrderService orderService;
     private final UserAccountMapper userAccountMapper;
@@ -184,6 +188,7 @@ public class AdminServiceImpl implements AdminService {
         order.setStatus("CANCELED");
         order.setCancelReason(request == null ? null : request.getReason());
         groupOrderMapper.updateById(order);
+        refundActiveMembers(orderId, "管理员取消订单退款");
         insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN",
                 request == null ? null : request.getReason());
     }
@@ -238,6 +243,7 @@ public class AdminServiceImpl implements AdminService {
             order.setStatus("CANCELED");
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
+            refundActiveMembers(order.getId(), "投诉处理取消订单退款");
         }
 
         insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED",
@@ -310,13 +316,20 @@ public class AdminServiceImpl implements AdminService {
         ComplaintListItemVO vo = new ComplaintListItemVO();
         vo.setComplaintId(complaint.getId());
         vo.setComplaintNo(complaint.getComplaintNo());
+        vo.setOrderId(complaint.getGroupOrderId());
+        vo.setAccusedUserId(complaint.getAccusedUserId());
         vo.setType(complaint.getType());
+        vo.setContent(complaint.getContent());
         vo.setStatus(complaint.getStatus());
+        vo.setHandleResult(complaint.getHandleResult());
         vo.setCreatedAt(complaint.getCreatedAt());
+        vo.setHandledAt(complaint.getHandledAt());
 
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
         if (order != null) {
+            vo.setOrderNo(order.getOrderNo());
             vo.setProductName(order.getProductName());
+            vo.setOpenedBySystem(Boolean.TRUE.equals(order.getComplaintOpened()));
         }
 
         UserAccount accused = complaint.getAccusedUserId() == null ? null : userAccountMapper.selectById(complaint.getAccusedUserId());
@@ -325,6 +338,51 @@ public class AdminServiceImpl implements AdminService {
         }
 
         return vo;
+    }
+
+    private void refundActiveMembers(Long orderId, String remark) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
+        );
+        for (GroupOrderMember member : members) {
+            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
+                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+                member.setRefundAmountTotal(refunded.add(netRefund));
+                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
+                        member.getId(), "REFUND_CANCEL", netRefund, remark);
+            }
+            if ("ACTIVE".equals(member.getJoinStatus())) {
+                member.setJoinStatus("CANCELED");
+            }
+            groupOrderMemberMapper.updateById(member);
+        }
+    }
+
+    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
+                                     String type, BigDecimal amount, String remark) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        Long existingCount = capitalRecordMapper.selectCount(
+                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
+        );
+        if (existingCount != null && existingCount > 0) {
+            return;
+        }
+
+        CapitalRecord record = new CapitalRecord();
+        record.setBizNo(bizNo);
+        record.setUserId(userId);
+        record.setGroupOrderId(orderId);
+        record.setMemberId(memberId);
+        record.setType(type);
+        record.setAmount(amount);
+        record.setStatus("SUCCESS");
+        record.setRemark(remark);
+        record.setCreatedAt(LocalDateTime.now());
+        capitalRecordMapper.insert(record);
     }
 
     private void insertOperationLog(String operatorType, Long operatorId, String bizType, Long bizId, String action, String detail) {

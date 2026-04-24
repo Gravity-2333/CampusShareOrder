@@ -2,6 +2,7 @@ package com.campusshareorder.backend.service.impl;
 
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.util.IdUtil;
+import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -12,14 +13,18 @@ import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.dto.order.OrderQueryRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
+import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
+import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.OrderReceipt;
 import com.campusshareorder.backend.entity.UserAccount;
+import com.campusshareorder.backend.mapper.CapitalRecordMapper;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
+import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
@@ -58,6 +63,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final UserAccountMapper userAccountMapper;
     private final OrderReceiptMapper orderReceiptMapper;
     private final ComplaintMapper complaintMapper;
+    private final CapitalRecordMapper capitalRecordMapper;
+    private final OperationLogMapper operationLogMapper;
 
     @Override
     @Transactional
@@ -101,6 +108,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         creatorMember.setRefundAmountTotal(BigDecimal.ZERO);
         creatorMember.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(creatorMember);
+        insertOperationLog("USER", userId, "ORDER", order.getId(), "ORDER_CREATED", request.getProductName());
 
         CreateOrderVO vo = new CreateOrderVO();
         vo.setOrderId(order.getId());
@@ -265,6 +273,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
 
         order.setCurrentMemberCount(order.getCurrentMemberCount() + 1);
         groupOrderMapper.updateById(order);
+        insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_JOINED", request == null ? null : request.getRemark());
     }
 
     @Override
@@ -283,6 +292,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setPayStatus("PAID");
         member.setPaidAt(LocalDateTime.now());
         groupOrderMemberMapper.updateById(member);
+        insertCapitalRecord("PAY-M" + member.getId(), userId, orderId, member.getId(),
+                "PAY", member.getPayAmount(), "成员支付拼单预估金额");
+        insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_PAID", null);
         tryGroupOrder(order);
     }
 
@@ -305,6 +317,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         groupOrderMemberMapper.deleteById(member.getId());
         order.setCurrentMemberCount(Math.max(order.getCurrentMemberCount() - 1, 1));
         groupOrderMapper.updateById(order);
+        insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_EXITED", null);
     }
 
     @Override
@@ -339,6 +352,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setReceiptUploadDeadlineAt(null);
         order.setStatus("WAIT_DELIVERY");
         groupOrderMapper.updateById(order);
+        refundActualAmountDifference(order, request.getActualTotalAmount());
+        insertOperationLog("USER", userId, "ORDER", orderId, "RECEIPT_UPLOADED", request.getImageUrl());
     }
 
     @Override
@@ -372,6 +387,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             }
             groupOrderMemberMapper.updateById(member);
         }
+        insertOperationLog("USER", userId, "ORDER", orderId, "ORDER_DELIVERED", null);
     }
 
     @Override
@@ -393,18 +409,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setReceiveStatus("RECEIVED");
         member.setReceivedAt(LocalDateTime.now());
         groupOrderMemberMapper.updateById(member);
-
-        List<GroupOrderMember> activeMembers = groupOrderMemberMapper.selectList(
-                new LambdaQueryWrapper<GroupOrderMember>()
-                        .eq(GroupOrderMember::getGroupOrderId, orderId)
-                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
-        );
-        boolean allReceived = activeMembers.stream().allMatch(item ->
-                "RECEIVED".equals(item.getReceiveStatus()) || "AUTO_RECEIVED".equals(item.getReceiveStatus()));
-        if (allReceived) {
-            order.setStatus("COMPLETED");
-            groupOrderMapper.updateById(order);
-        }
+        insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_RECEIVED", null);
+        tryCompleteOrder(orderId);
     }
 
     @Override
@@ -433,6 +439,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             order.setCancelReason("DEADLINE_NOT_GROUPED");
             groupOrderMapper.updateById(order);
             cancelActiveMembers(order.getId());
+            insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_AUTO_CANCELED", "DEADLINE_NOT_GROUPED");
         }
     }
 
@@ -453,6 +460,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             if (receiptCount == 0) {
                 order.setComplaintOpened(true);
                 groupOrderMapper.updateById(order);
+                insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "COMPLAINT_CHANNEL_OPENED",
+                        "RECEIPT_TIMEOUT");
             }
         }
     }
@@ -472,6 +481,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         for (GroupOrder order : timeoutOrders) {
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
+            insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "COMPLAINT_CHANNEL_OPENED",
+                    "DELIVERY_TIMEOUT");
         }
     }
 
@@ -497,6 +508,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 member.setReceiveStatus("AUTO_RECEIVED");
                 member.setReceivedAt(LocalDateTime.now());
                 groupOrderMemberMapper.updateById(member);
+                insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "MEMBER_AUTO_RECEIVED",
+                        "memberId=" + member.getId());
             }
 
             tryCompleteOrder(order.getId());
@@ -529,6 +542,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             order.setStatus("GROUPED");
             order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(30));
             groupOrderMapper.updateById(order);
+            insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_GROUPED", null);
         }
     }
 
@@ -548,6 +562,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (allReceived) {
             order.setStatus("COMPLETED");
             groupOrderMapper.updateById(order);
+            BigDecimal settleAmount = order.getActualTotalAmount() == null
+                    ? order.getEstimatedTotalAmount()
+                    : order.getActualTotalAmount();
+            insertCapitalRecord("SET-O" + orderId, order.getCreatorUserId(), orderId, null,
+                    "SETTLE_TO_CREATOR", settleAmount, "订单完成结算给发起人");
+            insertOperationLog("SYSTEM", null, "ORDER", orderId, "ORDER_COMPLETED", null);
         }
     }
 
@@ -561,12 +581,89 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
                 BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
                 member.setRefundAmountTotal(refunded.add(netRefund));
+                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
+                        member.getId(), "REFUND_CANCEL", netRefund, "订单取消净退款");
             }
             if ("ACTIVE".equals(member.getJoinStatus())) {
                 member.setJoinStatus("CANCELED");
             }
             groupOrderMemberMapper.updateById(member);
         }
+    }
+
+    private void refundActualAmountDifference(GroupOrder order, BigDecimal actualTotalAmount) {
+        if (order.getEstimatedTotalAmount() == null || actualTotalAmount == null) {
+            return;
+        }
+        BigDecimal diffTotal = order.getEstimatedTotalAmount().subtract(actualTotalAmount);
+        if (diffTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        BigDecimal diffPerMember = diffTotal.divide(
+                BigDecimal.valueOf(order.getTotalMemberCount()),
+                2,
+                RoundingMode.HALF_UP
+        );
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>()
+                        .eq(GroupOrderMember::getGroupOrderId, order.getId())
+                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+                        .eq(GroupOrderMember::getPayStatus, "PAID")
+        );
+        for (GroupOrderMember member : members) {
+            BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+            BigDecimal payableDiff = member.getPayAmount() == null
+                    ? diffPerMember
+                    : member.getPayAmount().subtract(refunded).min(diffPerMember).max(BigDecimal.ZERO);
+            if (payableDiff.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            member.setRefundAmountTotal(refunded.add(payableDiff));
+            groupOrderMemberMapper.updateById(member);
+            insertCapitalRecord("RFD-M" + member.getId(), member.getUserId(),
+                    order.getId(), member.getId(), "REFUND_DIFF", payableDiff, "实际金额低于预估金额差额退款");
+        }
+    }
+
+    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
+                                     String type, BigDecimal amount, String remark) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        Long existingCount = capitalRecordMapper.selectCount(
+                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
+        );
+        if (existingCount != null && existingCount > 0) {
+            return;
+        }
+
+        CapitalRecord record = new CapitalRecord();
+        record.setBizNo(bizNo);
+        record.setUserId(userId);
+        record.setGroupOrderId(orderId);
+        record.setMemberId(memberId);
+        record.setType(type);
+        record.setAmount(amount);
+        record.setStatus("SUCCESS");
+        record.setRemark(remark);
+        record.setCreatedAt(LocalDateTime.now());
+        capitalRecordMapper.insert(record);
+    }
+
+    private void insertOperationLog(String operatorType, Long operatorId, String bizType, Long bizId,
+                                    String action, String detail) {
+        OperationLog log = new OperationLog();
+        log.setOperatorType(operatorType);
+        log.setOperatorId(operatorId);
+        log.setBizType(bizType);
+        log.setBizId(bizId);
+        log.setAction(action);
+        log.setDetailJson(JSONUtil.createObj()
+                .set("detail", detail == null ? "" : detail)
+                .toString());
+        log.setCreatedAt(LocalDateTime.now());
+        operationLogMapper.insert(log);
     }
 
     private OrderBasicInfoVO buildBasicInfo(GroupOrder order) {

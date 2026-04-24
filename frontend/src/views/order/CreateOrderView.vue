@@ -16,8 +16,27 @@ import {
 const router = useRouter()
 const orderStore = useOrderStore()
 const loading = ref(false)
+
+const padDatePart = (value) => String(value).padStart(2, '0')
+
+const formatApiDateTime = (date) => {
+  const year = date.getFullYear()
+  const month = padDatePart(date.getMonth() + 1)
+  const day = padDatePart(date.getDate())
+  const hours = padDatePart(date.getHours())
+  const minutes = padDatePart(date.getMinutes())
+  const seconds = padDatePart(date.getSeconds())
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+const defaultDeadlineAt = () => {
+  const deadline = new Date()
+  deadline.setHours(deadline.getHours() + 6, 0, 0, 0)
+  return formatApiDateTime(deadline)
+}
+
 const form = reactive({
-  deadlineAt: '2026-04-17 21:00:00',
+  deadlineAt: defaultDeadlineAt(),
   estimatedTotalAmount: 48,
   pickupPoint: '东区宿舍门口',
   productDesc: '',

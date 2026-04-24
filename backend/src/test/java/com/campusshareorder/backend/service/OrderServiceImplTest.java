@@ -143,6 +143,75 @@ class OrderServiceImplTest {
         verify(capitalRecordMapper, never()).insert(any(CapitalRecord.class));
     }
 
+    @Test
+    void cancelExpiredOpenOrdersCancelsMembersAndRefundsPaidAmount() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        GroupOrderMember paidMember = paidMember(11L, 101L, false);
+
+        when(groupOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(paidMember));
+        when(capitalRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        orderService.cancelExpiredOpenOrders();
+
+        assertThat(order.getStatus()).isEqualTo("CANCELED");
+        assertThat(order.getCancelReason()).isEqualTo("DEADLINE_NOT_GROUPED");
+        assertThat(paidMember.getJoinStatus()).isEqualTo("CANCELED");
+        assertThat(paidMember.getRefundAmountTotal()).isEqualByComparingTo("30.00");
+
+        ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
+        verify(capitalRecordMapper).insert(capitalCaptor.capture());
+        assertThat(capitalCaptor.getValue().getType()).isEqualTo("REFUND_CANCEL");
+    }
+
+    @Test
+    void openReceiptTimeoutComplaintsOpensComplaintChannelWhenReceiptMissing() {
+        GroupOrder order = groupedOrder();
+        order.setComplaintOpened(false);
+        when(groupOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
+        when(orderReceiptMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(
+                paidMember(11L, 101L, false),
+                paidMember(12L, 102L, true)
+        ));
+
+        orderService.openReceiptTimeoutComplaints();
+
+        assertThat(order.getComplaintOpened()).isTrue();
+        verify(groupOrderMapper).updateById(order);
+
+        ArgumentCaptor<OperationLog> logCaptor = ArgumentCaptor.forClass(OperationLog.class);
+        verify(operationLogMapper).insert(logCaptor.capture());
+        assertThat(logCaptor.getValue().getAction()).isEqualTo("COMPLAINT_CHANNEL_OPENED");
+    }
+
+    @Test
+    void autoConfirmReceivedMembersCompletesOrderAfterTimeout() {
+        GroupOrder order = waitReceiveOrder();
+        order.setDeliveredAt(LocalDateTime.now().minusMinutes(40));
+        GroupOrderMember timeoutMember = paidMember(11L, 101L, false);
+        timeoutMember.setReceiveStatus("WAIT_CONFIRM");
+        GroupOrderMember creator = paidMember(12L, 102L, true);
+        creator.setReceiveStatus("RECEIVED");
+
+        when(groupOrderMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(order));
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class)))
+                .thenReturn(List.of(timeoutMember))
+                .thenReturn(List.of(timeoutMember, creator));
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(capitalRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        orderService.autoConfirmReceivedMembers();
+
+        assertThat(timeoutMember.getReceiveStatus()).isEqualTo("AUTO_RECEIVED");
+        assertThat(order.getStatus()).isEqualTo("COMPLETED");
+
+        ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
+        verify(capitalRecordMapper).insert(capitalCaptor.capture());
+        assertThat(capitalCaptor.getValue().getType()).isEqualTo("SETTLE_TO_CREATOR");
+    }
+
     private GroupOrder groupedOrder() {
         GroupOrder order = new GroupOrder();
         order.setId(1L);

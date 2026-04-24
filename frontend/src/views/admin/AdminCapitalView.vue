@@ -210,7 +210,7 @@ onMounted(loadRecords)
       <EmptyState
         v-else
         title="暂无资金记录"
-        description="后续切到 live 时，页面仍然只通过 store -> api 层消费。"
+        description="支付、退款和结算动作会在这里形成资金流水。"
       />
     </PageSection>
   </div>

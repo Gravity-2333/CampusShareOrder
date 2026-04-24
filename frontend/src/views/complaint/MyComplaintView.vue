@@ -28,7 +28,7 @@ const stats = computed(() => [
   {
     label: '当前页',
     value: `${complaintStore.myComplaintsPage.page}/${complaintStore.myComplaintsPage.pages || 1}`,
-    hint: '后续切 live 仍保持相同分页消费方式',
+    hint: '统一使用固定分页结构渲染',
   },
 ])
 
@@ -192,7 +192,7 @@ onMounted(loadComplaints)
       <EmptyState
         v-else
         title="暂无投诉"
-        description="投诉列表也遵循固定分页结构，方便后续无缝换到 live。"
+        description="投诉列表遵循固定分页结构，便于持续联调和维护。"
       />
     </PageSection>
   </div>

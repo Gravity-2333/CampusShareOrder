@@ -187,7 +187,7 @@ onMounted(loadLogs)
       <EmptyState
         v-else
         title="暂无操作日志"
-        description="日志列表同样保持 provider 同签名结构，方便后续联调切换。"
+        description="订单、投诉和后台处理动作会在这里持续沉淀。"
       />
     </PageSection>
   </div>

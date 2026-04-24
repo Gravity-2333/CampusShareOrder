@@ -105,7 +105,7 @@ const handleSubmit = async () => {
 
       <div class="auth-card-summary">
         <strong>快速创建普通用户账号</strong>
-        <p>昵称、手机号、密码校验都走统一校验工具，后续切真实接口时不需要重写页面逻辑。</p>
+        <p>昵称、手机号、密码校验都走统一校验工具，提交入口保持稳定。</p>
       </div>
 
       <el-form

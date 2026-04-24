@@ -29,7 +29,7 @@ const stats = computed(() => {
     {
       label: '关联订单',
       value: complaint.value.orderNo,
-      hint: '处理投诉后，mock 中会同步取消关联订单',
+      hint: '处理投诉后会同步更新关联订单状态',
     },
     {
       label: '投诉类型',

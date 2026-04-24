@@ -152,7 +152,7 @@ onMounted(loadProfile)
     >
       <div class="form-intro surface-card">
         <strong>修改后会同步更新当前登录上下文和资料页展示。</strong>
-        <p>这里仅维护昵称和联系方式，不改动契约外字段，后续切换真实接口时只需继续对接统一的资料接口。</p>
+        <p>这里仅维护昵称和联系方式，不改动契约外字段，页面始终通过统一资料接口提交。</p>
       </div>
 
       <el-form

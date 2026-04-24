@@ -65,7 +65,7 @@ const handleSubmit = async () => {
       </p>
       <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
       <p>
-        当前运行模式为 <strong>{{ appStore.apiMode }}</strong>，页面只通过统一 API 方法取数，后续切换到 live 模式时不用逐页清理假数据。
+        当前运行模式为 <strong>{{ appStore.apiMode }}</strong>，页面只通过统一 API 方法取数，业务代码不直接依赖临时数据。
       </p>
 
       <div class="auth-metric-grid">

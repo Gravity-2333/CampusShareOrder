@@ -288,7 +288,7 @@ onMounted(loadOrders)
       <EmptyState
         v-else
         title="暂无订单"
-        description="后续切换 live 时，列表仍只通过 store -> api 层消费。"
+        description="订单列表统一通过 store -> api 层消费，便于持续维护。"
       />
     </PageSection>
   </div>

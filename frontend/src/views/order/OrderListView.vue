@@ -54,7 +54,7 @@ const stats = computed(() => {
     {
       label: '当前页',
       value: `${orderStore.hallPage.page}/${orderStore.hallPage.pages || 1}`,
-      hint: '支持后续切换到真实分页接口',
+      hint: '统一使用固定分页接口结构',
     },
   ]
 })

@@ -225,7 +225,7 @@ onMounted(loadComplaints)
       <EmptyState
         v-else
         title="暂无投诉"
-        description="当前没有投诉记录，后续切 live 时页面结构无需调整。"
+        description="当前没有投诉记录，可在用户端提交投诉后回到这里处理。"
       />
     </PageSection>
   </div>

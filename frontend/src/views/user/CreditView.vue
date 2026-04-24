@@ -126,7 +126,7 @@ onMounted(loadCredit)
       <EmptyState
         v-else
         title="暂无信用分记录"
-        description="后续切 live 时仍然只需要替换底层 provider。"
+        description="信用分记录会在投诉处理等场景后自动同步。"
       />
     </PageSection>
   </div>

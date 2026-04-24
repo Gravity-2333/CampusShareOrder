@@ -1196,7 +1196,7 @@ onMounted(() => {
 
         <PageSection
           title="动作概览"
-          description="详情页只消费契约中的 actionFlags，便于后续从 mock 切换到真实接口。"
+          description="详情页只消费契约中的 actionFlags，保证动作判断集中且稳定。"
         >
           <div class="action-summary-grid">
             <div

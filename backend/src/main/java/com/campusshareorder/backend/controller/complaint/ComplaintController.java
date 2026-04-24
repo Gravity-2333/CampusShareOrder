@@ -1,14 +1,14 @@
 package com.campusshareorder.backend.controller.complaint;
 
 import com.campusshareorder.backend.common.response.ApiResponse;
+import com.campusshareorder.backend.common.response.PageResult;
+import com.campusshareorder.backend.common.util.SecurityUtils;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
 import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.service.ComplaintService;
-import com.campusshareorder.backend.utils.SecurityUtils;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
 import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
-import com.campusshareorder.backend.vo.common.PageVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -31,16 +31,15 @@ public class ComplaintController {
     }
 
     @GetMapping("/my")
-    public ApiResponse<PageVO<ComplaintListItemVO>> getMyComplaints(MyComplaintQueryRequest request) {
+    public ApiResponse<PageResult<ComplaintListItemVO>> getMyComplaints(MyComplaintQueryRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        PageVO<ComplaintListItemVO> page = complaintService.getMyComplaints(request, userId);
-        return ApiResponse.success(page);
+        return ApiResponse.success(complaintService.getMyComplaints(request, userId));
     }
 
-    @GetMapping("/{id}")
-    public ApiResponse<ComplaintDetailVO> getComplaintDetail(@PathVariable Long id) {
+    @GetMapping("/{complaintId}")
+    public ApiResponse<ComplaintDetailVO> getComplaintDetail(@PathVariable Long complaintId) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        ComplaintDetailVO detail = complaintService.getComplaintDetail(id, userId);
+        ComplaintDetailVO detail = complaintService.getComplaintDetail(complaintId, userId);
         return ApiResponse.success(detail);
     }
 }

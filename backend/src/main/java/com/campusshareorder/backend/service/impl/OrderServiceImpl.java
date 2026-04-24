@@ -5,6 +5,10 @@ import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.enums.OrderStatus;
+import com.campusshareorder.backend.common.exception.BusinessException;
+import com.campusshareorder.backend.common.response.PageResult;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
@@ -21,7 +25,6 @@ import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
-import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.ActionFlagsVO;
 import com.campusshareorder.backend.vo.order.ComplaintInfoVO;
 import com.campusshareorder.backend.vo.order.CreateOrderVO;
@@ -57,13 +60,13 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final OrderReceiptMapper orderReceiptMapper;
     private final ComplaintMapper complaintMapper;
 
-    @Override
-    @Transactional
-    public CreateOrderVO createOrder(CreateOrderRequest request, Long userId) {
-        UserAccount user = userAccountMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+     @Override
+     @Transactional
+     public CreateOrderVO createOrder(CreateOrderRequest request, Long userId) {
+         UserAccount user = userAccountMapper.selectById(userId);
+         if (user == null) {
+             throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+         }
 
         BigDecimal estimatedPerAmount = request.getEstimatedTotalAmount().divide(
                 BigDecimal.valueOf(request.getTotalMemberCount()),
@@ -84,21 +87,21 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setActualPerAmount(estimatedPerAmount);
         order.setPickupPoint(request.getPickupPoint());
         order.setDeadlineAt(LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss"));
-        order.setStatus("OPEN");
-        order.setComplaintOpened(false);
-        groupOrderMapper.insert(order);
+         order.setStatus(OrderStatus.OPEN.getCode());
+         order.setComplaintOpened(false);
+         groupOrderMapper.insert(order);
 
-        GroupOrderMember creatorMember = new GroupOrderMember();
-        creatorMember.setGroupOrderId(order.getId());
-        creatorMember.setUserId(userId);
-        creatorMember.setIsCreator(true);
-        creatorMember.setRole("INITIATOR");
-        creatorMember.setJoinStatus("ACTIVE");
-        creatorMember.setPayStatus("UNPAID");
-        creatorMember.setPayAmount(estimatedPerAmount);
-        creatorMember.setRefundAmountTotal(BigDecimal.ZERO);
-        creatorMember.setReceiveStatus("NOT_READY");
-        groupOrderMemberMapper.insert(creatorMember);
+         GroupOrderMember creatorMember = new GroupOrderMember();
+         creatorMember.setGroupOrderId(order.getId());
+         creatorMember.setUserId(userId);
+         creatorMember.setIsCreator(true);
+         creatorMember.setRole("INITIATOR");
+         creatorMember.setJoinStatus(com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode());
+         creatorMember.setPayStatus(com.campusshareorder.backend.common.enums.PayStatus.UNPAID.getCode());
+         creatorMember.setPayAmount(estimatedPerAmount);
+         creatorMember.setRefundAmountTotal(BigDecimal.ZERO);
+         creatorMember.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.PENDING.getCode());
+         groupOrderMemberMapper.insert(creatorMember);
 
         CreateOrderVO vo = new CreateOrderVO();
         vo.setOrderId(order.getId());
@@ -109,7 +112,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     }
 
     @Override
-    public PageVO<OrderListItemVO> getOrderList(OrderQueryRequest request) {
+    public PageResult<OrderListItemVO> getOrderList(OrderQueryRequest request) {
         Page<GroupOrder> page = new Page<>(request.getPage(), request.getPageSize());
         LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
 
@@ -145,7 +148,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             return vo;
         }).collect(Collectors.toList());
 
-        return new PageVO<>(list, orderPage.getTotal(), orderPage.getCurrent(), orderPage.getSize(), orderPage.getPages());
+        return new PageResult<>(list, request.getPage(), request.getPageSize(), orderPage.getTotal());
     }
 
     @Override
@@ -198,7 +201,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     }
 
     @Override
-    public PageVO<MyOrderListItemVO> getMyOrders(MyOrderQueryRequest request, Long userId) {
+    public PageResult<MyOrderListItemVO> getMyOrders(MyOrderQueryRequest request, Long userId) {
         Page<GroupOrderMember> page = new Page<>(request.getPage(), request.getPageSize());
         LambdaQueryWrapper<GroupOrderMember> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(GroupOrderMember::getUserId, userId).orderByDesc(GroupOrderMember::getCreatedAt);
@@ -225,18 +228,18 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             return vo;
         }).filter(Objects::nonNull).collect(Collectors.toList());
 
-        return new PageVO<>(list, memberPage.getTotal(), memberPage.getCurrent(), memberPage.getSize(), memberPage.getPages());
+        return new PageResult<>(list, request.getPage(), request.getPageSize(), memberPage.getTotal());
     }
 
     @Override
     @Transactional
     public void joinOrder(Long orderId, JoinOrderRequest request, Long userId) {
         GroupOrder order = requireOrder(orderId);
-        if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("当前订单状态不允许加入");
+        if (!OrderStatus.OPEN.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前订单状态不允许加入");
         }
         if (order.getCurrentMemberCount() >= order.getTotalMemberCount()) {
-            throw new RuntimeException("订单已满员");
+            throw new BusinessException(ErrorCode.ORDER_FULL, "订单已满员");
         }
 
         GroupOrderMember existingMember = groupOrderMemberMapper.selectOne(
@@ -245,21 +248,21 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                         .eq(GroupOrderMember::getUserId, userId)
         );
         if (existingMember != null) {
-            throw new RuntimeException("您已经加入该订单");
+            throw new BusinessException(ErrorCode.ALREADY_JOINED, "您已经加入该订单");
         }
 
         GroupOrderMember member = new GroupOrderMember();
         member.setGroupOrderId(orderId);
         member.setUserId(userId);
         member.setIsCreator(false);
-        member.setRole("MEMBER");
-        member.setRemark(request == null ? null : request.getRemark());
-        member.setJoinStatus("ACTIVE");
-        member.setPayStatus("UNPAID");
-        member.setPayAmount(order.getEstimatedPerAmount());
-        member.setRefundAmountTotal(BigDecimal.ZERO);
-        member.setReceiveStatus("NOT_READY");
-        groupOrderMemberMapper.insert(member);
+         member.setRole("MEMBER");
+         member.setRemark(request == null ? null : request.getRemark());
+         member.setJoinStatus(com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode());
+         member.setPayStatus(com.campusshareorder.backend.common.enums.PayStatus.UNPAID.getCode());
+         member.setPayAmount(order.getEstimatedPerAmount());
+         member.setRefundAmountTotal(BigDecimal.ZERO);
+         member.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.PENDING.getCode());
+         groupOrderMemberMapper.insert(member);
 
         order.setCurrentMemberCount(order.getCurrentMemberCount() + 1);
         groupOrderMapper.updateById(order);
@@ -269,16 +272,16 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Transactional
     public void payOrder(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
-        if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("当前订单状态不允许支付");
+        if (!OrderStatus.OPEN.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前订单状态不允许支付");
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
-        if (!"UNPAID".equals(member.getPayStatus())) {
-            throw new RuntimeException("当前账号已完成支付");
+        if (!com.campusshareorder.backend.common.enums.PayStatus.UNPAID.getCode().equals(member.getPayStatus())) {
+            throw new BusinessException(ErrorCode.ALREADY_PAID, "当前账号已完成支付");
         }
 
-        member.setPayStatus("PAID");
+        member.setPayStatus(com.campusshareorder.backend.common.enums.PayStatus.PAID.getCode());
         member.setPaidAt(LocalDateTime.now());
         groupOrderMemberMapper.updateById(member);
         tryGroupOrder(order);
@@ -290,14 +293,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         GroupOrder order = requireOrder(orderId);
         GroupOrderMember member = requireMember(orderId, userId);
 
-        if (!"OPEN".equals(order.getStatus())) {
-            throw new RuntimeException("只有开放中的订单才能退出");
+        if (!OrderStatus.OPEN.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有开放中的订单才能退出");
         }
         if (Boolean.TRUE.equals(member.getIsCreator())) {
-            throw new RuntimeException("发起人不能退出订单");
+            throw new BusinessException(ErrorCode.CREATOR_CANNOT_EXIT, "发起人不能退出订单");
         }
-        if (!"ACTIVE".equals(member.getJoinStatus()) || !"UNPAID".equals(member.getPayStatus())) {
-            throw new RuntimeException("当前成员状态不允许退出");
+        if (!com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode().equals(member.getJoinStatus()) || !com.campusshareorder.backend.common.enums.PayStatus.UNPAID.getCode().equals(member.getPayStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许退出");
         }
 
         groupOrderMemberMapper.deleteById(member.getId());
@@ -309,11 +312,11 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Transactional
     public void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId) {
         GroupOrder order = requireOrder(orderId);
-        if (!"GROUPED".equals(order.getStatus())) {
-            throw new RuntimeException("只有已成团订单才能上传凭证");
+        if (!OrderStatus.GROUPED.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有已成团订单才能上传凭证");
         }
         if (!Objects.equals(order.getCreatorUserId(), userId)) {
-            throw new RuntimeException("只有发起人可以上传凭证");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以上传凭证");
         }
 
         OrderReceipt receipt = new OrderReceipt();
@@ -332,40 +335,40 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 2,
                 RoundingMode.HALF_UP
         ));
-        order.setExpectedDeliveryStartAt(request.getExpectedDeliveryStartAt());
-        order.setExpectedDeliveryEndAt(request.getExpectedDeliveryEndAt());
-        order.setReceiptUploadDeadlineAt(null);
-        order.setStatus("WAIT_DELIVERY");
-        groupOrderMapper.updateById(order);
+         order.setExpectedDeliveryStartAt(request.getExpectedDeliveryStartAt());
+         order.setExpectedDeliveryEndAt(request.getExpectedDeliveryEndAt());
+         order.setReceiptUploadDeadlineAt(null);
+         order.setStatus(OrderStatus.WAIT_DELIVERY.getCode());
+         groupOrderMapper.updateById(order);
     }
 
     @Override
     @Transactional
     public void markDelivered(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
-        if (!"WAIT_DELIVERY".equals(order.getStatus())) {
-            throw new RuntimeException("只有待送达订单才能确认送达");
+        if (!OrderStatus.WAIT_DELIVERY.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有待送达订单才能确认送达");
         }
         if (!Objects.equals(order.getCreatorUserId(), userId)) {
-            throw new RuntimeException("只有发起人可以确认送达");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以确认送达");
         }
 
         LocalDateTime deliveredAt = LocalDateTime.now();
-        order.setStatus("WAIT_RECEIVE");
+        order.setStatus(OrderStatus.WAIT_RECEIVE.getCode());
         order.setDeliveredAt(deliveredAt);
         groupOrderMapper.updateById(order);
 
         List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
                 new LambdaQueryWrapper<GroupOrderMember>()
                         .eq(GroupOrderMember::getGroupOrderId, orderId)
-                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+                        .eq(GroupOrderMember::getJoinStatus, com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode())
         );
         for (GroupOrderMember member : members) {
             if (Boolean.TRUE.equals(member.getIsCreator())) {
-                member.setReceiveStatus("RECEIVED");
+                member.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode());
                 member.setReceivedAt(deliveredAt);
             } else {
-                member.setReceiveStatus("WAIT_CONFIRM");
+                member.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.PENDING.getCode());
                 member.setReceivedAt(null);
             }
             groupOrderMemberMapper.updateById(member);
@@ -376,33 +379,33 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Transactional
     public void confirmReceived(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);
-        if (!"WAIT_RECEIVE".equals(order.getStatus())) {
-            throw new RuntimeException("只有待收货订单才能确认收货");
+        if (!OrderStatus.WAIT_RECEIVE.getCode().equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有待收货订单才能确认收货");
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
         if (Boolean.TRUE.equals(member.getIsCreator())) {
-            throw new RuntimeException("发起人无需重复确认收货");
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "发起人无需重复确认收货");
         }
-        if (!"WAIT_CONFIRM".equals(member.getReceiveStatus())) {
-            throw new RuntimeException("当前收货状态不允许确认");
+        if (!com.campusshareorder.backend.common.enums.ReceiveStatus.PENDING.getCode().equals(member.getReceiveStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前收货状态不允许确认");
         }
 
-        member.setReceiveStatus("RECEIVED");
-        member.setReceivedAt(LocalDateTime.now());
-        groupOrderMemberMapper.updateById(member);
+         member.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode());
+         member.setReceivedAt(LocalDateTime.now());
+         groupOrderMemberMapper.updateById(member);
 
-        List<GroupOrderMember> activeMembers = groupOrderMemberMapper.selectList(
-                new LambdaQueryWrapper<GroupOrderMember>()
-                        .eq(GroupOrderMember::getGroupOrderId, orderId)
-                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
-        );
-        boolean allReceived = activeMembers.stream().allMatch(item ->
-                "RECEIVED".equals(item.getReceiveStatus()) || "AUTO_RECEIVED".equals(item.getReceiveStatus()));
-        if (allReceived) {
-            order.setStatus("COMPLETED");
-            groupOrderMapper.updateById(order);
-        }
+         List<GroupOrderMember> activeMembers = groupOrderMemberMapper.selectList(
+                 new LambdaQueryWrapper<GroupOrderMember>()
+                         .eq(GroupOrderMember::getGroupOrderId, orderId)
+                         .eq(GroupOrderMember::getJoinStatus, com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode())
+         );
+         boolean allReceived = activeMembers.stream().allMatch(item ->
+                 com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode().equals(item.getReceiveStatus()));
+         if (allReceived) {
+             order.setStatus(OrderStatus.COMPLETED.getCode());
+             groupOrderMapper.updateById(order);
+         }
     }
 
     @Override
@@ -419,12 +422,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public void processTimeoutCancel() {
         List<GroupOrder> expiredOrders = groupOrderMapper.selectList(
                 new LambdaQueryWrapper<GroupOrder>()
-                        .eq(GroupOrder::getStatus, "OPEN")
+                        .eq(GroupOrder::getStatus, OrderStatus.OPEN.getCode())
                         .lt(GroupOrder::getDeadlineAt, LocalDateTime.now())
         );
 
         for (GroupOrder order : expiredOrders) {
-            order.setStatus("CANCELED");
+            order.setStatus(OrderStatus.CANCELED.getCode());
             order.setCancelReason("未成团超时取消");
             groupOrderMapper.updateById(order);
 
@@ -432,13 +435,112 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                     new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, order.getId())
             );
             for (GroupOrderMember member : members) {
-                if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
+                if (com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode().equals(member.getJoinStatus()) && com.campusshareorder.backend.common.enums.PayStatus.PAID.getCode().equals(member.getPayStatus())) {
                     member.setRefundAmountTotal(member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount());
                 }
-                if ("ACTIVE".equals(member.getJoinStatus())) {
+                if (com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode().equals(member.getJoinStatus())) {
                     member.setJoinStatus("CANCELED");
                 }
                 groupOrderMemberMapper.updateById(member);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void openReceiptTimeoutComplaints() {
+        List<GroupOrder> expiredOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, OrderStatus.GROUPED.getCode())
+                        .lt(GroupOrder::getReceiptUploadDeadlineAt, LocalDateTime.now())
+                        .eq(GroupOrder::getComplaintOpened, false)
+        );
+
+        for (GroupOrder order : expiredOrders) {
+            order.setComplaintOpened(true);
+            groupOrderMapper.updateById(order);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void openDeliveryTimeoutComplaints() {
+        List<GroupOrder> expiredOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, OrderStatus.WAIT_RECEIVE.getCode())
+                        .lt(GroupOrder::getExpectedDeliveryEndAt, LocalDateTime.now().minusMinutes(60))
+                        .eq(GroupOrder::getComplaintOpened, false)
+        );
+
+        for (GroupOrder order : expiredOrders) {
+            order.setComplaintOpened(true);
+            groupOrderMapper.updateById(order);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void autoConfirmReceivedMembers() {
+        LocalDateTime deadline = LocalDateTime.now().minusMinutes(30);
+        List<GroupOrder> orders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, OrderStatus.WAIT_RECEIVE.getCode())
+                        .lt(GroupOrder::getDeliveredAt, deadline)
+        );
+
+        for (GroupOrder order : orders) {
+            List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                    new LambdaQueryWrapper<GroupOrderMember>()
+                            .eq(GroupOrderMember::getGroupOrderId, order.getId())
+                            .eq(GroupOrderMember::getJoinStatus, com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode())
+                            .eq(GroupOrderMember::getReceiveStatus, com.campusshareorder.backend.common.enums.ReceiveStatus.PENDING.getCode())
+                            .lt(GroupOrderMember::getReceivedAt, deadline)
+            );
+
+            for (GroupOrderMember member : members) {
+                if (!Boolean.TRUE.equals(member.getIsCreator())) {
+                    member.setReceiveStatus(com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode());
+                    member.setReceivedAt(LocalDateTime.now());
+                    groupOrderMemberMapper.updateById(member);
+                }
+            }
+
+            // Check if all received after auto confirm
+            List<GroupOrderMember> allActiveMembers = groupOrderMemberMapper.selectList(
+                    new LambdaQueryWrapper<GroupOrderMember>()
+                            .eq(GroupOrderMember::getGroupOrderId, order.getId())
+                            .eq(GroupOrderMember::getJoinStatus, com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode())
+            );
+
+            boolean allReceived = allActiveMembers.stream()
+                    .allMatch(m -> com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode().equals(m.getReceiveStatus()));
+            if (allReceived) {
+                order.setStatus(OrderStatus.COMPLETED.getCode());
+                groupOrderMapper.updateById(order);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void recoverCompletedOrders() {
+        List<GroupOrder> orders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, OrderStatus.WAIT_RECEIVE.getCode())
+        );
+
+        for (GroupOrder order : orders) {
+            List<GroupOrderMember> allActiveMembers = groupOrderMemberMapper.selectList(
+                    new LambdaQueryWrapper<GroupOrderMember>()
+                            .eq(GroupOrderMember::getGroupOrderId, order.getId())
+                            .eq(GroupOrderMember::getJoinStatus, com.campusshareorder.backend.common.enums.MemberJoinStatus.ACTIVE.getCode())
+            );
+
+            boolean allReceived = allActiveMembers.stream()
+                    .allMatch(m -> com.campusshareorder.backend.common.enums.ReceiveStatus.RECEIVED.getCode().equals(m.getReceiveStatus()));
+            if (allReceived && !allActiveMembers.isEmpty()) {
+                order.setStatus(OrderStatus.COMPLETED.getCode());
+                groupOrderMapper.updateById(order);
             }
         }
     }
@@ -652,7 +754,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private GroupOrder requireOrder(Long orderId) {
         GroupOrder order = groupOrderMapper.selectById(orderId);
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在");
         }
         return order;
     }
@@ -664,7 +766,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                         .eq(GroupOrderMember::getUserId, userId)
         );
         if (member == null) {
-            throw new RuntimeException("当前账号未加入该订单");
+            throw new BusinessException(ErrorCode.NOT_JOINED, "当前账号未加入该订单");
         }
         return member;
     }

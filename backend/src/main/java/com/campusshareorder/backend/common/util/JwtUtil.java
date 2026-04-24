@@ -1,4 +1,4 @@
-package com.campusshareorder.backend.utils;
+package com.campusshareorder.backend.common.util;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;

@@ -10,7 +10,10 @@ import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.AdminAccountMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.AuthService;
-import com.campusshareorder.backend.utils.JwtUtil;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
+import com.campusshareorder.backend.common.enums.UserStatus;
+import com.campusshareorder.backend.common.util.JwtUtil;
 import com.campusshareorder.backend.vo.auth.AdminLoginInfoVO;
 import com.campusshareorder.backend.vo.auth.AdminLoginVO;
 import com.campusshareorder.backend.vo.auth.CurrentLoginInfoVO;
@@ -33,7 +36,7 @@ public class AuthServiceImpl implements AuthService {
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserAccount::getPhone, request.getPhone());
         if (userAccountMapper.selectCount(wrapper) > 0) {
-            throw new RuntimeException("该手机号已注册");
+            throw new BusinessException(ErrorCode.PARAM_VALID_ERROR, "该手机号已注册");
         }
 
         UserAccount user = new UserAccount();
@@ -42,7 +45,7 @@ public class AuthServiceImpl implements AuthService {
         user.setNickname(request.getNickname());
         user.setCreditScore(80);
         user.setIsVerified(false);
-        user.setStatus("NORMAL");
+        user.setStatus(UserStatus.ACTIVE.getCode());
         userAccountMapper.insert(user);
 
         RegisterResultVO vo = new RegisterResultVO();
@@ -63,11 +66,11 @@ public class AuthServiceImpl implements AuthService {
         UserAccount user = userAccountMapper.selectOne(wrapper);
 
         if (user == null || !BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("手机号或密码错误");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "手机号或密码错误");
         }
 
-        if ("BANNED".equals(user.getStatus())) {
-            throw new RuntimeException("账号已被封禁，请联系管理员");
+        if (UserStatus.BANNED.getCode().equals(user.getStatus())) {
+            throw new BusinessException(ErrorCode.ACCOUNT_BANNED, "账号已被封禁，请联系管理员");
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getPhone(), "USER");
@@ -96,11 +99,11 @@ public class AuthServiceImpl implements AuthService {
         AdminAccount admin = adminAccountMapper.selectOne(wrapper);
 
         if (admin == null || !BCrypt.checkpw(request.getPassword(), admin.getPasswordHash())) {
-            throw new RuntimeException("管理员账号或密码错误");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员账号或密码错误");
         }
 
-        if ("BANNED".equals(admin.getStatus())) {
-            throw new RuntimeException("管理员账号已被禁用");
+        if (UserStatus.BANNED.getCode().equals(admin.getStatus())) {
+            throw new BusinessException(ErrorCode.ACCOUNT_BANNED, "管理员账号已被禁用");
         }
 
         String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
@@ -121,9 +124,9 @@ public class AuthServiceImpl implements AuthService {
     public CurrentLoginInfoVO getCurrentInfo(Long currentId, String role) {
         if ("ADMIN".equals(role)) {
             AdminAccount admin = adminAccountMapper.selectById(currentId);
-            if (admin == null) {
-                throw new RuntimeException("管理员不存在");
-            }
+         if (admin == null) {
+             throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员不存在");
+         }
 
             CurrentLoginInfoVO vo = new CurrentLoginInfoVO();
             vo.setRole("ADMIN");
@@ -133,10 +136,10 @@ public class AuthServiceImpl implements AuthService {
             return vo;
         }
 
-        UserAccount user = userAccountMapper.selectById(currentId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+         UserAccount user = userAccountMapper.selectById(currentId);
+         if (user == null) {
+             throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+         }
 
         CurrentLoginInfoVO vo = new CurrentLoginInfoVO();
         vo.setRole("USER");

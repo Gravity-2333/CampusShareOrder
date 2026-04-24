@@ -1,4 +1,4 @@
-package com.campusshareorder.backend.utils;
+package com.campusshareorder.backend.common.util;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

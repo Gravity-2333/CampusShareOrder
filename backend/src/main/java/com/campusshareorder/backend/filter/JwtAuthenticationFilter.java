@@ -1,6 +1,6 @@
 package com.campusshareorder.backend.filter;
 
-import com.campusshareorder.backend.utils.JwtUtil;
+import com.campusshareorder.backend.common.util.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

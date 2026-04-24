@@ -3,6 +3,10 @@ package com.campusshareorder.backend.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.enums.ComplaintStatus;
+import com.campusshareorder.backend.common.exception.BusinessException;
+import com.campusshareorder.backend.common.response.PageResult;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
 import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.entity.Complaint;
@@ -14,7 +18,6 @@ import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.ComplaintService;
-import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
 import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
@@ -40,7 +43,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
     public CreateComplaintVO createComplaint(CreateComplaintRequest request, Long userId) {
         GroupOrder order = groupOrderMapper.selectById(request.getOrderId());
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND, "订单不存在");
         }
 
         Long accusedUserId = request.getAccusedUserId();
@@ -49,14 +52,14 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         }
 
         if (userId.equals(accusedUserId)) {
-            throw new RuntimeException("不能投诉自己");
+            throw new BusinessException(ErrorCode.CREATOR_CANNOT_COMPLAINT, "不能投诉自己");
         }
 
         LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
         memberWrapper.eq(GroupOrderMember::getGroupOrderId, request.getOrderId())
                 .eq(GroupOrderMember::getUserId, accusedUserId);
         if (groupOrderMemberMapper.selectCount(memberWrapper) == 0) {
-            throw new RuntimeException("被投诉人不在该订单中");
+            throw new BusinessException(ErrorCode.PARAM_VALID_ERROR, "被投诉人不在该订单中");
         }
 
         LambdaQueryWrapper<Complaint> duplicateWrapper = new LambdaQueryWrapper<>();
@@ -64,7 +67,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
                 .eq(Complaint::getComplainantUserId, userId)
                 .eq(Complaint::getAccusedUserId, accusedUserId);
         if (complaintMapper.selectCount(duplicateWrapper) > 0) {
-            throw new RuntimeException("请勿重复投诉");
+            throw new BusinessException(ErrorCode.DUPLICATE_COMPLAINT, "请勿重复投诉");
         }
 
         Complaint complaint = new Complaint();
@@ -74,7 +77,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         complaint.setAccusedUserId(accusedUserId);
         complaint.setType(request.getType());
         complaint.setContent(request.getContent());
-        complaint.setStatus("PENDING");
+        complaint.setStatus(ComplaintStatus.PENDING.getCode());
         complaintMapper.insert(complaint);
 
         CreateComplaintVO vo = new CreateComplaintVO();
@@ -85,7 +88,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
     }
 
     @Override
-    public PageVO<ComplaintListItemVO> getMyComplaints(MyComplaintQueryRequest request, Long userId) {
+    public PageResult<ComplaintListItemVO> getMyComplaints(MyComplaintQueryRequest request, Long userId) {
         Page<Complaint> page = this.page(
                 new Page<>(request.getPage(), request.getPageSize()),
                 new LambdaQueryWrapper<Complaint>()
@@ -113,17 +116,17 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
             return vo;
         }).collect(Collectors.toList());
 
-        return PageVO.of(list, page.getTotal(), (long) request.getPage(), (long) request.getPageSize());
+        return new PageResult<>(list, request.getPage(), request.getPageSize(), page.getTotal());
     }
 
     @Override
     public ComplaintDetailVO getComplaintDetail(Long id, Long userId) {
         Complaint complaint = complaintMapper.selectById(id);
         if (complaint == null) {
-            throw new RuntimeException("投诉记录不存在");
+            throw new BusinessException(ErrorCode.COMPLAINT_NOT_FOUND, "投诉记录不存在");
         }
         if (!complaint.getComplainantUserId().equals(userId)) {
-            throw new RuntimeException("无权查看此投诉");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此投诉");
         }
 
         ComplaintDetailVO vo = new ComplaintDetailVO();

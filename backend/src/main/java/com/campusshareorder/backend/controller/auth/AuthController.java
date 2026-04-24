@@ -5,7 +5,7 @@ import com.campusshareorder.backend.dto.auth.AdminLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserRegisterRequest;
 import com.campusshareorder.backend.service.AuthService;
-import com.campusshareorder.backend.utils.SecurityUtils;
+import com.campusshareorder.backend.common.util.SecurityUtils;
 import com.campusshareorder.backend.vo.auth.AdminLoginVO;
 import com.campusshareorder.backend.vo.auth.CurrentLoginInfoVO;
 import com.campusshareorder.backend.vo.auth.RegisterResultVO;

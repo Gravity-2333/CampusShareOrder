@@ -6,6 +6,8 @@ import com.campusshareorder.backend.common.response.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindException;
+import org.springframework.validation.FieldError;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -26,8 +28,15 @@ public class GlobalExceptionHandler {
             ConstraintViolationException.class
     })
     public ApiResponse<?> handleValidationException(Exception e) {
-        log.warn("参数校验异常: {}", e.getMessage());
-        return ApiResponse.error(ErrorCode.VALIDATION_ERROR.getCode(), ErrorCode.VALIDATION_ERROR.getMessage());
+        String message = resolveValidationMessage(e);
+        log.warn("参数校验异常: {}", message);
+        return ApiResponse.error(ErrorCode.VALIDATION_ERROR.getCode(), message);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ApiResponse<?> handleHttpMessageNotReadableException(HttpMessageNotReadableException e) {
+        log.warn("请求体解析异常: {}", e.getMessage());
+        return ApiResponse.error(ErrorCode.VALIDATION_ERROR.getCode(), "请求体格式不正确");
     }
 
     @ExceptionHandler(RuntimeException.class)
@@ -40,5 +49,23 @@ public class GlobalExceptionHandler {
     public ApiResponse<?> handleException(Exception e) {
         log.error("系统异常", e);
         return ApiResponse.error(ErrorCode.SYSTEM_ERROR.getCode(), ErrorCode.SYSTEM_ERROR.getMessage());
+    }
+
+    private String resolveValidationMessage(Exception e) {
+        if (e instanceof MethodArgumentNotValidException methodArgumentNotValidException) {
+            FieldError fieldError = methodArgumentNotValidException.getBindingResult().getFieldError();
+            return fieldError == null ? ErrorCode.VALIDATION_ERROR.getMessage() : fieldError.getDefaultMessage();
+        }
+        if (e instanceof BindException bindException) {
+            FieldError fieldError = bindException.getBindingResult().getFieldError();
+            return fieldError == null ? ErrorCode.VALIDATION_ERROR.getMessage() : fieldError.getDefaultMessage();
+        }
+        if (e instanceof ConstraintViolationException constraintViolationException) {
+            return constraintViolationException.getConstraintViolations().stream()
+                    .findFirst()
+                    .map(item -> item.getMessage() == null ? ErrorCode.VALIDATION_ERROR.getMessage() : item.getMessage())
+                    .orElse(ErrorCode.VALIDATION_ERROR.getMessage());
+        }
+        return ErrorCode.VALIDATION_ERROR.getMessage();
     }
 }

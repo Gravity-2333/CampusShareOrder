@@ -77,7 +77,7 @@ public class AdminServiceImpl implements AdminService {
         overview.setMetrics(metrics);
         overview.setRecentOrders(getOrders("", "", 1, 5).getList());
         overview.setRecentComplaints(getComplaints("", 1, 5).getList());
-        overview.setRecentLogs(getOperationLogs("", 1, 5).getList());
+        overview.setRecentLogs(getOperationLogs("", "", "", "", 1, 5).getList());
         return overview;
     }
 
@@ -300,12 +300,40 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public PageVO<AdminCapitalRecordVO> getCapitalRecords(String type, Integer page, Integer pageSize) {
+    public PageVO<AdminCapitalRecordVO> getCapitalRecords(String keyword, String type, String status, Integer page, Integer pageSize) {
         Page<CapitalRecord> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<CapitalRecord> wrapper = new LambdaQueryWrapper<>();
 
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String trimmedKeyword = keyword.trim();
+            List<Long> orderIds = groupOrderMapper.selectList(new LambdaQueryWrapper<GroupOrder>()
+                    .like(GroupOrder::getOrderNo, trimmedKeyword)
+                    .or().like(GroupOrder::getProductName, trimmedKeyword)
+                    .or().like(GroupOrder::getPickupPoint, trimmedKeyword))
+                    .stream().map(GroupOrder::getId).collect(Collectors.toList());
+            List<Long> userIds = userAccountMapper.selectList(new LambdaQueryWrapper<UserAccount>()
+                    .like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword))
+                    .stream().map(UserAccount::getId).collect(Collectors.toList());
+
+            wrapper.and(w -> {
+                w.like(CapitalRecord::getBizNo, trimmedKeyword)
+                        .or().like(CapitalRecord::getRemark, trimmedKeyword);
+                if (!orderIds.isEmpty()) {
+                    w.or().in(CapitalRecord::getGroupOrderId, orderIds);
+                }
+                if (!userIds.isEmpty()) {
+                    w.or().in(CapitalRecord::getUserId, userIds);
+                }
+            });
+        }
+
         if (type != null && !type.trim().isEmpty()) {
-            wrapper.eq(CapitalRecord::getType, type);
+            wrapper.eq(CapitalRecord::getType, type.trim());
+        }
+
+        if (status != null && !status.trim().isEmpty()) {
+            wrapper.eq(CapitalRecord::getStatus, status.trim());
         }
 
         wrapper.orderByDesc(CapitalRecord::getCreatedAt);
@@ -331,12 +359,58 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public PageVO<AdminOperationLogVO> getOperationLogs(String action, Integer page, Integer pageSize) {
+    public PageVO<AdminOperationLogVO> getOperationLogs(String keyword, String action, String operatorType, String bizType, Integer page, Integer pageSize) {
         Page<OperationLog> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<>();
 
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String trimmedKeyword = keyword.trim();
+            List<Long> orderIds = groupOrderMapper.selectList(new LambdaQueryWrapper<GroupOrder>()
+                    .like(GroupOrder::getOrderNo, trimmedKeyword)
+                    .or().like(GroupOrder::getProductName, trimmedKeyword))
+                    .stream().map(GroupOrder::getId).collect(Collectors.toList());
+            List<Long> complaintIds = complaintMapper.selectList(new LambdaQueryWrapper<Complaint>()
+                    .like(Complaint::getComplaintNo, trimmedKeyword)
+                    .or().like(Complaint::getContent, trimmedKeyword))
+                    .stream().map(Complaint::getId).collect(Collectors.toList());
+            List<Long> userIds = userAccountMapper.selectList(new LambdaQueryWrapper<UserAccount>()
+                    .like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword))
+                    .stream().map(UserAccount::getId).collect(Collectors.toList());
+            List<Long> adminIds = adminAccountMapper.selectList(new LambdaQueryWrapper<AdminAccount>()
+                    .like(AdminAccount::getUsername, trimmedKeyword))
+                    .stream().map(AdminAccount::getId).collect(Collectors.toList());
+
+            wrapper.and(w -> {
+                w.like(OperationLog::getAction, trimmedKeyword)
+                        .or().like(OperationLog::getDetailJson, trimmedKeyword)
+                        .or().like(OperationLog::getBizType, trimmedKeyword);
+                if (!orderIds.isEmpty()) {
+                    w.or(n -> n.eq(OperationLog::getBizType, "ORDER").in(OperationLog::getBizId, orderIds));
+                }
+                if (!complaintIds.isEmpty()) {
+                    w.or(n -> n.eq(OperationLog::getBizType, "COMPLAINT").in(OperationLog::getBizId, complaintIds));
+                }
+                if (!userIds.isEmpty()) {
+                    w.or(n -> n.eq(OperationLog::getBizType, "USER").in(OperationLog::getBizId, userIds))
+                            .or(n -> n.eq(OperationLog::getOperatorType, "USER").in(OperationLog::getOperatorId, userIds));
+                }
+                if (!adminIds.isEmpty()) {
+                    w.or(n -> n.eq(OperationLog::getOperatorType, "ADMIN").in(OperationLog::getOperatorId, adminIds));
+                }
+            });
+        }
+
         if (action != null && !action.trim().isEmpty()) {
-            wrapper.like(OperationLog::getAction, action);
+            wrapper.like(OperationLog::getAction, action.trim());
+        }
+
+        if (operatorType != null && !operatorType.trim().isEmpty()) {
+            wrapper.eq(OperationLog::getOperatorType, operatorType.trim());
+        }
+
+        if (bizType != null && !bizType.trim().isEmpty()) {
+            wrapper.eq(OperationLog::getBizType, bizType.trim());
         }
 
         wrapper.orderByDesc(OperationLog::getCreatedAt);

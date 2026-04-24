@@ -79,9 +79,12 @@ export const banUser = async (userId, payload = { reason: '管理员封禁用户
     const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
     draft.logs.unshift({
       action: 'USER_BANNED',
+      bizType: 'USER',
       createdAt: timestamp(),
+      detail: payload.reason || '',
       logId: nextLogId,
       operatorName: '管理员',
+      operatorType: 'ADMIN',
       targetNo: `USER-${user.userId}`,
     })
 
@@ -111,9 +114,12 @@ export const unbanUser = async (userId) => {
     const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
     draft.logs.unshift({
       action: 'USER_UNBANNED',
+      bizType: 'USER',
       createdAt: timestamp(),
+      detail: '',
       logId: nextLogId,
       operatorName: '管理员',
+      operatorType: 'ADMIN',
       targetNo: `USER-${user.userId}`,
     })
   })
@@ -177,9 +183,12 @@ export const cancelOrder = async (orderId, payload = { reason: '管理员取消�
     const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
     draft.logs.unshift({
       action: 'ORDER_CANCELED_BY_ADMIN',
+      bizType: 'ORDER',
       createdAt: timestamp(),
+      detail: payload.reason || '',
       logId: nextLogId,
       operatorName: '管理员',
+      operatorType: 'ADMIN',
       targetNo: order.orderNo,
     })
 
@@ -241,9 +250,12 @@ export const handleComplaint = async (complaintId, payload) => {
     const nextLogId = Math.max(0, ...draft.logs.map((item) => item.logId)) + 1
     draft.logs.unshift({
       action: 'COMPLAINT_HANDLED',
+      bizType: 'COMPLAINT',
       createdAt: complaint.handledAt,
+      detail: payload.handleResult || '',
       logId: nextLogId,
       operatorName: '管理员',
+      operatorType: 'ADMIN',
       targetNo: complaint.complaintNo,
     })
   })
@@ -258,8 +270,20 @@ export const getCapitalRecords = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
+  const keyword = String(params.keyword || '').trim()
+  const status = String(params.status || '').trim()
   const type = String(params.type || '').trim()
-  const list = getDatabase().records.filter((item) => !type || item.type === type)
+  const list = getDatabase().records.filter((item) => {
+    const matchKeyword =
+      !keyword ||
+      item.bizNo?.includes(keyword) ||
+      item.orderNo?.includes(keyword) ||
+      item.userNickname?.includes(keyword) ||
+      item.remark?.includes(keyword)
+    const matchStatus = !status || item.status === status
+    const matchType = !type || item.type === type
+    return matchKeyword && matchStatus && matchType
+  })
 
   return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }
@@ -269,7 +293,21 @@ export const getOperationLogs = async (params = {}) => {
   await sleep()
 
   const action = String(params.action || '').trim()
-  const list = getDatabase().logs.filter((item) => !action || item.action.includes(action))
+  const bizType = String(params.bizType || '').trim()
+  const keyword = String(params.keyword || '').trim()
+  const operatorType = String(params.operatorType || '').trim()
+  const list = getDatabase().logs.filter((item) => {
+    const matchAction = !action || item.action?.includes(action)
+    const matchBizType = !bizType || item.bizType === bizType
+    const matchKeyword =
+      !keyword ||
+      item.action?.includes(keyword) ||
+      item.detail?.includes(keyword) ||
+      item.operatorName?.includes(keyword) ||
+      item.targetNo?.includes(keyword)
+    const matchOperatorType = !operatorType || item.operatorType === operatorType
+    return matchAction && matchBizType && matchKeyword && matchOperatorType
+  })
 
   return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }

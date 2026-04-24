@@ -13,6 +13,9 @@ const adminStore = useAdminStore()
 
 const filters = reactive({
   action: '',
+  bizType: '',
+  keyword: '',
+  operatorType: '',
   page: 1,
   pageSize: 10,
 })
@@ -46,7 +49,7 @@ const summaryText = computed(() => {
     return '当前筛选条件下没有日志记录。'
   }
 
-  if (filters.action) {
+  if (filters.action || filters.bizType || filters.keyword || filters.operatorType) {
     return '当前列表已经按动作关键字过滤，适合快速排查一类后台操作链路。'
   }
 
@@ -68,6 +71,9 @@ const submitFilters = async () => {
 
 const resetFilters = async () => {
   filters.action = ''
+  filters.bizType = ''
+  filters.keyword = ''
+  filters.operatorType = ''
   filters.page = 1
   filters.pageSize = 10
   await loadLogs()
@@ -104,12 +110,49 @@ onMounted(loadLogs)
 
       <div class="toolbar-row">
         <el-input
-          v-model="filters.action"
-          placeholder="按动作关键字筛选，例如 COMPLAINT"
+          v-model="filters.keyword"
+          placeholder="Search action, target or detail"
           clearable
           @keyup.enter="submitFilters"
         />
-        <div />
+        <el-input
+          v-model="filters.action"
+          placeholder="By action, e.g. COMPLAINT"
+          clearable
+          @keyup.enter="submitFilters"
+        />
+        <el-select
+          v-model="filters.operatorType"
+          placeholder="Operator"
+          clearable
+        >
+          <el-option
+            label="ADMIN"
+            value="ADMIN"
+          />
+          <el-option
+            label="USER"
+            value="USER"
+          />
+        </el-select>
+        <el-select
+          v-model="filters.bizType"
+          placeholder="Biz type"
+          clearable
+        >
+          <el-option
+            label="USER"
+            value="USER"
+          />
+          <el-option
+            label="ORDER"
+            value="ORDER"
+          />
+          <el-option
+            label="COMPLAINT"
+            value="COMPLAINT"
+          />
+        </el-select>
         <el-button
           type="primary"
           @click="submitFilters"
@@ -148,6 +191,14 @@ onMounted(loadLogs)
               label="操作人"
             />
             <el-table-column
+              prop="operatorType"
+              label="操作者类型"
+            />
+            <el-table-column
+              prop="bizType"
+              label="业务类型"
+            />
+            <el-table-column
               prop="targetNo"
               label="目标编号"
             />
@@ -175,6 +226,8 @@ onMounted(loadLogs)
             </div>
             <ul class="mobile-record-fields">
               <li><span>操作人</span><strong>{{ row.operatorName || '--' }}</strong></li>
+              <li><span>操作者类型</span><strong>{{ row.operatorType || '--' }}</strong></li>
+              <li><span>业务类型</span><strong>{{ row.bizType || '--' }}</strong></li>
               <li><span>目标编号</span><strong>{{ row.targetNo || '--' }}</strong></li>
               <li><span>说明</span><strong>{{ row.detail || '--' }}</strong></li>
             </ul>

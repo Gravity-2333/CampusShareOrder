@@ -120,22 +120,27 @@ public class AdminController {
 
     @GetMapping("/records/capital")
     public ApiResponse<PageVO<AdminCapitalRecordVO>> getCapitalRecords(
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String type,
+            @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
             HttpServletRequest request) {
         requireAdmin(request);
-        return ApiResponse.success(adminService.getCapitalRecords(type, page, pageSize));
+        return ApiResponse.success(adminService.getCapitalRecords(keyword, type, status, page, pageSize));
     }
 
     @GetMapping("/records/logs")
     public ApiResponse<PageVO<AdminOperationLogVO>> getOperationLogs(
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String action,
+            @RequestParam(defaultValue = "") String operatorType,
+            @RequestParam(defaultValue = "") String bizType,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
             HttpServletRequest request) {
         requireAdmin(request);
-        return ApiResponse.success(adminService.getOperationLogs(action, page, pageSize));
+        return ApiResponse.success(adminService.getOperationLogs(keyword, action, operatorType, bizType, page, pageSize));
     }
 
     private Long requireAdmin(HttpServletRequest request) {

@@ -37,7 +37,7 @@ public interface AdminService {
 
     void handleComplaint(Long complaintId, HandleComplaintRequest request, Long adminId);
 
-    PageVO<AdminCapitalRecordVO> getCapitalRecords(String type, Integer page, Integer pageSize);
+    PageVO<AdminCapitalRecordVO> getCapitalRecords(String keyword, String type, String status, Integer page, Integer pageSize);
 
-    PageVO<AdminOperationLogVO> getOperationLogs(String action, Integer page, Integer pageSize);
+    PageVO<AdminOperationLogVO> getOperationLogs(String keyword, String action, String operatorType, String bizType, Integer page, Integer pageSize);
 }

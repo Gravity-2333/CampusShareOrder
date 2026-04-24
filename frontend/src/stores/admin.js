@@ -42,6 +42,9 @@ export const useAdminStore = defineStore('admin', {
     },
     logsFilters: {
       action: '',
+      bizType: '',
+      keyword: '',
+      operatorType: '',
       page: 1,
       pageSize: 10,
     },
@@ -62,8 +65,10 @@ export const useAdminStore = defineStore('admin', {
     ordersLoading: false,
     ordersPage: defaultPageData(),
     recordsFilters: {
+      keyword: '',
       page: 1,
       pageSize: 10,
+      status: '',
       type: '',
     },
     recordsLoading: false,

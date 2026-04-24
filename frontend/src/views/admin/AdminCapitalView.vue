@@ -12,8 +12,10 @@ import { formatCapitalRecordType, formatCurrency, formatDateTime } from '../../u
 const adminStore = useAdminStore()
 
 const filters = reactive({
+  keyword: '',
   page: 1,
   pageSize: 10,
+  status: '',
   type: '',
 })
 
@@ -46,7 +48,7 @@ const summaryText = computed(() => {
     return '当前筛选条件下没有资金记录。'
   }
 
-  if (filters.type) {
+  if (filters.keyword || filters.status || filters.type) {
     return '当前列表已经按流水类型筛选，适合集中查看同一类资金流转。'
   }
 
@@ -67,8 +69,10 @@ const submitFilters = async () => {
 }
 
 const resetFilters = async () => {
+  filters.keyword = ''
   filters.page = 1
   filters.pageSize = 10
+  filters.status = ''
   filters.type = ''
   await loadRecords()
 }
@@ -103,6 +107,12 @@ onMounted(loadRecords)
       </p>
 
       <div class="toolbar-row">
+        <el-input
+          v-model="filters.keyword"
+          placeholder="Search biz no, order, user or remark"
+          clearable
+          @keyup.enter="submitFilters"
+        />
         <el-select
           v-model="filters.type"
           placeholder="按流水类型筛选"
@@ -125,7 +135,16 @@ onMounted(loadRecords)
             value="SETTLE_TO_CREATOR"
           />
         </el-select>
-        <div />
+        <el-select
+          v-model="filters.status"
+          placeholder="By status"
+          clearable
+        >
+          <el-option
+            label="SUCCESS"
+            value="SUCCESS"
+          />
+        </el-select>
         <el-button
           type="primary"
           @click="submitFilters"
@@ -172,6 +191,10 @@ onMounted(loadRecords)
               prop="orderNo"
               label="关联订单"
             />
+            <el-table-column
+              prop="status"
+              label="状态"
+            />
             <el-table-column label="金额">
               <template #default="{ row }">
                 {{ formatCurrency(row.amount) }}
@@ -202,6 +225,7 @@ onMounted(loadRecords)
             <ul class="mobile-record-fields">
               <li><span>用户</span><strong>{{ row.userNickname || '--' }}</strong></li>
               <li><span>关联订单</span><strong>{{ row.orderNo || '--' }}</strong></li>
+              <li><span>状态</span><strong>{{ row.status || '--' }}</strong></li>
               <li><span>金额</span><strong>{{ formatCurrency(row.amount) }}</strong></li>
               <li><span>备注</span><strong>{{ row.remark || '--' }}</strong></li>
               <li><span>时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>

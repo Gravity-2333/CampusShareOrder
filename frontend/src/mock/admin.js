@@ -188,7 +188,10 @@ export const getComplaints = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
-  return pageResult(getDatabase().complaints, Number(params.page || 1), Number(params.pageSize || 10))
+  const status = String(params.status || '').trim()
+  const list = getDatabase().complaints.filter((item) => !status || item.status === status)
+
+  return pageResult(list, Number(params.page || 1), Number(params.pageSize || 10))
 }
 
 export const getComplaintDetail = async (complaintId) => {

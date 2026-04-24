@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -13,6 +13,12 @@ import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../.
 
 const router = useRouter()
 const adminStore = useAdminStore()
+
+const filters = reactive({
+  page: 1,
+  pageSize: 10,
+  status: '',
+})
 
 const stats = computed(() => [
   {
@@ -37,10 +43,22 @@ const summaryText = computed(() => {
 
 const loadComplaints = async () => {
   try {
-    await adminStore.loadComplaints({ page: 1, pageSize: 10 })
+    await adminStore.loadComplaints(filters)
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const handleSearch = async () => {
+  filters.page = 1
+  await loadComplaints()
+}
+
+const handleReset = async () => {
+  filters.status = ''
+  filters.page = 1
+  filters.pageSize = 10
+  await loadComplaints()
 }
 
 const handleComplaint = async (row) => {
@@ -71,7 +89,9 @@ const handleComplaint = async (row) => {
 
 const handlePageChange = async ({ page, pageSize }) => {
   try {
-    await adminStore.loadComplaints({ page, pageSize })
+    filters.page = page
+    filters.pageSize = pageSize
+    await adminStore.loadComplaints(filters)
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -104,6 +124,31 @@ onMounted(loadComplaints)
         <span class="table-caption">
           共 {{ adminStore.complaintsPage.total }} 条投诉，当前待处理 {{ stats[1].value }} 条。
         </span>
+        <div class="filter-panel compact-filter-panel">
+          <el-select
+            v-model="filters.status"
+            clearable
+            placeholder="按状态筛选"
+          >
+            <el-option
+              label="待处理"
+              value="PENDING"
+            />
+            <el-option
+              label="已处理"
+              value="PROCESSED"
+            />
+          </el-select>
+          <el-button
+            type="primary"
+            @click="handleSearch"
+          >
+            查询
+          </el-button>
+          <el-button @click="handleReset">
+            重置
+          </el-button>
+        </div>
       </div>
 
       <div

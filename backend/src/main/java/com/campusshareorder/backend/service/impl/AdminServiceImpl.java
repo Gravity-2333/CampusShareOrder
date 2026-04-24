@@ -76,14 +76,14 @@ public class AdminServiceImpl implements AdminService {
         AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
         overview.setMetrics(metrics);
         overview.setRecentOrders(getOrders("", 1, 5).getList());
-        overview.setRecentComplaints(getComplaints(1, 5).getList());
+        overview.setRecentComplaints(getComplaints("", 1, 5).getList());
         overview.setRecentLogs(getOperationLogs("", 1, 5).getList());
         return overview;
     }
 
     @Override
     public PageVO<AdminUserListItemVO> getUsers(String keyword, String status, Integer page, Integer pageSize) {
-        Page<UserAccount> pageRequest = new Page<>(page, pageSize);
+        Page<UserAccount> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
 
         if (keyword != null && !keyword.trim().isEmpty()) {
@@ -152,7 +152,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public PageVO<OrderListItemVO> getOrders(String status, Integer page, Integer pageSize) {
-        Page<GroupOrder> pageRequest = new Page<>(page, pageSize);
+        Page<GroupOrder> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
 
         if (status != null && !status.trim().isEmpty()) {
@@ -222,9 +222,14 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public PageVO<ComplaintListItemVO> getComplaints(Integer page, Integer pageSize) {
-        Page<Complaint> pageRequest = new Page<>(page, pageSize);
+    public PageVO<ComplaintListItemVO> getComplaints(String status, Integer page, Integer pageSize) {
+        Page<Complaint> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<Complaint> wrapper = new LambdaQueryWrapper<>();
+
+        if (status != null && !status.trim().isEmpty()) {
+            wrapper.eq(Complaint::getStatus, status.trim());
+        }
+
         wrapper.orderByDesc(Complaint::getCreatedAt);
         Page<Complaint> complaintPage = complaintMapper.selectPage(pageRequest, wrapper);
 
@@ -289,7 +294,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public PageVO<AdminCapitalRecordVO> getCapitalRecords(String type, Integer page, Integer pageSize) {
-        Page<CapitalRecord> pageRequest = new Page<>(page, pageSize);
+        Page<CapitalRecord> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<CapitalRecord> wrapper = new LambdaQueryWrapper<>();
 
         if (type != null && !type.trim().isEmpty()) {
@@ -320,7 +325,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public PageVO<AdminOperationLogVO> getOperationLogs(String action, Integer page, Integer pageSize) {
-        Page<OperationLog> pageRequest = new Page<>(page, pageSize);
+        Page<OperationLog> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<OperationLog> wrapper = new LambdaQueryWrapper<>();
 
         if (action != null && !action.trim().isEmpty()) {
@@ -579,5 +584,16 @@ public class AdminServiceImpl implements AdminService {
 
     private String denormalizeOrderStatus(String status) {
         return status;
+    }
+
+    private long normalizePage(Integer page) {
+        return page == null || page < 1 ? 1 : page;
+    }
+
+    private long normalizePageSize(Integer pageSize) {
+        if (pageSize == null || pageSize < 1) {
+            return 10;
+        }
+        return Math.min(pageSize, 100);
     }
 }

@@ -117,7 +117,7 @@ export const useAdminStore = defineStore('admin', {
 
         const refreshTasks = [
           this.loadUsers(this.usersFilters),
-          this.loadDashboardMetrics(),
+          this.loadDashboardOverview(),
         ]
 
         if (this.userDetail?.userId === Number(row.userId)) {
@@ -162,7 +162,7 @@ export const useAdminStore = defineStore('admin', {
 
         const refreshTasks = [
           this.loadOrders(this.ordersFilters),
-          this.loadDashboardMetrics(),
+          this.loadDashboardOverview(),
         ]
 
         if (this.orderDetail?.basicInfo?.orderId === Number(orderId)) {
@@ -208,7 +208,7 @@ export const useAdminStore = defineStore('admin', {
         const refreshTasks = [
           this.loadComplaints(this.complaintsFilters),
           this.loadOrders(this.ordersFilters),
-          this.loadDashboardMetrics(),
+          this.loadDashboardOverview(),
         ]
 
         if (this.complaintDetail?.complaintId === Number(complaintId)) {

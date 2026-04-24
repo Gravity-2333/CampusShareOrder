@@ -2,6 +2,8 @@ package com.campusshareorder.backend.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.admin.BanUserRequest;
 import com.campusshareorder.backend.dto.admin.CancelOrderRequest;
 import com.campusshareorder.backend.dto.admin.HandleComplaintRequest;
@@ -232,6 +234,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void handleComplaint(Long complaintId, HandleComplaintRequest request, Long adminId) {
         Complaint complaint = requireComplaint(complaintId);
+        if ("PROCESSED".equals(complaint.getStatus())) {
+            throw new BusinessException(ErrorCode.COMPLAINT_ALREADY_PROCESSED);
+        }
+
         complaint.setStatus("PROCESSED");
         complaint.setHandleResult(request == null ? null : request.getHandleResult());
         complaint.setHandledAt(LocalDateTime.now());
@@ -246,6 +252,7 @@ public class AdminServiceImpl implements AdminService {
             refundActiveMembers(order.getId(), "投诉处理取消订单退款");
         }
 
+        applyComplaintCreditPenalty(complaint);
         insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED",
                 request == null ? null : request.getHandleResult());
     }
@@ -383,6 +390,41 @@ public class AdminServiceImpl implements AdminService {
         record.setRemark(remark);
         record.setCreatedAt(LocalDateTime.now());
         capitalRecordMapper.insert(record);
+    }
+
+    private void applyComplaintCreditPenalty(Complaint complaint) {
+        if (complaint.getAccusedUserId() == null) {
+            return;
+        }
+
+        Long existingCount = creditChangeRecordMapper.selectCount(
+                new LambdaQueryWrapper<CreditChangeRecord>()
+                        .eq(CreditChangeRecord::getRelatedComplaintId, complaint.getId())
+                        .eq(CreditChangeRecord::getReasonType, "COMPLAINT_PENALTY")
+        );
+        if (existingCount != null && existingCount > 0) {
+            return;
+        }
+
+        UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
+        if (accusedUser == null) {
+            return;
+        }
+
+        int delta = -10;
+        int currentScore = accusedUser.getCreditScore() == null ? 0 : accusedUser.getCreditScore();
+        accusedUser.setCreditScore(Math.max(0, currentScore + delta));
+        userAccountMapper.updateById(accusedUser);
+
+        CreditChangeRecord record = new CreditChangeRecord();
+        record.setUserId(accusedUser.getId());
+        record.setChangeValue(delta);
+        record.setReasonType("COMPLAINT_PENALTY");
+        record.setRelatedOrderId(complaint.getGroupOrderId());
+        record.setRelatedComplaintId(complaint.getId());
+        record.setRemark("投诉成立扣减信用分");
+        record.setCreatedAt(LocalDateTime.now());
+        creditChangeRecordMapper.insert(record);
     }
 
     private void insertOperationLog(String operatorType, Long operatorId, String bizType, Long bizId, String action, String detail) {

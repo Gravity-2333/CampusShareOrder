@@ -187,6 +187,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void cancelOrder(Long orderId, CancelOrderRequest request, Long adminId) {
         GroupOrder order = requireOrder(orderId);
+        if ("COMPLETED".equals(order.getStatus()) || "CANCELED".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "终态订单不能取消");
+        }
+
         order.setStatus("CANCELED");
         order.setCancelReason(request == null ? null : request.getReason());
         groupOrderMapper.updateById(order);

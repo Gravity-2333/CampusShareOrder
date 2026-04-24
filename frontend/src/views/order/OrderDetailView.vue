@@ -858,7 +858,7 @@ const confirmAction = async (action) => {
   }
 }
 
-const toApiDateTime = (value) => String(value || '').trim().replace(' ', 'T')
+const toApiDateTime = (value) => String(value || '').trim()
 
 const promptReceiptPayload = async () => {
   const { value: imageUrl } = await ElMessageBox.prompt('请输入凭证图片地址', '上传凭证', {

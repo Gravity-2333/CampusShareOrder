@@ -217,6 +217,9 @@ export const uploadReceipt = async (orderId, payload) => {
     }
 
     order.actualTotalAmount = Number(payload.actualTotalAmount)
+    order.expectedDeliveryStartAt = payload.expectedDeliveryStartAt || order.expectedDeliveryStartAt
+    order.expectedDeliveryEndAt = payload.expectedDeliveryEndAt || order.expectedDeliveryEndAt
+    order.receiptImageUrl = payload.imageUrl || order.receiptImageUrl
     order.receiptUploadedAt = timestamp()
     order.status = 'WAIT_DELIVERY'
   })

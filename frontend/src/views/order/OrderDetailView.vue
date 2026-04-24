@@ -858,10 +858,25 @@ const confirmAction = async (action) => {
   }
 }
 
-const promptReceiptAmount = async () => {
-  const { value } = await ElMessageBox.prompt('请输入本次拼单的实际总金额', '上传凭证', {
+const toApiDateTime = (value) => String(value || '').trim().replace(' ', 'T')
+
+const promptReceiptPayload = async () => {
+  const { value: imageUrl } = await ElMessageBox.prompt('请输入凭证图片地址', '上传凭证', {
     cancelButtonText: '取消',
-    confirmButtonText: '提交',
+    confirmButtonText: '下一步',
+    inputPlaceholder: '例如 https://example.com/receipt.jpg',
+    inputValidator: (inputValue) => {
+      if (!inputValue?.trim()) {
+        return '请输入凭证图片地址'
+      }
+
+      return true
+    },
+  })
+
+  const { value: amount } = await ElMessageBox.prompt('请输入本次拼单的实际总金额', '上传凭证', {
+    cancelButtonText: '取消',
+    confirmButtonText: '下一步',
     inputPattern: /^(0|[1-9]\d*)(\.\d{1,2})?$/,
     inputPlaceholder: '例如 54.00',
     inputType: 'number',
@@ -878,8 +893,39 @@ const promptReceiptAmount = async () => {
     },
   })
 
+  const { value: startAt } = await ElMessageBox.prompt('请输入预计开始送达时间', '上传凭证', {
+    cancelButtonText: '取消',
+    confirmButtonText: '下一步',
+    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
+    inputValidator: (inputValue) => {
+      if (!inputValue?.trim()) {
+        return '请输入预计开始送达时间'
+      }
+
+      return true
+    },
+  })
+
+  const { value: endAt } = await ElMessageBox.prompt('请输入预计最晚送达时间', '上传凭证', {
+    cancelButtonText: '取消',
+    confirmButtonText: '提交',
+    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+    inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
+    inputValidator: (inputValue) => {
+      if (!inputValue?.trim()) {
+        return '请输入预计最晚送达时间'
+      }
+
+      return true
+    },
+  })
+
   return {
-    actualTotalAmount: Number(value),
+    actualTotalAmount: Number(amount),
+    expectedDeliveryEndAt: toApiDateTime(endAt),
+    expectedDeliveryStartAt: toApiDateTime(startAt),
+    imageUrl: imageUrl.trim(),
   }
 }
 
@@ -926,7 +972,7 @@ const runAction = async (action) => {
     }
 
     if (action === 'upload') {
-      payload = await promptReceiptAmount()
+      payload = await promptReceiptPayload()
     }
 
     await orderStore.runDetailAction(currentOrderId.value, action, payload)

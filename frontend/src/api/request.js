@@ -42,6 +42,8 @@ const normalizeResponseStrings = (payload) => {
   return payload
 }
 
+const shouldClearSession = (code) => [401, 40101, 40102, 40302].includes(Number(code))
+
 request.interceptors.request.use((config) => {
   const token = getAccessToken()
 
@@ -61,7 +63,7 @@ request.interceptors.response.use(
         const error = new Error(payload.message || '请求失败')
         error.code = payload.code
 
-        if (payload.code === 401 || payload.code === 40101 || payload.code === 40102) {
+        if (shouldClearSession(payload.code)) {
           clearSessionStorage()
         }
 
@@ -80,7 +82,7 @@ request.interceptors.response.use(
       const wrappedError = new Error(responsePayload.message || '请求失败')
       wrappedError.code = responsePayload.code
 
-      if (wrappedError.code === 401 || wrappedError.code === 40101 || wrappedError.code === 40102) {
+      if (shouldClearSession(wrappedError.code)) {
         clearSessionStorage()
       }
 

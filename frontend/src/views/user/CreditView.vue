@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
+import AppPagination from '../../components/common/AppPagination.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
@@ -26,7 +27,7 @@ const stats = computed(() => [
   },
   {
     label: '变更记录',
-    value: userStore.credit.records.length,
+    value: userStore.credit.total || userStore.credit.records.length,
     hint: '来自 UserCreditVO.records',
   },
 ])
@@ -53,12 +54,16 @@ const formatRelatedBiz = (row) => {
   return '--'
 }
 
-const loadCredit = async () => {
+const loadCredit = async (params = { page: 1, pageSize: 10 }) => {
   try {
-    await Promise.all([userStore.loadCredit(), userStore.ensureProfileLoaded()])
+    await Promise.all([userStore.loadCredit(params), userStore.ensureProfileLoaded()])
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const handlePageChange = async ({ page, pageSize }) => {
+  await loadCredit({ page, pageSize })
 }
 
 onMounted(loadCredit)
@@ -86,7 +91,7 @@ onMounted(loadCredit)
 
       <div class="table-toolbar">
         <span class="table-caption">
-          当前信用分 <strong>{{ userStore.credit.creditScore }}</strong>，共 {{ userStore.credit.records.length }} 条变更记录。
+          当前信用分 <strong>{{ userStore.credit.creditScore }}</strong>，共 {{ userStore.credit.total || userStore.credit.records.length }} 条变更记录。
         </span>
         <div class="page-actions">
           <el-button @click="router.push('/profile')">
@@ -158,6 +163,13 @@ onMounted(loadCredit)
             </ul>
           </article>
         </div>
+        <AppPagination
+          :page="userStore.credit.page"
+          :page-size="userStore.credit.pageSize"
+          :pages="userStore.credit.pages"
+          :total="userStore.credit.total"
+          @change="handlePageChange"
+        />
       </div>
       <EmptyState
         v-else

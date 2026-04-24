@@ -71,22 +71,28 @@ export const updateUserProfile = async (payload) => {
   }
 }
 
-export const getUserCredit = async () => {
+export const getUserCredit = async (params = {}) => {
   const user = await requireUser()
+  const records = user.creditRecords.map((record, index) => ({
+    currentScore: record.currentScore ?? user.creditScore,
+    delta: record.delta,
+    reasonType: record.reasonType || 'INITIAL',
+    recordId: record.recordId || index + 1,
+    relatedComplaintId: record.relatedComplaintId || null,
+    relatedOrderId: record.relatedOrderId || null,
+    remark: record.remark || record.changeReason,
+    changeReason: record.changeReason || record.remark,
+    createdAt: record.createdAt,
+  }))
+  const page = pageResult(records, Number(params.page || 1), Number(params.pageSize || 10))
 
   return {
     creditScore: user.creditScore,
-    records: user.creditRecords.map((record, index) => ({
-      currentScore: record.currentScore ?? user.creditScore,
-      delta: record.delta,
-      reasonType: record.reasonType || 'INITIAL',
-      recordId: record.recordId || index + 1,
-      relatedComplaintId: record.relatedComplaintId || null,
-      relatedOrderId: record.relatedOrderId || null,
-      remark: record.remark || record.changeReason,
-      changeReason: record.changeReason || record.remark,
-      createdAt: record.createdAt,
-    })),
+    page: page.page,
+    pageSize: page.pageSize,
+    pages: page.pages,
+    records: page.list,
+    total: page.total,
   }
 }
 

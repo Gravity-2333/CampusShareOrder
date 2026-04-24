@@ -17,7 +17,11 @@ const defaultSession = () => ({
 
 const defaultCredit = () => ({
   creditScore: 0,
+  page: 1,
+  pageSize: 10,
+  pages: 0,
   records: [],
+  total: 0,
 })
 
 export const useUserStore = defineStore('user', {
@@ -198,12 +202,16 @@ export const useUserStore = defineStore('user', {
         this.savingProfile = false
       }
     },
-    async loadCredit() {
+    async loadCredit(params = { page: 1, pageSize: 10 }) {
       this.creditLoading = true
 
       try {
-        const credit = await getUserCredit()
-        this.credit = credit
+        const credit = await getUserCredit(params)
+        this.credit = {
+          ...defaultCredit(),
+          ...credit,
+          records: Array.isArray(credit.records) ? credit.records : [],
+        }
         return credit
       } finally {
         this.creditLoading = false

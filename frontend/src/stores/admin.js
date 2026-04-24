@@ -249,21 +249,6 @@ export const useAdminStore = defineStore('admin', {
         this.logsLoading = false
       }
     },
-    async loadDashboardMetrics() {
-      const [users, orders, complaints] = await Promise.all([
-        getAdminUsers({ page: 1, pageSize: 100 }),
-        getAdminOrders({ page: 1, pageSize: 100 }),
-        getAdminComplaints({ page: 1, pageSize: 100 }),
-      ])
-
-      this.metrics = {
-        complaints: complaints.total,
-        orders: orders.total,
-        users: users.total,
-      }
-
-      return this.metrics
-    },
     async loadDashboardOverview() {
       this.dashboardLoading = true
 

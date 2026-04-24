@@ -1,6 +1,8 @@
 package com.campusshareorder.backend.controller.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.dto.user.UpdateProfileRequest;
@@ -41,17 +43,13 @@ public class UserController {
     @GetMapping("/my-orders")
     public ApiResponse<PageVO<MyOrderListItemVO>> getMyOrders(MyOrderQueryRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        PageVO<MyOrderListItemVO> page = orderService.getMyOrders(request, userId);
-        return ApiResponse.success(page);
+        return ApiResponse.success(orderService.getMyOrders(request, userId));
     }
 
     @PostMapping("/verify-student")
     public ApiResponse<VerifyStudentVO> verifyStudent(@Valid @RequestBody VerifyStudentRequest request) {
         Long userId = SecurityUtils.getRequiredCurrentUserId();
-        UserAccount user = userAccountMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        UserAccount user = requireUser(userId);
 
         user.setStudentNo(request.getStudentNo());
         user.setIsVerified(true);
@@ -65,11 +63,7 @@ public class UserController {
 
     @GetMapping("/profile")
     public ApiResponse<UserProfileVO> getProfile() {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
-        UserAccount user = userAccountMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
 
         UserProfileVO vo = new UserProfileVO();
         vo.setUserId(user.getId());
@@ -86,11 +80,7 @@ public class UserController {
 
     @PutMapping("/profile")
     public ApiResponse<Void> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
-        UserAccount user = userAccountMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
 
         if (request.getNickname() != null && !request.getNickname().trim().isEmpty()) {
             user.setNickname(request.getNickname().trim());
@@ -105,14 +95,10 @@ public class UserController {
 
     @GetMapping("/credit")
     public ApiResponse<UserCreditVO> getCreditRecords() {
-        Long userId = SecurityUtils.getRequiredCurrentUserId();
-        UserAccount user = userAccountMapper.selectById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        UserAccount user = requireUser(SecurityUtils.getRequiredCurrentUserId());
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CreditChangeRecord::getUserId, userId)
+        wrapper.eq(CreditChangeRecord::getUserId, user.getId())
                 .orderByDesc(CreditChangeRecord::getCreatedAt);
         List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
 
@@ -134,5 +120,13 @@ public class UserController {
         creditVO.setCreditScore(user.getCreditScore());
         creditVO.setRecords(items);
         return ApiResponse.success(creditVO);
+    }
+
+    private UserAccount requireUser(Long userId) {
+        UserAccount user = userAccountMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+        }
+        return user;
     }
 }

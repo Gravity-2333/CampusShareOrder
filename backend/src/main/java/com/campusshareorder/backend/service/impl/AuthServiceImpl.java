@@ -2,6 +2,8 @@ package com.campusshareorder.backend.service.impl;
 
 import cn.hutool.crypto.digest.BCrypt;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.auth.AdminLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserLoginRequest;
 import com.campusshareorder.backend.dto.auth.UserRegisterRequest;
@@ -33,7 +35,7 @@ public class AuthServiceImpl implements AuthService {
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserAccount::getPhone, request.getPhone());
         if (userAccountMapper.selectCount(wrapper) > 0) {
-            throw new RuntimeException("该手机号已注册");
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该手机号已注册");
         }
 
         UserAccount user = new UserAccount();
@@ -63,11 +65,11 @@ public class AuthServiceImpl implements AuthService {
         UserAccount user = userAccountMapper.selectOne(wrapper);
 
         if (user == null || !BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
-            throw new RuntimeException("手机号或密码错误");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "手机号或密码错误");
         }
 
         if ("BANNED".equals(user.getStatus())) {
-            throw new RuntimeException("账号已被封禁，请联系管理员");
+            throw new BusinessException(ErrorCode.USER_BANNED, "账号已被封禁，请联系管理员");
         }
 
         String token = jwtUtil.generateToken(user.getId(), user.getPhone(), "USER");
@@ -96,11 +98,11 @@ public class AuthServiceImpl implements AuthService {
         AdminAccount admin = adminAccountMapper.selectOne(wrapper);
 
         if (admin == null || !BCrypt.checkpw(request.getPassword(), admin.getPasswordHash())) {
-            throw new RuntimeException("管理员账号或密码错误");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员账号或密码错误");
         }
 
         if ("BANNED".equals(admin.getStatus())) {
-            throw new RuntimeException("管理员账号已被禁用");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "管理员账号已被禁用");
         }
 
         String token = jwtUtil.generateToken(admin.getId(), admin.getUsername(), "ADMIN");
@@ -122,7 +124,7 @@ public class AuthServiceImpl implements AuthService {
         if ("ADMIN".equals(role)) {
             AdminAccount admin = adminAccountMapper.selectById(currentId);
             if (admin == null) {
-                throw new RuntimeException("管理员不存在");
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员不存在");
             }
 
             CurrentLoginInfoVO vo = new CurrentLoginInfoVO();
@@ -135,7 +137,7 @@ public class AuthServiceImpl implements AuthService {
 
         UserAccount user = userAccountMapper.selectById(currentId);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
         }
 
         CurrentLoginInfoVO vo = new CurrentLoginInfoVO();

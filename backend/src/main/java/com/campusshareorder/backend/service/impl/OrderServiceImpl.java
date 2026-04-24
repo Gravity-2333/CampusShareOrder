@@ -5,6 +5,8 @@ import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
@@ -408,39 +410,106 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Override
     @Transactional
     public void processAutoGroup() {
-        List<GroupOrder> orders = groupOrderMapper.selectList(
-                new LambdaQueryWrapper<GroupOrder>().eq(GroupOrder::getStatus, "OPEN")
-        );
-        orders.forEach(this::tryGroupOrder);
+        recoverCompletedOrders();
     }
 
     @Override
     @Transactional
     public void processTimeoutCancel() {
+        cancelExpiredOpenOrders();
+    }
+
+    @Override
+    @Transactional
+    public void cancelExpiredOpenOrders() {
         List<GroupOrder> expiredOrders = groupOrderMapper.selectList(
                 new LambdaQueryWrapper<GroupOrder>()
                         .eq(GroupOrder::getStatus, "OPEN")
-                        .lt(GroupOrder::getDeadlineAt, LocalDateTime.now())
+                        .le(GroupOrder::getDeadlineAt, LocalDateTime.now())
         );
 
         for (GroupOrder order : expiredOrders) {
             order.setStatus("CANCELED");
-            order.setCancelReason("未成团超时取消");
+            order.setCancelReason("DEADLINE_NOT_GROUPED");
             groupOrderMapper.updateById(order);
+            cancelActiveMembers(order.getId());
+        }
+    }
 
-            List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
-                    new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, order.getId())
+    @Override
+    @Transactional
+    public void openReceiptTimeoutComplaints() {
+        List<GroupOrder> timeoutOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, "GROUPED")
+                        .eq(GroupOrder::getComplaintOpened, false)
+                        .le(GroupOrder::getReceiptUploadDeadlineAt, LocalDateTime.now())
+        );
+
+        for (GroupOrder order : timeoutOrders) {
+            Long receiptCount = orderReceiptMapper.selectCount(
+                    new LambdaQueryWrapper<OrderReceipt>().eq(OrderReceipt::getGroupOrderId, order.getId())
             );
-            for (GroupOrderMember member : members) {
-                if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
-                    member.setRefundAmountTotal(member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount());
-                }
-                if ("ACTIVE".equals(member.getJoinStatus())) {
-                    member.setJoinStatus("CANCELED");
-                }
-                groupOrderMemberMapper.updateById(member);
+            if (receiptCount == 0) {
+                order.setComplaintOpened(true);
+                groupOrderMapper.updateById(order);
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public void openDeliveryTimeoutComplaints() {
+        List<GroupOrder> timeoutOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, "WAIT_DELIVERY")
+                        .eq(GroupOrder::getComplaintOpened, false)
+                        .isNotNull(GroupOrder::getExpectedDeliveryEndAt)
+                        .isNull(GroupOrder::getDeliveredAt)
+                        .le(GroupOrder::getExpectedDeliveryEndAt, LocalDateTime.now().minusMinutes(60))
+        );
+
+        for (GroupOrder order : timeoutOrders) {
+            order.setComplaintOpened(true);
+            groupOrderMapper.updateById(order);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void autoConfirmReceivedMembers() {
+        List<GroupOrder> receiveOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>()
+                        .eq(GroupOrder::getStatus, "WAIT_RECEIVE")
+                        .isNotNull(GroupOrder::getDeliveredAt)
+                        .le(GroupOrder::getDeliveredAt, LocalDateTime.now().minusMinutes(30))
+        );
+
+        for (GroupOrder order : receiveOrders) {
+            List<GroupOrderMember> waitMembers = groupOrderMemberMapper.selectList(
+                    new LambdaQueryWrapper<GroupOrderMember>()
+                            .eq(GroupOrderMember::getGroupOrderId, order.getId())
+                            .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+                            .eq(GroupOrderMember::getReceiveStatus, "WAIT_CONFIRM")
+            );
+
+            for (GroupOrderMember member : waitMembers) {
+                member.setReceiveStatus("AUTO_RECEIVED");
+                member.setReceivedAt(LocalDateTime.now());
+                groupOrderMemberMapper.updateById(member);
+            }
+
+            tryCompleteOrder(order.getId());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void recoverCompletedOrders() {
+        List<GroupOrder> receiveOrders = groupOrderMapper.selectList(
+                new LambdaQueryWrapper<GroupOrder>().eq(GroupOrder::getStatus, "WAIT_RECEIVE")
+        );
+        receiveOrders.forEach(order -> tryCompleteOrder(order.getId()));
     }
 
     private void tryGroupOrder(GroupOrder order) {
@@ -460,6 +529,43 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             order.setStatus("GROUPED");
             order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(30));
             groupOrderMapper.updateById(order);
+        }
+    }
+
+    private void tryCompleteOrder(Long orderId) {
+        GroupOrder order = groupOrderMapper.selectById(orderId);
+        if (order == null || !"WAIT_RECEIVE".equals(order.getStatus())) {
+            return;
+        }
+
+        List<GroupOrderMember> activeMembers = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>()
+                        .eq(GroupOrderMember::getGroupOrderId, orderId)
+                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+        );
+        boolean allReceived = !activeMembers.isEmpty() && activeMembers.stream().allMatch(item ->
+                "RECEIVED".equals(item.getReceiveStatus()) || "AUTO_RECEIVED".equals(item.getReceiveStatus()));
+        if (allReceived) {
+            order.setStatus("COMPLETED");
+            groupOrderMapper.updateById(order);
+        }
+    }
+
+    private void cancelActiveMembers(Long orderId) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
+        );
+        for (GroupOrderMember member : members) {
+            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
+                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+                member.setRefundAmountTotal(refunded.add(netRefund));
+            }
+            if ("ACTIVE".equals(member.getJoinStatus())) {
+                member.setJoinStatus("CANCELED");
+            }
+            groupOrderMemberMapper.updateById(member);
         }
     }
 
@@ -652,7 +758,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private GroupOrder requireOrder(Long orderId) {
         GroupOrder order = groupOrderMapper.selectById(orderId);
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
         return order;
     }
@@ -664,7 +770,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                         .eq(GroupOrderMember::getUserId, userId)
         );
         if (member == null) {
-            throw new RuntimeException("当前账号未加入该订单");
+            throw new BusinessException(ErrorCode.ORDER_MEMBER_REQUIRED);
         }
         return member;
     }

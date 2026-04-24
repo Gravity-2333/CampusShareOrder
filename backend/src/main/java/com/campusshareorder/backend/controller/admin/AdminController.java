@@ -1,5 +1,7 @@
 package com.campusshareorder.backend.controller.admin;
 
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.admin.BanUserRequest;
 import com.campusshareorder.backend.dto.admin.CancelOrderRequest;
@@ -130,7 +132,7 @@ public class AdminController {
     private Long requireAdmin(HttpServletRequest request) {
         String role = request.getAttribute("role") == null ? "" : String.valueOf(request.getAttribute("role"));
         if (!"ADMIN".equals(role)) {
-            throw new RuntimeException("当前账号无权访问管理端接口");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号无权访问管理端接口");
         }
 
         Object userId = request.getAttribute("userId");
@@ -138,6 +140,6 @@ public class AdminController {
             return longValue;
         }
 
-        throw new RuntimeException("管理员未登录");
+        throw new BusinessException(ErrorCode.UNAUTHORIZED, "管理员未登录");
     }
 }

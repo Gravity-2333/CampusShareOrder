@@ -1,5 +1,6 @@
 package com.campusshareorder.backend.controller.order;
 
+import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.JoinOrderRequest;
@@ -30,7 +31,7 @@ public class OrderController {
     public ApiResponse<CreateOrderVO> createOrder(@RequestBody CreateOrderRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         return ApiResponse.success(orderService.createOrder(request, userId));
     }
@@ -44,7 +45,7 @@ public class OrderController {
     public ApiResponse<OrderDetailVO> getOrderDetail(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         return ApiResponse.success(orderService.getOrderDetail(orderId, userId));
     }
@@ -53,7 +54,7 @@ public class OrderController {
     public ApiResponse<Void> joinOrder(@PathVariable Long orderId, @RequestBody JoinOrderRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.joinOrder(orderId, request, userId);
         return ApiResponse.success();
@@ -63,7 +64,7 @@ public class OrderController {
     public ApiResponse<Void> payOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.payOrder(orderId, userId);
         return ApiResponse.success();
@@ -73,7 +74,7 @@ public class OrderController {
     public ApiResponse<Void> exitOrder(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.exitOrder(orderId, userId);
         return ApiResponse.success();
@@ -83,7 +84,7 @@ public class OrderController {
     public ApiResponse<Void> uploadReceipt(@PathVariable Long orderId, @RequestBody UploadReceiptRequest request, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.uploadReceipt(orderId, request, userId);
         return ApiResponse.success();
@@ -93,7 +94,7 @@ public class OrderController {
     public ApiResponse<Void> markDelivered(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.markDelivered(orderId, userId);
         return ApiResponse.success();
@@ -103,7 +104,7 @@ public class OrderController {
     public ApiResponse<Void> confirmReceived(@PathVariable Long orderId, HttpServletRequest httpRequest) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         if (userId == null) {
-            return ApiResponse.error(401, "请先登录");
+            return ApiResponse.error(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMessage());
         }
         orderService.confirmReceived(orderId, userId);
         return ApiResponse.success();

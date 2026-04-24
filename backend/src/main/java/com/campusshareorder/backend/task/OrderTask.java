@@ -11,19 +11,28 @@ public class OrderTask {
 
     private final OrderService orderService;
 
-    /**
-     * 每 5 分钟执行一次自动成团处理
-     */
-    @Scheduled(cron = "0 */5 * * * ?")
-    public void processAutoGroup() {
-        orderService.processAutoGroup();
+    @Scheduled(cron = "0 */1 * * * ?")
+    public void cancelExpiredOpenOrders() {
+        orderService.cancelExpiredOpenOrders();
     }
 
-    /**
-     * 每 3 分钟执行一次超时取消处理
-     */
-    @Scheduled(cron = "0 */3 * * * ?")
-    public void processTimeoutCancel() {
-        orderService.processTimeoutCancel();
+    @Scheduled(cron = "0 */1 * * * ?")
+    public void openReceiptTimeoutComplaints() {
+        orderService.openReceiptTimeoutComplaints();
+    }
+
+    @Scheduled(cron = "0 */1 * * * ?")
+    public void openDeliveryTimeoutComplaints() {
+        orderService.openDeliveryTimeoutComplaints();
+    }
+
+    @Scheduled(cron = "0 */1 * * * ?")
+    public void autoConfirmReceivedMembers() {
+        orderService.autoConfirmReceivedMembers();
+    }
+
+    @Scheduled(cron = "0 */1 * * * ?")
+    public void recoverCompletedOrders() {
+        orderService.recoverCompletedOrders();
     }
 }

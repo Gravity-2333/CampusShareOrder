@@ -1,8 +1,11 @@
 package com.campusshareorder.backend.service.impl;
 
+import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
 import com.campusshareorder.backend.dto.complaint.MyComplaintQueryRequest;
 import com.campusshareorder.backend.entity.Complaint;
@@ -18,7 +21,6 @@ import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintDetailVO;
 import com.campusshareorder.backend.vo.complaint.ComplaintListItemVO;
 import com.campusshareorder.backend.vo.complaint.CreateComplaintVO;
-import cn.hutool.core.util.IdUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
     public CreateComplaintVO createComplaint(CreateComplaintRequest request, Long userId) {
         GroupOrder order = groupOrderMapper.selectById(request.getOrderId());
         if (order == null) {
-            throw new RuntimeException("订单不存在");
+            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
 
         Long accusedUserId = request.getAccusedUserId();
@@ -49,14 +51,14 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         }
 
         if (userId.equals(accusedUserId)) {
-            throw new RuntimeException("不能投诉自己");
+            throw new BusinessException(ErrorCode.COMPLAINT_SELF_NOT_ALLOWED);
         }
 
         LambdaQueryWrapper<GroupOrderMember> memberWrapper = new LambdaQueryWrapper<>();
         memberWrapper.eq(GroupOrderMember::getGroupOrderId, request.getOrderId())
                 .eq(GroupOrderMember::getUserId, accusedUserId);
         if (groupOrderMemberMapper.selectCount(memberWrapper) == 0) {
-            throw new RuntimeException("被投诉人不在该订单中");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "被投诉人不在该订单中");
         }
 
         LambdaQueryWrapper<Complaint> duplicateWrapper = new LambdaQueryWrapper<>();
@@ -64,7 +66,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
                 .eq(Complaint::getComplainantUserId, userId)
                 .eq(Complaint::getAccusedUserId, accusedUserId);
         if (complaintMapper.selectCount(duplicateWrapper) > 0) {
-            throw new RuntimeException("请勿重复投诉");
+            throw new BusinessException(ErrorCode.COMPLAINT_DUPLICATED);
         }
 
         Complaint complaint = new Complaint();
@@ -93,21 +95,28 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
                         .orderByDesc(Complaint::getCreatedAt)
         );
 
-        List<ComplaintListItemVO> list = page.getRecords().stream().map(c -> {
+        List<ComplaintListItemVO> list = page.getRecords().stream().map(complaint -> {
             ComplaintListItemVO vo = new ComplaintListItemVO();
-            vo.setComplaintId(c.getId());
-            vo.setComplaintNo(c.getComplaintNo());
-            vo.setType(c.getType());
-            vo.setStatus(c.getStatus());
-            vo.setCreatedAt(c.getCreatedAt());
+            vo.setComplaintId(complaint.getId());
+            vo.setComplaintNo(complaint.getComplaintNo());
+            vo.setType(complaint.getType());
+            vo.setStatus(complaint.getStatus());
+            vo.setContent(complaint.getContent());
+            vo.setCreatedAt(complaint.getCreatedAt());
+            vo.setHandledAt(complaint.getHandledAt());
+            vo.setHandleResult(complaint.getHandleResult());
+            vo.setOpenedBySystem(false);
 
-            UserAccount accusedUser = userAccountMapper.selectById(c.getAccusedUserId());
+            UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
             if (accusedUser != null) {
+                vo.setAccusedUserId(accusedUser.getId());
                 vo.setAccusedNickname(accusedUser.getNickname());
             }
 
-            GroupOrder order = groupOrderMapper.selectById(c.getGroupOrderId());
+            GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
             if (order != null) {
+                vo.setOrderId(order.getId());
+                vo.setOrderNo(order.getOrderNo());
                 vo.setProductName(order.getProductName());
             }
             return vo;
@@ -120,10 +129,10 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
     public ComplaintDetailVO getComplaintDetail(Long id, Long userId) {
         Complaint complaint = complaintMapper.selectById(id);
         if (complaint == null) {
-            throw new RuntimeException("投诉记录不存在");
+            throw new BusinessException(ErrorCode.COMPLAINT_NOT_FOUND);
         }
         if (!complaint.getComplainantUserId().equals(userId)) {
-            throw new RuntimeException("无权查看此投诉");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此投诉");
         }
 
         ComplaintDetailVO vo = new ComplaintDetailVO();

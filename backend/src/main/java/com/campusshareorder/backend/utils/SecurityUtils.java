@@ -1,30 +1,27 @@
 package com.campusshareorder.backend.utils;
 
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 public class SecurityUtils {
 
-    /**
-     * 获取当前登录用户的ID
-     * @return 用户ID，如果未登录则返回 null
-     */
+    private SecurityUtils() {
+    }
+
     public static Long getCurrentUserId() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Long) {
-            return (Long) authentication.getPrincipal();
+        if (authentication != null && authentication.getPrincipal() instanceof Long userId) {
+            return userId;
         }
         return null;
     }
 
-    /**
-     * 获取当前登录用户的ID，如果未登录则抛出异常
-     * @return 用户ID
-     */
     public static Long getRequiredCurrentUserId() {
         Long userId = getCurrentUserId();
         if (userId == null) {
-            throw new RuntimeException("用户未登录");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
         return userId;
     }

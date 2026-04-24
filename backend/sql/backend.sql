@@ -237,18 +237,18 @@ ON DUPLICATE KEY UPDATE phone = VALUES(phone);
 -- 插入初始拼单订单
 INSERT INTO group_order (id, order_no, creator_user_id, product_name, product_desc, total_member_count, current_member_count, estimated_total_amount, estimated_per_amount, pickup_point, deadline_at, status)
 VALUES 
-(1, 'GO20260417001', 1, '晚饭拼单', '三个人一起点晚饭，均摊配送费。', 3, 2, 48.00, 16.00, '东区宿舍门口', '2026-04-21 21:00:00', 'OPEN'),
-(2, 'GO20260417002', 2, '奶茶拼单', '奶茶加小料拼单。', 3, 3, 60.00, 20.00, '图书馆南门', '2026-04-21 10:00:00', 'WAIT_DELIVERY')
+(1, 'GO20260417001', 1, '晚饭拼单', '三个人一起点晚饭，均摊配送费。', 3, 2, 48.00, 16.00, '东区宿舍门口', DATE_ADD(NOW(), INTERVAL 6 HOUR), 'OPEN'),
+(2, 'GO20260417002', 2, '奶茶拼单', '奶茶加小料拼单。', 3, 3, 60.00, 20.00, '图书馆南门', DATE_ADD(NOW(), INTERVAL 2 HOUR), 'WAIT_DELIVERY')
 ON DUPLICATE KEY UPDATE order_no = VALUES(order_no);
 
 -- 插入订单成员
 INSERT INTO group_order_member (group_order_id, user_id, is_creator, pay_status, pay_amount, paid_at, receive_status, role)
 VALUES 
-(1, 1, 1, 'PAID', 16.00, '2026-04-21 08:35:00', 'NOT_READY', 'INITIATOR'),
+(1, 1, 1, 'PAID', 16.00, DATE_SUB(NOW(), INTERVAL 90 MINUTE), 'NOT_READY', 'INITIATOR'),
 (1, 2, 0, 'UNPAID', 16.00, NULL, 'NOT_READY', 'MEMBER'),
-(2, 2, 1, 'PAID', 20.00, '2026-04-21 09:01:00', 'NOT_READY', 'INITIATOR'),
-(2, 1, 0, 'PAID', 20.00, '2026-04-21 09:05:00', 'NOT_READY', 'MEMBER'),
-(2, 3, 0, 'PAID', 20.00, '2026-04-21 09:10:00', 'NOT_READY', 'MEMBER')
+(2, 2, 1, 'PAID', 20.00, DATE_SUB(NOW(), INTERVAL 60 MINUTE), 'NOT_READY', 'INITIATOR'),
+(2, 1, 0, 'PAID', 20.00, DATE_SUB(NOW(), INTERVAL 55 MINUTE), 'NOT_READY', 'MEMBER'),
+(2, 3, 0, 'PAID', 20.00, DATE_SUB(NOW(), INTERVAL 50 MINUTE), 'NOT_READY', 'MEMBER')
 ON DUPLICATE KEY UPDATE group_order_id = VALUES(group_order_id), user_id = VALUES(user_id);
 
 -- 插入信用分记录

@@ -1,11 +1,13 @@
 package com.campusshareorder.backend.controller.user;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.common.response.ApiResponse;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.dto.user.UpdateProfileRequest;
+import com.campusshareorder.backend.dto.user.UserCreditQueryRequest;
 import com.campusshareorder.backend.dto.user.VerifyStudentRequest;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.UserAccount;
@@ -28,7 +30,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
@@ -106,15 +107,18 @@ public class UserController {
     }
 
     @GetMapping("/credit")
-    public ApiResponse<UserCreditVO> getCreditRecords() {
+    public ApiResponse<UserCreditVO> getCreditRecords(UserCreditQueryRequest request) {
         UserAccount user = requireUser(SecurityUtils.getRequiredUserId());
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, user.getId())
                 .orderByDesc(CreditChangeRecord::getCreatedAt);
-        List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
+        Page<CreditChangeRecord> page = creditChangeRecordMapper.selectPage(
+                new Page<>(request.getPage(), request.getPageSize()),
+                wrapper
+        );
 
-        List<UserCreditItemVO> items = records.stream().map(record -> {
+        var items = page.getRecords().stream().map(record -> {
             UserCreditItemVO vo = new UserCreditItemVO();
             vo.setRecordId(record.getId());
             vo.setDelta(record.getChangeValue());
@@ -131,6 +135,10 @@ public class UserController {
         UserCreditVO creditVO = new UserCreditVO();
         creditVO.setCreditScore(user.getCreditScore());
         creditVO.setRecords(items);
+        creditVO.setPage(page.getCurrent());
+        creditVO.setPageSize(page.getSize());
+        creditVO.setTotal(page.getTotal());
+        creditVO.setPages(page.getPages());
         return ApiResponse.success(creditVO);
     }
 

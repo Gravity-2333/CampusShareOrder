@@ -22,13 +22,32 @@ export const createComplaint = async (payload) => {
     if (!order) {
       makeFailure(40401, '订单不存在')
     }
+    if (!order.complaintOpened) {
+      makeFailure(40903, '投诉通道尚未开启')
+    }
+    if (order.creatorUserId === user.userId) {
+      makeFailure(40301, '发起人不能发起该订单投诉')
+    }
 
     const complaintId = Math.max(0, ...draft.complaints.map((item) => item.complaintId)) + 1
-    const accusedMember = order.members.find((item) => item.role === 'INITIATOR')
+    const accusedUserId = Number(payload.accusedUserId || order.creatorUserId)
+    const accusedMember =
+      order.members.find((item) => item.userId === accusedUserId) ||
+      order.members.find((item) => item.role === 'INITIATOR')
+
+    if (!order.members.some((item) => item.userId === user.userId)) {
+      makeFailure(40301, '投诉人不在该订单中')
+    }
+    if (!accusedMember) {
+      makeFailure(40301, '被投诉人不在该订单中')
+    }
+    if (accusedUserId === user.userId) {
+      makeFailure(40909, '不能投诉自己')
+    }
 
     createdComplaint = {
       accusedNickname: accusedMember?.nickname || order.initiatorNickname,
-      accusedUserId: order.creatorUserId,
+      accusedUserId,
       complaintId,
       complaintNo: `CP${Date.now()}`,
       complainantUserId: user.userId,

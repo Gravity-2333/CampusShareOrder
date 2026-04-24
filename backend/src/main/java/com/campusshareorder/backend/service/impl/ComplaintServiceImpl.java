@@ -48,6 +48,12 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         if (order == null) {
             throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
         }
+        if (!Boolean.TRUE.equals(order.getComplaintOpened())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "投诉通道尚未开启");
+        }
+        if (userId.equals(order.getCreatorUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "发起人不能发起该订单投诉");
+        }
 
         Long accusedUserId = request.getAccusedUserId();
         if (accusedUserId == null) {
@@ -74,8 +80,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
 
         LambdaQueryWrapper<Complaint> duplicateWrapper = new LambdaQueryWrapper<>();
         duplicateWrapper.eq(Complaint::getGroupOrderId, request.getOrderId())
-                .eq(Complaint::getComplainantUserId, userId)
-                .eq(Complaint::getAccusedUserId, accusedUserId);
+                .eq(Complaint::getComplainantUserId, userId);
         if (complaintMapper.selectCount(duplicateWrapper) > 0) {
             throw new BusinessException(ErrorCode.COMPLAINT_DUPLICATED);
         }

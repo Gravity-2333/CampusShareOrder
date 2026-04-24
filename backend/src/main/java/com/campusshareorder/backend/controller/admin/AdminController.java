@@ -73,12 +73,13 @@ public class AdminController {
 
     @GetMapping("/orders")
     public ApiResponse<PageVO<OrderListItemVO>> getOrders(
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
             HttpServletRequest request) {
         requireAdmin(request);
-        return ApiResponse.success(adminService.getOrders(status, page, pageSize));
+        return ApiResponse.success(adminService.getOrders(keyword, status, page, pageSize));
     }
 
     @GetMapping("/orders/{orderId}")

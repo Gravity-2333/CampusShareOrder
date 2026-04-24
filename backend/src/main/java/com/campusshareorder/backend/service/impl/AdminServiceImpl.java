@@ -75,7 +75,7 @@ public class AdminServiceImpl implements AdminService {
 
         AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
         overview.setMetrics(metrics);
-        overview.setRecentOrders(getOrders("", 1, 5).getList());
+        overview.setRecentOrders(getOrders("", "", 1, 5).getList());
         overview.setRecentComplaints(getComplaints("", 1, 5).getList());
         overview.setRecentLogs(getOperationLogs("", 1, 5).getList());
         return overview;
@@ -151,9 +151,16 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public PageVO<OrderListItemVO> getOrders(String status, Integer page, Integer pageSize) {
+    public PageVO<OrderListItemVO> getOrders(String keyword, String status, Integer page, Integer pageSize) {
         Page<GroupOrder> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(GroupOrder::getOrderNo, trimmedKeyword)
+                    .or().like(GroupOrder::getProductName, trimmedKeyword)
+                    .or().like(GroupOrder::getPickupPoint, trimmedKeyword));
+        }
 
         if (status != null && !status.trim().isEmpty()) {
             wrapper.eq(GroupOrder::getStatus, denormalizeOrderStatus(status));

@@ -128,9 +128,19 @@ export const getOrders = async (params = {}) => {
   await requireAdmin()
   await sleep()
 
+  const keyword = String(params.keyword || '').trim()
   const status = String(params.status || '').trim()
   const list = getDatabase()
-    .orders.filter((order) => !status || order.status === status)
+    .orders.filter((order) => {
+      const matchKeyword =
+        !keyword ||
+        order.orderNo.includes(keyword) ||
+        order.productName.includes(keyword) ||
+        order.pickupPoint.includes(keyword) ||
+        order.initiatorNickname.includes(keyword)
+      const matchStatus = !status || order.status === status
+      return matchKeyword && matchStatus
+    })
     .map((order) => ({
       creatorNickname: order.initiatorNickname,
       currentMemberCount: order.currentMemberCount,

@@ -15,6 +15,7 @@ const router = useRouter()
 const adminStore = useAdminStore()
 
 const filters = reactive({
+  keyword: '',
   page: 1,
   pageSize: 10,
   status: '',
@@ -61,6 +62,7 @@ const loadOrders = async () => {
 }
 
 const resetFilters = async () => {
+  filters.keyword = ''
   filters.page = 1
   filters.pageSize = 10
   filters.status = ''
@@ -122,6 +124,12 @@ onMounted(loadOrders)
         {{ summaryText }}
       </p>
       <div class="toolbar-row">
+        <el-input
+          v-model="filters.keyword"
+          placeholder="Search order no, product or pickup point"
+          clearable
+          @keyup.enter="loadOrders"
+        />
         <el-select
           v-model="filters.status"
           placeholder="按状态筛选"

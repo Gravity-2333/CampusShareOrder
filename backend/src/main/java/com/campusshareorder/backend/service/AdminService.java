@@ -25,7 +25,7 @@ public interface AdminService {
 
     void unbanUser(Long userId, Long adminId);
 
-    PageVO<OrderListItemVO> getOrders(String status, Integer page, Integer pageSize);
+    PageVO<OrderListItemVO> getOrders(String keyword, String status, Integer page, Integer pageSize);
 
     OrderDetailVO getOrderDetail(Long orderId);
 

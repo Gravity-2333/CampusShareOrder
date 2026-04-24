@@ -13,6 +13,7 @@ import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
+import com.campusshareorder.backend.entity.Notification;
 import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.AdminAccountMapper;
@@ -21,6 +22,7 @@ import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
+import com.campusshareorder.backend.mapper.NotificationMapper;
 import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.AdminService;
@@ -59,6 +61,7 @@ public class AdminServiceImpl implements AdminService {
     private final CreditChangeRecordMapper creditChangeRecordMapper;
     private final GroupOrderMapper groupOrderMapper;
     private final GroupOrderMemberMapper groupOrderMemberMapper;
+    private final NotificationMapper notificationMapper;
     private final OperationLogMapper operationLogMapper;
     private final OrderService orderService;
     private final UserAccountMapper userAccountMapper;
@@ -214,6 +217,8 @@ public class AdminServiceImpl implements AdminService {
         refundActiveMembers(orderId, "管理员取消订单退款");
         insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN",
                 request == null ? null : request.getReason());
+        notifyActiveMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
+                "管理员已取消该订单，系统会按规则处理退款。");
     }
 
     @Override
@@ -276,6 +281,10 @@ public class AdminServiceImpl implements AdminService {
         applyComplaintCreditPenalty(complaint);
         insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED",
                 request == null ? null : request.getHandleResult());
+        insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED", "投诉已处理",
+                "你的投诉已由管理员处理，请查看处理结果。", complaint.getGroupOrderId(), complaintId);
+        insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED", "投诉处理完成",
+                "与你相关的投诉已处理，请关注订单和信用分变化。", complaint.getGroupOrderId(), complaintId);
     }
 
     @Override
@@ -460,6 +469,34 @@ public class AdminServiceImpl implements AdminService {
                 .toString());
         log.setCreatedAt(LocalDateTime.now());
         operationLogMapper.insert(log);
+    }
+
+    private void notifyActiveMembers(Long orderId, String type, String title, String content) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>()
+                        .eq(GroupOrderMember::getGroupOrderId, orderId)
+                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+        );
+        for (GroupOrderMember member : members) {
+            insertNotification(member.getUserId(), type, title, content, orderId, null);
+        }
+    }
+
+    private void insertNotification(Long userId, String type, String title, String content,
+                                    Long orderId, Long complaintId) {
+        if (userId == null) {
+            return;
+        }
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setContent(content);
+        notification.setIsRead(false);
+        notification.setRelatedOrderId(orderId);
+        notification.setRelatedComplaintId(complaintId);
+        notification.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(notification);
     }
 
     private String buildTargetNo(OperationLog log) {

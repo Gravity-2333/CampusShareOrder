@@ -17,6 +17,7 @@ import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
+import com.campusshareorder.backend.entity.Notification;
 import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.OrderReceipt;
 import com.campusshareorder.backend.entity.UserAccount;
@@ -24,6 +25,7 @@ import com.campusshareorder.backend.mapper.CapitalRecordMapper;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
+import com.campusshareorder.backend.mapper.NotificationMapper;
 import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
@@ -64,6 +66,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final OrderReceiptMapper orderReceiptMapper;
     private final ComplaintMapper complaintMapper;
     private final CapitalRecordMapper capitalRecordMapper;
+    private final NotificationMapper notificationMapper;
     private final OperationLogMapper operationLogMapper;
 
     @Override
@@ -454,6 +457,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             groupOrderMapper.updateById(order);
             cancelActiveMembers(order.getId());
             insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_AUTO_CANCELED", "DEADLINE_NOT_GROUPED");
+            notifyActiveMembers(order.getId(), "ORDER_CANCELED", "拼单已自动取消",
+                    "订单超时未成团，系统已取消订单并处理退款。", true);
         }
     }
 
@@ -476,6 +481,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 groupOrderMapper.updateById(order);
                 insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "COMPLAINT_CHANNEL_OPENED",
                         "RECEIPT_TIMEOUT");
+                notifyActiveMembers(order.getId(), "COMPLAINT_CHANNEL_OPENED", "投诉通道已开启",
+                        "发起人超时未上传凭证，系统已为该订单开启投诉通道。", false);
             }
         }
     }
@@ -497,6 +504,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             groupOrderMapper.updateById(order);
             insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "COMPLAINT_CHANNEL_OPENED",
                     "DELIVERY_TIMEOUT");
+            notifyActiveMembers(order.getId(), "COMPLAINT_CHANNEL_OPENED", "投诉通道已开启",
+                    "订单超过预计最晚送达时间，系统已开启投诉通道。", false);
         }
     }
 
@@ -524,6 +533,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 groupOrderMemberMapper.updateById(member);
                 insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "MEMBER_AUTO_RECEIVED",
                         "memberId=" + member.getId());
+                insertNotification(order.getCreatorUserId(), "MEMBER_AUTO_RECEIVED", "成员已自动确认收货",
+                        "订单中有成员超时未确认，系统已自动确认收货。", order.getId(), null);
             }
 
             tryCompleteOrder(order.getId());
@@ -557,6 +568,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(30));
             groupOrderMapper.updateById(order);
             insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_GROUPED", null);
+            notifyActiveMembers(order.getId(), "ORDER_GROUPED", "拼单已成团",
+                    "订单已满员且成员均已支付，请关注后续凭证和送达进度。", true);
         }
     }
 
@@ -582,6 +595,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             insertCapitalRecord("SET-O" + orderId, order.getCreatorUserId(), orderId, null,
                     "SETTLE_TO_CREATOR", settleAmount, "订单完成结算给发起人");
             insertOperationLog("SYSTEM", null, "ORDER", orderId, "ORDER_COMPLETED", null);
+            notifyActiveMembers(orderId, "ORDER_COMPLETED", "订单已完成",
+                    "全部成员已确认收货，订单已完成并生成结算记录。", true);
         }
     }
 
@@ -678,6 +693,37 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 .toString());
         log.setCreatedAt(LocalDateTime.now());
         operationLogMapper.insert(log);
+    }
+
+    private void notifyActiveMembers(Long orderId, String type, String title, String content, boolean includeCreator) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>()
+                        .eq(GroupOrderMember::getGroupOrderId, orderId)
+                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+        );
+        for (GroupOrderMember member : members) {
+            if (!includeCreator && Boolean.TRUE.equals(member.getIsCreator())) {
+                continue;
+            }
+            insertNotification(member.getUserId(), type, title, content, orderId, null);
+        }
+    }
+
+    private void insertNotification(Long userId, String type, String title, String content,
+                                    Long orderId, Long complaintId) {
+        if (userId == null) {
+            return;
+        }
+        Notification notification = new Notification();
+        notification.setUserId(userId);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setContent(content);
+        notification.setIsRead(false);
+        notification.setRelatedOrderId(orderId);
+        notification.setRelatedComplaintId(complaintId);
+        notification.setCreatedAt(LocalDateTime.now());
+        notificationMapper.insert(notification);
     }
 
     private OrderBasicInfoVO buildBasicInfo(GroupOrder order) {

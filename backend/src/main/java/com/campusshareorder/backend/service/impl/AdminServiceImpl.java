@@ -217,7 +217,7 @@ public class AdminServiceImpl implements AdminService {
         refundActiveMembers(orderId, "管理员取消订单退款");
         insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN",
                 request == null ? null : request.getReason());
-        notifyActiveMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
+        notifyOrderMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
                 "管理员已取消该订单，系统会按规则处理退款。");
     }
 
@@ -471,11 +471,9 @@ public class AdminServiceImpl implements AdminService {
         operationLogMapper.insert(log);
     }
 
-    private void notifyActiveMembers(Long orderId, String type, String title, String content) {
+    private void notifyOrderMembers(Long orderId, String type, String title, String content) {
         List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
-                new LambdaQueryWrapper<GroupOrderMember>()
-                        .eq(GroupOrderMember::getGroupOrderId, orderId)
-                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
         );
         for (GroupOrderMember member : members) {
             insertNotification(member.getUserId(), type, title, content, orderId, null);

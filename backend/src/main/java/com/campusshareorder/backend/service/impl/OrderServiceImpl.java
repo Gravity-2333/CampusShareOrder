@@ -405,6 +405,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             groupOrderMemberMapper.updateById(member);
         }
         insertOperationLog("USER", userId, "ORDER", orderId, "ORDER_DELIVERED", null);
+        notifyOrderMembers(orderId, "ORDER_DELIVERED", "订单已送达",
+                "发起人已确认送达，请及时确认收货。", false);
     }
 
     @Override
@@ -457,7 +459,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             groupOrderMapper.updateById(order);
             cancelActiveMembers(order.getId());
             insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_AUTO_CANCELED", "DEADLINE_NOT_GROUPED");
-            notifyActiveMembers(order.getId(), "ORDER_CANCELED", "拼单已自动取消",
+            notifyOrderMembers(order.getId(), "ORDER_CANCELED", "拼单已自动取消",
                     "订单超时未成团，系统已取消订单并处理退款。", true);
         }
     }
@@ -700,6 +702,18 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 new LambdaQueryWrapper<GroupOrderMember>()
                         .eq(GroupOrderMember::getGroupOrderId, orderId)
                         .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+        );
+        for (GroupOrderMember member : members) {
+            if (!includeCreator && Boolean.TRUE.equals(member.getIsCreator())) {
+                continue;
+            }
+            insertNotification(member.getUserId(), type, title, content, orderId, null);
+        }
+    }
+
+    private void notifyOrderMembers(Long orderId, String type, String title, String content, boolean includeCreator) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
         );
         for (GroupOrderMember member : members) {
             if (!includeCreator && Boolean.TRUE.equals(member.getIsCreator())) {

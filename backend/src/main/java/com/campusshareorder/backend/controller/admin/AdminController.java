@@ -9,6 +9,7 @@ import com.campusshareorder.backend.dto.admin.HandleComplaintRequest;
 import com.campusshareorder.backend.service.AdminService;
 import com.campusshareorder.backend.vo.admin.AdminCapitalRecordVO;
 import com.campusshareorder.backend.vo.admin.AdminComplaintDetailVO;
+import com.campusshareorder.backend.vo.admin.AdminDashboardOverviewVO;
 import com.campusshareorder.backend.vo.admin.AdminOperationLogVO;
 import com.campusshareorder.backend.vo.admin.AdminUserDetailVO;
 import com.campusshareorder.backend.vo.admin.AdminUserListItemVO;
@@ -32,6 +33,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final AdminService adminService;
+
+    @GetMapping("/dashboard/overview")
+    public ApiResponse<AdminDashboardOverviewVO> getDashboardOverview(HttpServletRequest request) {
+        requireAdmin(request);
+        return ApiResponse.success(adminService.getDashboardOverview());
+    }
 
     @GetMapping("/users")
     public ApiResponse<PageVO<AdminUserListItemVO>> getUsers(

@@ -5,6 +5,7 @@ import com.campusshareorder.backend.dto.admin.CancelOrderRequest;
 import com.campusshareorder.backend.dto.admin.HandleComplaintRequest;
 import com.campusshareorder.backend.vo.admin.AdminCapitalRecordVO;
 import com.campusshareorder.backend.vo.admin.AdminComplaintDetailVO;
+import com.campusshareorder.backend.vo.admin.AdminDashboardOverviewVO;
 import com.campusshareorder.backend.vo.admin.AdminOperationLogVO;
 import com.campusshareorder.backend.vo.admin.AdminUserDetailVO;
 import com.campusshareorder.backend.vo.admin.AdminUserListItemVO;
@@ -14,6 +15,8 @@ import com.campusshareorder.backend.vo.order.OrderDetailVO;
 import com.campusshareorder.backend.vo.order.OrderListItemVO;
 
 public interface AdminService {
+    AdminDashboardOverviewVO getDashboardOverview();
+
     PageVO<AdminUserListItemVO> getUsers(String keyword, String status, Integer page, Integer pageSize);
 
     AdminUserDetailVO getUserDetail(Long userId);

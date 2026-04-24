@@ -2,6 +2,36 @@ import { getDatabase, mutateDatabase, pageResult, timestamp } from './database'
 import { makeFailure } from './database'
 import { buildOrderDetail, requireAdmin, sleep } from './shared'
 
+export const getDashboardOverview = async () => {
+  await requireAdmin()
+  await sleep()
+
+  const database = getDatabase()
+  const recentOrders = database.orders.slice(0, 5).map((order) => ({
+    creatorNickname: order.initiatorNickname,
+    currentMemberCount: order.currentMemberCount,
+    deadlineAt: order.deadlineAt,
+    estimatedTotalAmount: order.estimatedTotalAmount,
+    orderId: order.orderId,
+    orderNo: order.orderNo,
+    pickupPoint: order.pickupPoint,
+    productName: order.productName,
+    status: order.status,
+    totalMemberCount: order.totalMemberCount,
+  }))
+
+  return {
+    metrics: {
+      complaints: database.complaints.length,
+      orders: database.orders.length,
+      users: database.users.length,
+    },
+    recentComplaints: database.complaints.slice(0, 5),
+    recentLogs: database.logs.slice(0, 5),
+    recentOrders,
+  }
+}
+
 export const getUsers = async (params = {}) => {
   await requireAdmin()
   await sleep()

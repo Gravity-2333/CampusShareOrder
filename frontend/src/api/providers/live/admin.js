@@ -1,5 +1,7 @@
 import request from '../../request'
 
+export const getDashboardOverview = () => request.get('/api/admin/dashboard/overview')
+
 export const getUsers = (params) => request.get('/api/admin/users', { params })
 
 export const getUserDetail = (userId) => request.get(`/api/admin/users/${userId}`)

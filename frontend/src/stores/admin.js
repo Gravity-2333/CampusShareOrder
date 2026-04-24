@@ -10,6 +10,7 @@ import {
   getAdminUserDetail,
   getAdminUsers,
   getCapitalRecords,
+  getDashboardOverview,
   getOperationLogs,
   handleAdminComplaint,
   unbanUser,
@@ -267,21 +268,17 @@ export const useAdminStore = defineStore('admin', {
       this.dashboardLoading = true
 
       try {
-        const [metrics, orders, complaints, logs] = await Promise.all([
-          this.loadDashboardMetrics(),
-          getAdminOrders({ page: 1, pageSize: 5 }),
-          getAdminComplaints({ page: 1, pageSize: 5 }),
-          getOperationLogs({ page: 1, pageSize: 5 }),
-        ])
+        const overview = await getDashboardOverview()
 
+        this.metrics = overview.metrics || this.metrics
         this.dashboardOverview = {
-          recentComplaints: complaints.list,
-          recentLogs: logs.list,
-          recentOrders: orders.list,
+          recentComplaints: overview.recentComplaints || [],
+          recentLogs: overview.recentLogs || [],
+          recentOrders: overview.recentOrders || [],
         }
 
         return {
-          metrics,
+          metrics: this.metrics,
           overview: this.dashboardOverview,
         }
       } finally {

@@ -27,6 +27,8 @@ import com.campusshareorder.backend.service.AdminService;
 import com.campusshareorder.backend.service.OrderService;
 import com.campusshareorder.backend.vo.admin.AdminCapitalRecordVO;
 import com.campusshareorder.backend.vo.admin.AdminComplaintDetailVO;
+import com.campusshareorder.backend.vo.admin.AdminDashboardMetricsVO;
+import com.campusshareorder.backend.vo.admin.AdminDashboardOverviewVO;
 import com.campusshareorder.backend.vo.admin.AdminCreditRecordVO;
 import com.campusshareorder.backend.vo.admin.AdminOperationLogVO;
 import com.campusshareorder.backend.vo.admin.AdminUserDetailVO;
@@ -60,6 +62,21 @@ public class AdminServiceImpl implements AdminService {
     private final OperationLogMapper operationLogMapper;
     private final OrderService orderService;
     private final UserAccountMapper userAccountMapper;
+
+    @Override
+    public AdminDashboardOverviewVO getDashboardOverview() {
+        AdminDashboardMetricsVO metrics = new AdminDashboardMetricsVO();
+        metrics.setUsers(userAccountMapper.selectCount(null));
+        metrics.setOrders(groupOrderMapper.selectCount(null));
+        metrics.setComplaints(complaintMapper.selectCount(null));
+
+        AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
+        overview.setMetrics(metrics);
+        overview.setRecentOrders(getOrders("", 1, 5).getList());
+        overview.setRecentComplaints(getComplaints(1, 5).getList());
+        overview.setRecentLogs(getOperationLogs("", 1, 5).getList());
+        return overview;
+    }
 
     @Override
     public PageVO<AdminUserListItemVO> getUsers(String keyword, String status, Integer page, Integer pageSize) {

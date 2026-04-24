@@ -1,6 +1,8 @@
 import provider from './provider'
 import { normalizeOrderDetail } from './adapters/order'
 
+export const getDashboardOverview = (params) => provider.admin.getDashboardOverview(params)
+
 export const getAdminUsers = (params) => provider.admin.getUsers(params)
 
 export const getAdminUserDetail = (userId) => provider.admin.getUserDetail(userId)

@@ -37,17 +37,12 @@ const defaultDeadlineAt = () => {
 
 const form = reactive({
   deadlineAt: defaultDeadlineAt(),
-  estimatedTotalAmount: 48,
-  pickupPoint: '东区宿舍门口',
+  estimatedTotalAmount: 1,
+  pickupPoint: '',
   productDesc: '',
-  productName: '新建拼单',
+  productName: '',
   totalMemberCount: 3,
 })
-
-const previewRows = [
-  { label: '请求对象', value: 'CreateOrderRequest' },
-  { label: '接口路径', value: 'POST /api/orders' },
-]
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -83,7 +78,7 @@ const handleSubmit = async () => {
       <StatCard
         label="预计人均"
         :value="formatCurrency(form.estimatedTotalAmount / form.totalMemberCount)"
-        hint="仅作为前端预览，不替代后端结算逻辑"
+        hint="帮助你在发起前预估每位成员的分摊金额"
       />
       <StatCard
         label="目标人数"
@@ -94,7 +89,7 @@ const handleSubmit = async () => {
 
     <PageSection
       title="发起拼单"
-      description="CreateOrderRequest 字段严格对齐冻结契约。"
+      description="填写商品、人数、金额和取货信息，创建后即可邀请同学加入。"
     >
       <div class="form-intro surface-card">
         <strong>创建前提示</strong>
@@ -157,27 +152,6 @@ const handleSubmit = async () => {
           创建拼单
         </el-button>
       </div>
-    </PageSection>
-
-    <PageSection
-      title="提交预览"
-      description="这里用于在前端阶段先核对请求字段是否符合冻结契约。"
-    >
-      <ul class="detail-list">
-        <li
-          v-for="row in previewRows"
-          :key="row.label"
-        >
-          <span>{{ row.label }}</span>
-          <strong>{{ row.value }}</strong>
-        </li>
-        <li><span>productName</span><strong>{{ form.productName || '--' }}</strong></li>
-        <li><span>productDesc</span><strong>{{ form.productDesc || '--' }}</strong></li>
-        <li><span>totalMemberCount</span><strong>{{ form.totalMemberCount }}</strong></li>
-        <li><span>estimatedTotalAmount</span><strong>{{ formatCurrency(form.estimatedTotalAmount) }}</strong></li>
-        <li><span>pickupPoint</span><strong>{{ form.pickupPoint || '--' }}</strong></li>
-        <li><span>deadlineAt</span><strong>{{ form.deadlineAt || '--' }}</strong></li>
-      </ul>
     </PageSection>
   </div>
 </template>

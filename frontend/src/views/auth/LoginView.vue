@@ -3,34 +3,22 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import { useAppStore } from '../../stores/app'
 import { useUserStore } from '../../stores/user'
 import { firstValidationError, validatePassword, validatePhone } from '../../utils/validate'
 
 const router = useRouter()
-const appStore = useAppStore()
 const userStore = useUserStore()
 
 const form = reactive({
-  password: '123456',
-  phone: '13800000001',
+  password: '',
+  phone: '',
 })
 const loading = ref(false)
-const demoAccounts = [
-  { label: '张三', phone: '13800000001' },
-  { label: '李四', phone: '13800000002' },
-  { label: '王五', phone: '13800000003' },
-]
 const heroMetrics = [
-  { label: '统一返回', value: '{ code, message, data }' },
-  { label: '鉴权方式', value: 'Bearer Token' },
-  { label: '数据模式', value: 'mock / live' },
+  { label: '多人拼单', value: '一键发起和加入' },
+  { label: '流程透明', value: '支付、凭证、收货清晰可查' },
+  { label: '异常可追踪', value: '投诉与信用记录闭环' },
 ]
-
-const applyDemoAccount = (phone) => {
-  form.phone = phone
-  form.password = '123456'
-}
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -61,11 +49,11 @@ const handleSubmit = async () => {
   <div class="auth-page">
     <section class="auth-hero">
       <p class="section-kicker">
-        契约优先前端
+        Campus Share Order
       </p>
-      <h1>先把前端主干搭稳，再安心对接真实接口。</h1>
+      <h1>让校园拼单更省心、更透明。</h1>
       <p>
-        当前运行模式为 <strong>{{ appStore.apiMode }}</strong>，页面只通过统一 API 方法取数，业务代码不直接依赖临时数据。
+        和同学一起凑单、分摊配送费、跟踪凭证与收货状态，把每一次拼单都放在清楚的流程里。
       </p>
 
       <div class="auth-metric-grid">
@@ -80,25 +68,8 @@ const handleSubmit = async () => {
       </div>
 
       <div class="auth-side-note">
-        <strong>当前重点</strong>
-        <p>先把用户主流程、订单详情闭环和后续联调结构稳定，再逐步切到真实接口。</p>
-      </div>
-
-      <div
-        v-if="appStore.apiMode === 'mock'"
-        class="auth-demo-grid"
-      >
-        <button
-          v-for="account in demoAccounts"
-          :key="account.phone"
-          type="button"
-          class="auth-demo-card"
-          @click="applyDemoAccount(account.phone)"
-        >
-          <span>演示账号</span>
-          <strong>{{ account.label }}</strong>
-          <small>{{ account.phone }}</small>
-        </button>
+        <strong>从发起到完成，全程有迹可循</strong>
+        <p>实名认证后即可发起拼单，成员加入、支付、上传凭证、确认送达和投诉处理都会被记录。</p>
       </div>
     </section>
 
@@ -125,7 +96,7 @@ const handleSubmit = async () => {
 
       <div class="auth-card-summary">
         <strong>欢迎回来</strong>
-        <p>登录后会先进入拼单大厅，后续创建拼单、参与拼单和投诉流程都从统一路由继续。</p>
+        <p>登录后进入拼单大厅，查看正在招募的拼单，也可以管理自己的参与记录。</p>
       </div>
 
       <el-form
@@ -161,7 +132,7 @@ const handleSubmit = async () => {
       </el-form>
 
       <div class="auth-card-footer">
-        <span>普通用户与管理员账号完全分离</span>
+        <span>还没有账号？注册后即可完善资料</span>
         <button
           type="button"
           class="auth-inline-link"

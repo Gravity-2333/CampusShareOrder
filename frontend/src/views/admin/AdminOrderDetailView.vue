@@ -32,7 +32,7 @@ const stats = computed(() => {
     {
       label: '订单状态',
       value: formatOrderStatus(detail.value.basicInfo.status),
-      hint: '管理端详情复用契约中的 OrderDetailVO',
+      hint: '展示订单金额、人数与处理状态',
     },
     {
       label: '当前成员',
@@ -118,7 +118,7 @@ onMounted(() => {
     <PageSection
       v-loading="adminStore.orderDetailLoading"
       title="订单详情"
-      description="后台详情页只负责消费契约字段，不自行推导新的业务状态。"
+      description="帮助管理员查看订单全貌、成员进度和异常处理线索。"
     >
       <template v-if="detail">
         <div class="card-header-row">
@@ -231,7 +231,7 @@ onMounted(() => {
 
           <PageSection
             title="时间线"
-            description="对应 timeline 聚合展示。"
+            description="按时间顺序查看订单关键事件。"
           >
             <el-timeline>
               <el-timeline-item

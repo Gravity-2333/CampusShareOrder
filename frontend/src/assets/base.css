@@ -6,12 +6,17 @@
   --color-text-muted: #66726a;
   --color-text-inverse: #f9f4ea;
   --color-primary: #3b7a57;
+  --color-primary-strong: #24523a;
   --color-primary-soft: #cfe7d7;
   --color-accent: #d87b4d;
+  --color-accent-strong: #b85f35;
   --color-accent-soft: #f6d7c9;
   --color-danger: #b24333;
+  --color-warning: #b9852f;
+  --color-success: #2f7d53;
   --color-surface: rgba(255, 251, 244, 0.9);
   --color-surface-strong: rgba(253, 250, 243, 0.9);
+  --color-surface-raised: rgba(255, 253, 248, 0.96);
   --color-sidebar-bg: rgba(46, 63, 52, 0.94);
   --color-sidebar-kicker: #f2cbb8;
   --color-sidebar-menu-text: rgba(255, 247, 235, 0.76);
@@ -28,6 +33,10 @@
   --font-family-display: Georgia, 'Times New Roman', serif;
   --surface-blur: 12px;
   --shadow-soft: 0 20px 60px rgba(53, 60, 48, 0.12);
+  --shadow-card: 0 18px 46px rgba(53, 60, 48, 0.1);
+  --shadow-card-hover: 0 26px 80px rgba(53, 60, 48, 0.16);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  --focus-ring: 0 0 0 3px rgba(59, 122, 87, 0.16);
   --radius-large: 28px;
   --radius-medium: 18px;
   --radius-small: 12px;

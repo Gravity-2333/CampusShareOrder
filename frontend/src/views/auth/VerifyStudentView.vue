@@ -29,7 +29,7 @@ const stats = computed(() => [
   {
     label: '当前学号',
     value: userStore.profile?.studentNo || '--',
-    hint: 'VerifyStudentRequest 仅提交 studentNo',
+    hint: '请填写本人真实学号',
   },
 ])
 
@@ -85,7 +85,7 @@ onMounted(loadProfile)
 
     <PageSection
       title="实名认证"
-      description="该页面对应契约中的 POST /api/users/verify-student。"
+      description="完成学号认证后，即可发起拼单并参与完整订单流程。"
     >
       <el-alert
         title="认证后，路由守卫会允许你进入发起拼单页面。"
@@ -95,7 +95,7 @@ onMounted(loadProfile)
 
       <div class="form-intro surface-card">
         <strong>认证说明</strong>
-        <p>当前阶段仅提交学号字段，认证完成后会同步刷新登录态和个人资料中的认证状态。</p>
+        <p>认证完成后会同步刷新你的登录状态和个人资料，未认证账号无法发起拼单。</p>
       </div>
 
       <el-form
@@ -127,7 +127,7 @@ onMounted(loadProfile)
 
     <PageSection
       title="当前资料"
-      description="方便核对认证前后 UserProfileVO 的变化。"
+      description="认证完成后，这里的学号和认证状态会同步更新。"
     >
       <ul class="detail-list">
         <li

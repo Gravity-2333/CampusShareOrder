@@ -110,7 +110,7 @@ onMounted(() => {
     <PageSection
       v-loading="adminStore.complaintDetailLoading"
       title="投诉详情"
-      description="对应 GET /api/admin/complaints/{complaintId}。"
+      description="查看投诉详情、关联订单、处理状态并完成后台处置。"
     >
       <template v-if="complaint">
         <div class="card-header-row">

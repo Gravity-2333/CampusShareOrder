@@ -28,7 +28,7 @@ const stats = computed(() => {
     {
       label: '记录总量',
       value: adminStore.recordsPage.total,
-      hint: '对应固定分页结构 total',
+      hint: '统计当前筛选条件下的记录总量',
     },
     {
       label: '当前页金额',
@@ -100,7 +100,7 @@ onMounted(loadRecords)
 
     <PageSection
       title="资金记录"
-      description="对应 GET /api/admin/records/capital。"
+      description="核对订单支付、退款和发起人结算等资金流向。"
     >
       <p class="muted-text">
         {{ summaryText }}
@@ -109,7 +109,7 @@ onMounted(loadRecords)
       <div class="toolbar-row">
         <el-input
           v-model="filters.keyword"
-          placeholder="Search biz no, order, user or remark"
+          placeholder="搜索流水号、订单、用户或备注"
           clearable
           @keyup.enter="submitFilters"
         />
@@ -137,7 +137,7 @@ onMounted(loadRecords)
         </el-select>
         <el-select
           v-model="filters.status"
-          placeholder="By status"
+          placeholder="按状态筛选"
           clearable
         >
           <el-option

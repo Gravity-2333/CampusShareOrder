@@ -16,7 +16,7 @@ const userStore = useUserStore()
 
 const form = reactive({
   nickname: '',
-  password: '123456',
+  password: '',
   phone: '',
 })
 const loading = ref(false)
@@ -59,7 +59,7 @@ const handleSubmit = async () => {
         创建账号
       </p>
       <h1>先建好用户身份，再进入拼单与投诉流程。</h1>
-      <p>注册页保持轻量，只收集契约要求的基础字段，避免把后续业务资料提前塞进登录入口。</p>
+      <p>注册后即可进入校园拼单，完成认证后可以发起拼单、加入订单并查看完整流程。</p>
 
       <div class="auth-side-note">
         <strong>注册后你会得到</strong>
@@ -105,7 +105,7 @@ const handleSubmit = async () => {
 
       <div class="auth-card-summary">
         <strong>快速创建普通用户账号</strong>
-        <p>昵称、手机号、密码校验都走统一校验工具，提交入口保持稳定。</p>
+        <p>手机号会作为登录账号，请使用常用号码；昵称会展示给拼单成员。</p>
       </div>
 
       <el-form

@@ -187,7 +187,7 @@ const nextStepHint = computed(() => {
     return '当前账号已经提交投诉，可继续查看处理进度。'
   }
 
-  return '当前页面主要用于查看订单聚合信息，是否可操作以 actionFlags 为准。'
+  return '当前页面主要用于查看订单聚合信息，操作入口会随订单状态自动变化。'
 })
 
 const timelineToneMap = {
@@ -783,7 +783,7 @@ const stats = computed(() => {
       value: formatOrderStatus(detail.value.basicInfo.status),
     },
     {
-      hint: '基于 actionFlags 汇总',
+      hint: '根据当前订单状态汇总',
       label: '可执行动作',
       value: Object.values(detail.value.actionFlags).filter(Boolean).length,
     },
@@ -1028,7 +1028,7 @@ onMounted(() => {
     <PageSection
       v-loading="orderStore.detailLoading"
       title="拼单详情"
-      description="当前页面按聚合详情结构展示，按钮可用性完全以 actionFlags 为准。"
+      description="查看订单状态、成员进度、支付凭证、收货确认和异常处理信息。"
     >
       <template v-if="detail">
         <div class="card-header-row">
@@ -1137,7 +1137,7 @@ onMounted(() => {
 
         <PageSection
           title="当前账号视角"
-          description="把当前身份、当前权限和当前限制说清楚，减少联调时反复猜测。"
+          description="说明你在当前订单中的身份、可操作事项和限制原因。"
         >
           <div class="action-summary-grid">
             <div
@@ -1196,7 +1196,7 @@ onMounted(() => {
 
         <PageSection
           title="动作概览"
-          description="详情页只消费契约中的 actionFlags，保证动作判断集中且稳定。"
+          description="根据当前订单状态展示可执行动作，避免误操作。"
         >
           <div class="action-summary-grid">
             <div
@@ -1230,7 +1230,7 @@ onMounted(() => {
 
         <PageSection
           title="当前风险"
-          description="把支付、凭证、送达、投诉这些阻塞点集中展示，方便联调和演示。"
+          description="集中展示支付、凭证、送达、投诉等可能影响进度的事项。"
         >
           <div class="action-summary-grid">
             <div
@@ -1275,7 +1275,7 @@ onMounted(() => {
 
         <PageSection
           title="成员列表"
-          description="成员信息展示加入、支付、收货及最近事件，方便联调时核对状态流转。"
+          description="查看成员加入、支付、收货和最近事件，快速判断当前进展。"
         >
           <div class="desktop-table">
             <el-table
@@ -1363,7 +1363,7 @@ onMounted(() => {
         <div class="detail-grid">
           <PageSection
             title="支付汇总"
-            description="对应 paymentSummary 聚合字段。"
+            description="汇总订单预计金额、实付金额和退款情况。"
           >
             <ul class="detail-list">
               <li>
@@ -1395,7 +1395,7 @@ onMounted(() => {
 
           <PageSection
             title="投诉与凭证"
-            description="对应 complaintInfo 与 receiptInfo。"
+            description="查看凭证、投诉通道和异常处理状态。"
           >
             <ul class="detail-list">
               <li>
@@ -1430,7 +1430,7 @@ onMounted(() => {
         <div class="detail-grid">
           <PageSection
             title="收货信息"
-            description="对应 receiveInfo 聚合字段。"
+            description="查看送达与收货确认进度。"
           >
             <ul class="detail-list">
               <li>

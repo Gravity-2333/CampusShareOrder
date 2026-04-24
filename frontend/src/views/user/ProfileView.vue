@@ -99,7 +99,7 @@ onMounted(loadProfile)
     <PageSection
       v-loading="userStore.profileLoading"
       title="个人资料概览"
-      description="优先展示 UserProfileVO 里的固定字段，方便后续联调直接对照。"
+      description="集中查看账号身份、认证状态、联系方式和信用信息。"
     >
       <div class="detail-grid">
         <div class="surface-card detail-panel">
@@ -148,11 +148,11 @@ onMounted(loadProfile)
 
     <PageSection
       title="修改资料"
-      description="对应 GET / PUT /api/users/profile。"
+      description="保持昵称和联系方式准确，方便拼单成员及时沟通。"
     >
       <div class="form-intro surface-card">
-        <strong>修改后会同步更新当前登录上下文和资料页展示。</strong>
-        <p>这里仅维护昵称和联系方式，不改动契约外字段，页面始终通过统一资料接口提交。</p>
+        <strong>修改后会同步更新资料页展示。</strong>
+        <p>昵称会展示给拼单成员，联系方式用于订单沟通，请填写常用且准确的信息。</p>
       </div>
 
       <el-form

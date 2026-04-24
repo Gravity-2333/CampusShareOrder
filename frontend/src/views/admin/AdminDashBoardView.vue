@@ -6,24 +6,21 @@ import { ElMessage } from 'element-plus'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
-import { useAppStore } from '../../stores/app'
 import { useAdminStore } from '../../stores/admin'
 import { useUserStore } from '../../stores/user'
 import { formatComplaintStatus, formatDateTime, formatOrderStatus } from '../../utils/format'
 
 const router = useRouter()
-const appStore = useAppStore()
 const adminStore = useAdminStore()
 const userStore = useUserStore()
 
 const cards = computed(() => [
-  { hint: 'GET /api/admin/users', label: '用户总数', value: adminStore.metrics.users },
-  { hint: 'GET /api/admin/orders', label: '订单总数', value: adminStore.metrics.orders },
-  { hint: 'GET /api/admin/complaints', label: '投诉总数', value: adminStore.metrics.complaints },
+  { hint: '已注册用户规模', label: '用户总数', value: adminStore.metrics.users },
+  { hint: '平台累计拼单数量', label: '订单总数', value: adminStore.metrics.orders },
+  { hint: '需要关注的异常反馈', label: '投诉总数', value: adminStore.metrics.complaints },
 ])
 
 const overviewRows = computed(() => [
-  { label: '当前模式', value: appStore.apiMode },
   { label: '当前身份', value: userStore.displayName },
   { label: '角色', value: userStore.session.role || '--' },
   { label: '管理员账号', value: userStore.session.username || '--' },
@@ -65,20 +62,6 @@ const loadDashboard = async () => {
   }
 }
 
-const handleResetMock = async () => {
-  try {
-    const reset = await appStore.resetMockData()
-
-    if (reset) {
-      userStore.clearSession()
-      ElMessage.success('Mock 数据已重置，请重新登录查看初始状态')
-      router.push('/admin/login')
-    }
-  } catch (error) {
-    ElMessage.error(error.message)
-  }
-}
-
 onMounted(loadDashboard)
 </script>
 
@@ -97,7 +80,7 @@ onMounted(loadDashboard)
     <PageSection
       v-loading="adminStore.dashboardLoading"
       title="管理台概览"
-      description="这里集中展示后台上下文、快捷入口与近期动态，便于联调和演示。"
+      description="集中展示平台运行概况、快捷入口与近期动态，帮助管理员快速处理风险事项。"
     >
       <div class="detail-grid">
         <div class="surface-card detail-panel">
@@ -111,19 +94,6 @@ onMounted(loadDashboard)
               <strong>{{ item.value }}</strong>
             </li>
           </ul>
-          <div
-            v-if="appStore.apiMode === 'mock'"
-            class="page-actions"
-          >
-            <el-button
-              type="warning"
-              plain
-              :loading="appStore.mockResetting"
-              @click="handleResetMock"
-            >
-              重置 Mock 数据
-            </el-button>
-          </div>
         </div>
 
         <div class="surface-card detail-panel">

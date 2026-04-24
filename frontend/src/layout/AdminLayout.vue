@@ -21,7 +21,7 @@ const navItems = [
 
 const activePath = computed(() => route.path)
 const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
-const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '切换导航'))
+const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '收起导航'))
 
 const handleNavSelect = () => {
   appStore.closeMobileNav()
@@ -118,9 +118,6 @@ onBeforeUnmount(() => {
     <div class="app-main">
       <header class="app-header">
         <div>
-          <div class="mode-chip">
-            模式：{{ appStore.apiMode }}
-          </div>
           <h2>{{ route.meta.title || '管理后台' }}</h2>
         </div>
         <div class="header-actions">

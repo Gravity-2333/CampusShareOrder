@@ -3,17 +3,15 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import { useAppStore } from '../../stores/app'
 import { useUserStore } from '../../stores/user'
 import { firstValidationError, validatePassword, requireValue } from '../../utils/validate'
 
 const router = useRouter()
-const appStore = useAppStore()
 const userStore = useUserStore()
 
 const form = reactive({
-  password: '123456',
-  username: 'admin',
+  password: '',
+  username: '',
 })
 const loading = ref(false)
 const adminFocus = [
@@ -21,11 +19,6 @@ const adminFocus = [
   { label: '投诉处理', value: '先看详情再填写处理结果' },
   { label: '后台记录', value: '追踪日志与资金变化' },
 ]
-
-const fillAdminAccount = () => {
-  form.username = 'admin'
-  form.password = '123456'
-}
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -94,20 +87,9 @@ const handleSubmit = async () => {
         </div>
       </template>
 
-      <el-alert
-        class="auth-alert"
-        :title="
-          appStore.apiMode === 'mock'
-            ? 'Mock 模式下可直接使用 admin / admin123 登录。'
-            : '当前为 live 模式，可使用 admin / 123456 登录。'
-        "
-        type="info"
-        :closable="false"
-      />
-
       <div class="auth-card-summary">
         <strong>进入平台管理端</strong>
-        <p>登录后会直接进入后台概览，后续所有治理动作都通过统一管理路由完成。</p>
+        <p>登录后进入后台概览，集中处理用户、订单、投诉与平台记录。</p>
       </div>
 
       <el-form
@@ -135,12 +117,6 @@ const handleSubmit = async () => {
             @click="handleSubmit"
           >
             登录管理端
-          </el-button>
-          <el-button
-            v-if="appStore.apiMode === 'mock'"
-            @click="fillAdminAccount"
-          >
-            填入演示账号
           </el-button>
         </div>
       </el-form>

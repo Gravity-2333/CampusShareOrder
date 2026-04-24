@@ -6,10 +6,12 @@
 
 .surface-card {
   backdrop-filter: blur(var(--surface-blur));
-  background: var(--color-surface);
+  background:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.94), rgba(255, 249, 240, 0.86)),
+    var(--color-surface);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-medium);
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-card), var(--shadow-inset);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease,
@@ -135,8 +137,11 @@
 }
 
 .app-sidebar {
-  background: var(--color-sidebar-bg);
+  background:
+    radial-gradient(circle at 22% 0%, rgba(242, 203, 184, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(46, 63, 52, 0.97), rgba(36, 52, 43, 0.96));
   border-radius: var(--radius-large);
+  box-shadow: 0 24px 70px rgba(33, 45, 38, 0.24);
   color: var(--color-text-inverse);
   overflow: hidden;
   padding: var(--space-sm);
@@ -158,7 +163,7 @@
 }
 
 .app-sidebar.collapsed {
-  padding: 0.9rem 0.7rem;
+  padding: 0.9rem 0.65rem;
 }
 
 .brand-block {
@@ -183,6 +188,12 @@
   justify-content: center;
   letter-spacing: 0.08em;
   width: 40px;
+}
+
+.app-sidebar.collapsed .brand-mark {
+  border-radius: 18px;
+  height: 48px;
+  width: 48px;
 }
 
 .brand-block h1 {
@@ -214,10 +225,19 @@
   border-radius: 14px;
   margin-bottom: 0.25rem;
   min-height: 46px;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
 }
 
 .shell-menu .el-menu-item.is-active {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(242, 203, 184, 0.18));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.shell-menu .el-menu-item:hover {
+  transform: translateX(2px);
 }
 
 .app-sidebar.collapsed .brand-block {
@@ -235,8 +255,16 @@
 }
 
 .app-sidebar.collapsed .shell-menu .el-menu-item {
+  border-radius: 18px;
   justify-content: center;
-  padding: 0;
+  margin: 0.3rem auto;
+  min-height: 48px;
+  padding: 0 !important;
+  width: 52px;
+}
+
+.app-sidebar.collapsed .shell-menu .el-menu-item:hover {
+  transform: translateY(-1px);
 }
 
 .app-sidebar.collapsed .shell-menu .el-menu-tooltip__trigger {
@@ -262,6 +290,14 @@
   position: sticky;
   top: var(--space-sm);
   z-index: 5;
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 1.5rem 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(59, 122, 87, 0.2), transparent);
 }
 
 .app-header h2 {
@@ -398,41 +434,6 @@
   padding-left: 1.15rem;
 }
 
-.auth-demo-grid {
-  display: grid;
-  gap: var(--space-xs);
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-}
-
-.auth-demo-card {
-  background: rgba(255, 252, 247, 0.76);
-  border: 1px solid rgba(216, 208, 194, 0.72);
-  border-radius: var(--radius-medium);
-  color: var(--color-text);
-  cursor: pointer;
-  display: grid;
-  gap: 0.18rem;
-  padding: 0.95rem 1rem;
-  text-align: left;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-
-.auth-demo-card:hover {
-  background: rgba(255, 250, 243, 0.96);
-  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--color-border-strong));
-  transform: translateY(-1px);
-}
-
-.auth-demo-card span,
-.auth-demo-card small {
-  color: var(--color-text-muted);
-}
-
-.auth-demo-card strong {
-  font-family: var(--font-family-display);
-  font-size: 1.08rem;
-}
-
 .auth-card {
   border-radius: var(--radius-large);
   border: 1px solid var(--color-border-strong);
@@ -565,6 +566,25 @@
   box-shadow: inset 0 0 0 1px rgba(216, 208, 194, 0.45);
 }
 
+.filter-panel,
+.compact-filter-panel {
+  align-items: center;
+  background: rgba(255, 252, 247, 0.72);
+  border: 1px solid rgba(216, 208, 194, 0.68);
+  border-radius: var(--radius-medium);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: 0.9rem;
+}
+
+.filter-panel .el-input,
+.filter-panel .el-select,
+.compact-filter-panel .el-input,
+.compact-filter-panel .el-select {
+  min-width: 180px;
+}
+
 .order-grid,
 .detail-grid {
   display: grid;
@@ -604,7 +624,7 @@
 .stat-card:hover,
 .empty-state:hover {
   border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-border-strong));
-  box-shadow: 0 24px 70px rgba(53, 60, 48, 0.16);
+  box-shadow: var(--shadow-card-hover), var(--shadow-inset);
 }
 
 .order-card:hover,
@@ -838,11 +858,76 @@
 
 .table-stack .el-table {
   border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
 .table-stack .el-table th.el-table__cell {
   background: rgba(246, 241, 231, 0.88);
+}
+
+.el-button {
+  font-weight: 700;
+}
+
+.el-button.el-button--primary {
+  --el-button-bg-color: var(--color-primary);
+  --el-button-border-color: var(--color-primary);
+  --el-button-hover-bg-color: var(--color-primary-strong);
+  --el-button-hover-border-color: var(--color-primary-strong);
+  --el-button-active-bg-color: var(--color-primary-strong);
+  --el-button-active-border-color: var(--color-primary-strong);
+}
+
+.el-button.el-button--danger {
+  --el-button-bg-color: var(--color-danger);
+  --el-button-border-color: var(--color-danger);
+}
+
+.el-button.is-link {
+  --el-button-text-color: var(--color-primary);
+  font-weight: 700;
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper {
+  border-radius: 14px;
+  box-shadow: inset 0 0 0 1px rgba(216, 208, 194, 0.56);
+  transition:
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.el-input__wrapper.is-focus,
+.el-textarea__inner:focus,
+.el-select__wrapper.is-focused {
+  box-shadow: inset 0 0 0 1px var(--color-primary), var(--focus-ring);
+}
+
+.el-input-number .el-input__wrapper {
+  padding-left: 0.4rem;
+  padding-right: 0.4rem;
+}
+
+.el-card {
+  border-color: var(--color-border-strong);
+  border-radius: var(--radius-medium);
+}
+
+.el-alert {
+  border-radius: var(--radius-medium);
+}
+
+.el-tag {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.el-pagination.is-background .btn-next,
+.el-pagination.is-background .btn-prev,
+.el-pagination.is-background .el-pager li {
+  border-radius: 999px;
 }
 
 .receipt-preview {
@@ -928,8 +1013,7 @@
     max-width: 12ch;
   }
 
-  .auth-metric-grid,
-  .auth-demo-grid {
+  .auth-metric-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1064,6 +1148,20 @@
 
   .pagination-bar .el-pagination {
     justify-content: center;
+  }
+
+  .filter-panel,
+  .compact-filter-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filter-panel .el-input,
+  .filter-panel .el-select,
+  .compact-filter-panel .el-input,
+  .compact-filter-panel .el-select {
+    min-width: 0;
+    width: 100%;
   }
 
   .detail-actions-bar {

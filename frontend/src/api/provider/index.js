@@ -1,38 +1,25 @@
-export const apiMode = import.meta.env.VITE_API_MODE === 'live' ? 'live' : 'mock'
-
 const providerLoaders = {
-  live: {
-    admin: () => import('../providers/live/admin'),
-    auth: () => import('../providers/live/auth'),
-    complaint: () => import('../providers/live/complaint'),
-    order: () => import('../providers/live/order'),
-    user: () => import('../providers/live/user'),
-  },
-  mock: {
-    admin: () => import('../../mock/admin'),
-    auth: () => import('../../mock/auth'),
-    complaint: () => import('../../mock/complaint'),
-    order: () => import('../../mock/order'),
-    user: () => import('../../mock/user'),
-  },
+  admin: () => import('../providers/live/admin'),
+  auth: () => import('../providers/live/auth'),
+  complaint: () => import('../providers/live/complaint'),
+  order: () => import('../providers/live/order'),
+  user: () => import('../providers/live/user'),
 }
 
 const providerModules = new Map()
 
 const loadProviderModule = async (domain) => {
-  const cacheKey = `${apiMode}:${domain}`
-
-  if (!providerModules.has(cacheKey)) {
-    const loader = providerLoaders[apiMode]?.[domain]
+  if (!providerModules.has(domain)) {
+    const loader = providerLoaders[domain]
 
     if (!loader) {
-      throw new Error(`未找到 ${apiMode} 模式下的 ${domain} provider`)
+      throw new Error(`未找到 ${domain} 服务`)
     }
 
-    providerModules.set(cacheKey, loader())
+    providerModules.set(domain, loader())
   }
 
-  return providerModules.get(cacheKey)
+  return providerModules.get(domain)
 }
 
 const createDomainProxy = (domain) =>
@@ -49,7 +36,7 @@ const createDomainProxy = (domain) =>
           const targetMethod = domainModule[methodName]
 
           if (typeof targetMethod !== 'function') {
-            throw new Error(`provider ${domain}.${methodName} 不存在`)
+            throw new Error(`${domain}.${methodName} 服务不存在`)
           }
 
           return targetMethod(...args)

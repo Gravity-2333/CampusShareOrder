@@ -18,7 +18,7 @@ const stats = computed(() => [
   {
     label: '投诉总数',
     value: complaintStore.myComplaintsPage.total,
-    hint: '对应固定分页结构 total',
+    hint: '展示你发起过的投诉记录',
   },
   {
     label: '待处理',
@@ -28,7 +28,7 @@ const stats = computed(() => [
   {
     label: '当前页',
     value: `${complaintStore.myComplaintsPage.page}/${complaintStore.myComplaintsPage.pages || 1}`,
-    hint: '统一使用固定分页结构渲染',
+    hint: '便于快速定位历史处理记录',
   },
 ])
 
@@ -73,7 +73,7 @@ onMounted(loadComplaints)
 
     <PageSection
       title="我的投诉"
-      description="对应 GET /api/complaints/my。"
+      description="查看投诉处理进度、处理结果和关联订单信息。"
     >
       <p class="muted-text">
         {{ summaryText }}
@@ -192,7 +192,7 @@ onMounted(loadComplaints)
       <EmptyState
         v-else
         title="暂无投诉"
-        description="投诉列表遵循固定分页结构，便于持续联调和维护。"
+        description="订单出现异常时，你可以从订单详情页发起投诉。"
       />
     </PageSection>
   </div>

@@ -29,7 +29,7 @@ const stats = computed(() => {
     {
       label: '日志总量',
       value: adminStore.logsPage.total,
-      hint: '对应固定分页结构 total',
+      hint: '统计当前筛选条件下的记录总量',
     },
     {
       label: '管理员操作',
@@ -102,7 +102,7 @@ onMounted(loadLogs)
 
     <PageSection
       title="操作日志"
-      description="对应 GET /api/admin/records/logs。"
+      description="追踪关键后台操作、处理对象和操作人信息。"
     >
       <p class="muted-text">
         {{ summaryText }}
@@ -111,19 +111,19 @@ onMounted(loadLogs)
       <div class="toolbar-row">
         <el-input
           v-model="filters.keyword"
-          placeholder="Search action, target or detail"
+          placeholder="搜索动作、对象或详情"
           clearable
           @keyup.enter="submitFilters"
         />
         <el-input
           v-model="filters.action"
-          placeholder="By action, e.g. COMPLAINT"
+          placeholder="按动作筛选，如 COMPLAINT"
           clearable
           @keyup.enter="submitFilters"
         />
         <el-select
           v-model="filters.operatorType"
-          placeholder="Operator"
+          placeholder="操作人"
           clearable
         >
           <el-option
@@ -137,7 +137,7 @@ onMounted(loadLogs)
         </el-select>
         <el-select
           v-model="filters.bizType"
-          placeholder="Biz type"
+          placeholder="业务类型"
           clearable
         >
           <el-option

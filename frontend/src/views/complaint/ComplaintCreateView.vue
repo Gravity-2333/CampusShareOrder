@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -18,14 +18,6 @@ const form = reactive({
   orderId: Number(route.query.orderId || 0),
   type: 'NOT_PURCHASED',
 })
-
-const previewRows = computed(() => [
-  { label: '请求对象', value: 'CreateComplaintRequest' },
-  { label: '接口路径', value: 'POST /api/complaints' },
-  { label: 'orderId', value: form.orderId || '--' },
-  { label: 'type', value: form.type },
-  { label: 'content', value: form.content || '--' },
-])
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -58,18 +50,18 @@ const handleSubmit = async () => {
       <StatCard
         label="投诉订单"
         :value="form.orderId || '--'"
-        hint="CreateComplaintRequest 要求提交 orderId"
+        hint="请确认投诉对象与实际订单一致"
       />
       <StatCard
         label="投诉类型"
         :value="formatComplaintType(form.type)"
-        hint="契约枚举只允许 NOT_PURCHASED / FAKE_RECEIPT"
+        hint="选择最贴近当前问题的处理原因"
       />
     </div>
 
     <PageSection
       title="发起投诉"
-      description="对应 POST /api/complaints。"
+      description="提交后平台会进入处理流程，你可以在我的投诉中跟踪进展。"
     >
       <el-alert
         title="投诉提交后将进入待处理状态，后续可在我的投诉中查看处理结果。"
@@ -79,7 +71,7 @@ const handleSubmit = async () => {
 
       <div class="form-intro surface-card">
         <strong>投诉说明</strong>
-        <p>当前阶段投诉类型只允许“未购买”或“伪造凭证”，是否能发起投诉仍以订单详情里的 actionFlags 为准。</p>
+        <p>请尽量说明异常发生的时间、涉及的成员和你希望平台协助处理的事项，便于管理员快速判断。</p>
       </div>
 
       <el-form
@@ -130,21 +122,6 @@ const handleSubmit = async () => {
           提交投诉
         </el-button>
       </div>
-    </PageSection>
-
-    <PageSection
-      title="提交预览"
-      description="方便在前端阶段核对投诉请求字段与契约一致。"
-    >
-      <ul class="detail-list">
-        <li
-          v-for="row in previewRows"
-          :key="row.label"
-        >
-          <span>{{ row.label }}</span>
-          <strong>{{ row.value }}</strong>
-        </li>
-      </ul>
     </PageSection>
   </div>
 </template>

@@ -8,13 +8,11 @@ import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
-import { useAppStore } from '../../stores/app'
 import { useOrderStore } from '../../stores/order'
 import { useUserStore } from '../../stores/user'
 import { formatCurrency, formatDateTime, formatOrderStatus } from '../../utils/format'
 
 const router = useRouter()
-const appStore = useAppStore()
 const orderStore = useOrderStore()
 const userStore = useUserStore()
 const filters = reactive({
@@ -26,7 +24,6 @@ const filters = reactive({
 
 const visibleOrders = computed(() => orderStore.hallPage.list)
 const canCreateOrder = computed(() => userStore.session.isVerified)
-const canResetMock = computed(() => appStore.apiMode === 'mock')
 
 const stats = computed(() => {
   const openCount = visibleOrders.value.filter((order) => order.status === 'OPEN').length
@@ -39,7 +36,7 @@ const stats = computed(() => {
     {
       label: '可见订单',
       value: orderStore.hallPage.total,
-      hint: '契约分页结构 list / page / pageSize / total / pages',
+      hint: '当前筛选条件下的拼单数量',
     },
     {
       label: '招募中',
@@ -54,7 +51,7 @@ const stats = computed(() => {
     {
       label: '当前页',
       value: `${orderStore.hallPage.page}/${orderStore.hallPage.pages || 1}`,
-      hint: '统一使用固定分页接口结构',
+      hint: '继续翻页查看更多拼单',
     },
   ]
 })
@@ -68,7 +65,7 @@ const hallTips = computed(() => {
     return '当前账号尚未实名认证，可以先浏览大厅，认证后再发起拼单。'
   }
 
-  return '大厅页优先承接浏览、筛选、加入和跳转详情，不在列表页重复复杂业务推导。'
+  return '浏览正在进行的拼单，选择合适的订单加入，或发起自己的拼单。'
 })
 
 const loadOrders = async () => {
@@ -150,21 +147,6 @@ const handleJoinAndView = async (order) => {
   }
 }
 
-const handleResetMock = async () => {
-  try {
-    const reset = await appStore.resetMockData()
-
-    if (!reset) {
-      return
-    }
-
-    await resetFilters()
-    ElMessage.success('演示数据已重置')
-  } catch (error) {
-    ElMessage.error(error.message || '重置失败')
-  }
-}
-
 const handlePageChange = async ({ page, pageSize }) => {
   filters.page = page
   filters.pageSize = pageSize
@@ -188,7 +170,7 @@ onMounted(loadOrders)
 
     <PageSection
       title="拼单大厅"
-      description="页面只使用统一 API 服务，不直接拼接接口地址。"
+      description="浏览校园内正在招募的拼单，按商品或状态快速筛选。"
     >
       <p class="muted-text">
         {{ hallTips }}
@@ -250,13 +232,6 @@ onMounted(loadOrders)
           @click="goCreateOrder"
         >
           {{ canCreateOrder ? '发起拼单' : '先去认证再发起' }}
-        </el-button>
-        <el-button
-          v-if="canResetMock"
-          :loading="appStore.mockResetting"
-          @click="handleResetMock"
-        >
-          重置演示数据
         </el-button>
         <el-button
           plain

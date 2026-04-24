@@ -1,16 +1,12 @@
 import { defineStore } from 'pinia'
 
-import { apiMode } from '../api/provider'
-
 let viewportListeners = 0
 let detachViewportListener = null
 
 export const useAppStore = defineStore('app', {
   state: () => ({
-    apiMode,
     isMobileViewport: false,
     mobileNavOpen: false,
-    mockResetting: false,
     sidebarCollapsed: false,
   }),
   actions: {
@@ -65,21 +61,6 @@ export const useAppStore = defineStore('app', {
     },
     closeMobileNav() {
       this.mobileNavOpen = false
-    },
-    async resetMockData() {
-      if (this.apiMode !== 'mock') {
-        return false
-      }
-
-      this.mockResetting = true
-
-      try {
-        const { resetDatabase } = await import('../mock/database')
-        resetDatabase()
-        return true
-      } finally {
-        this.mockResetting = false
-      }
     },
   },
 })

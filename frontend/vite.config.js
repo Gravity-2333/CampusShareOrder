@@ -38,14 +38,6 @@ export default defineConfig({
             return 'vendor'
           }
 
-          if (id.includes('/src/mock/') || id.includes('\\src\\mock\\')) {
-            if (id.endsWith('database.js') || id.endsWith('shared.js')) {
-              return 'mock-core'
-            }
-
-            return 'mock-provider'
-          }
-
           if (id.includes('/src/api/providers/live/') || id.includes('\\src\\api\\providers\\live\\')) {
             return 'live-provider'
           }

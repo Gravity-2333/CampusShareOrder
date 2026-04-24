@@ -24,12 +24,12 @@ const stats = computed(() => {
     {
       label: '投诉状态',
       value: formatComplaintStatus(complaint.value.status),
-      hint: '字段来自 ComplaintDetailVO.status',
+      hint: '展示当前处理进度',
     },
     {
       label: '投诉类型',
       value: formatComplaintType(complaint.value.type),
-      hint: '契约枚举 NOT_PURCHASED / FAKE_RECEIPT',
+      hint: '帮助管理员快速判断问题类型',
     },
     {
       label: '关联订单',
@@ -80,7 +80,7 @@ onMounted(() => {
     <PageSection
       v-loading="complaintStore.complaintDetailLoading"
       title="投诉详情"
-      description="对应 GET /api/complaints/{complaintId}。"
+      description="查看投诉内容、处理状态、关联订单和最终处理结果。"
     >
       <template v-if="complaint">
         <div class="card-header-row">

@@ -18,7 +18,7 @@ const stats = computed(() => [
   {
     label: '参与订单',
     value: orderStore.myOrdersPage.total,
-    hint: '对应固定分页结构 total',
+    hint: '展示你创建或加入过的拼单',
   },
   {
     label: '待收货',
@@ -73,7 +73,7 @@ onMounted(loadOrders)
 
     <PageSection
       title="我的拼单"
-      description="对应 GET /api/users/my-orders。"
+      description="跟踪自己参与的拼单状态、支付进度和后续操作。"
     >
       <p class="muted-text">
         {{ summaryText }}
@@ -200,7 +200,7 @@ onMounted(loadOrders)
       <EmptyState
         v-else
         title="还没有参与的拼单"
-        description="加入或创建拼单后，这里会按分页结构展示。"
+        description="加入或创建拼单后，这里会展示你的订单记录。"
       >
         <div class="page-actions">
           <el-button @click="router.push('/orders')">

@@ -28,7 +28,7 @@ const stats = computed(() => [
   {
     label: '变更记录',
     value: userStore.credit.total || userStore.credit.records.length,
-    hint: '来自 UserCreditVO.records',
+    hint: '展示与你相关的信用分变化明细',
   },
 ])
 
@@ -83,7 +83,7 @@ onMounted(loadCredit)
 
     <PageSection
       title="信用分记录"
-      description="对应 GET /api/users/credit。"
+      description="查看信用分变化、关联订单和投诉处理记录。"
     >
       <p class="muted-text">
         {{ summaryText }}

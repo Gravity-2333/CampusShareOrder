@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * UserStatus 枚举类单元测试
+ * UserStatus 枚举类单元测试，添加配置文件和示例
  */
 class UserStatusTest {
 

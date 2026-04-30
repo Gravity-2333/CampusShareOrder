@@ -1,7 +1,8 @@
 package com.campusshareorder.backend.common.constant;
 
 /**
- * 用户相关常量
+ * 用户相关常量，定义了用户相关的常量，如默认信用分、最高信用分、最低信用分、信用分扣减阈值等。
+ * 以及用户状态、用户角色、昵称最大长度、昵称最小长度、手机号长度、学号长度、密码最小长度、密码最大长度、验证码长度、验证码有效期（分钟）等。
  */
 public class UserConstants {
 

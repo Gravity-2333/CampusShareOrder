@@ -60,6 +60,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final OrderReceiptMapper orderReceiptMapper;
     private final ComplaintMapper complaintMapper;
 
+    // 创建订单
      @Override
      @Transactional
      public CreateOrderVO createOrder(CreateOrderRequest request, Long userId) {
@@ -111,6 +112,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         return vo;
     }
 
+    // 查询订单列表
     @Override
     public PageResult<OrderListItemVO> getOrderList(OrderQueryRequest request) {
         Page<GroupOrder> page = new Page<>(request.getPage(), request.getPageSize());
@@ -151,6 +153,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         return new PageResult<>(list, request.getPage(), request.getPageSize(), orderPage.getTotal());
     }
 
+    // 查询订单详情
     @Override
     public OrderDetailVO getOrderDetail(Long orderId, Long userId) {
         GroupOrder order = requireOrder(orderId);

@@ -158,11 +158,36 @@ class OrderServiceImplTest {
         assertThat(order.getStatus()).isEqualTo("CANCELED");
         assertThat(order.getCancelReason()).isEqualTo("DEADLINE_NOT_GROUPED");
         assertThat(paidMember.getJoinStatus()).isEqualTo("CANCELED");
+        assertThat(paidMember.getPayStatus()).isEqualTo("REFUNDED");
         assertThat(paidMember.getRefundAmountTotal()).isEqualByComparingTo("30.00");
 
         ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
         verify(capitalRecordMapper).insert(capitalCaptor.capture());
         assertThat(capitalCaptor.getValue().getType()).isEqualTo("REFUND_CANCEL");
+    }
+
+    @Test
+    void paidMemberCanExitOpenOrderAndRefundsPaidAmount() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        order.setCurrentMemberCount(2);
+        GroupOrderMember paidMember = paidMember(11L, 101L, false);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(paidMember);
+        when(capitalRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        orderService.exitOrder(1L, 101L);
+
+        assertThat(paidMember.getJoinStatus()).isEqualTo("REFUNDED");
+        assertThat(paidMember.getPayStatus()).isEqualTo("REFUNDED");
+        assertThat(paidMember.getRefundAmountTotal()).isEqualByComparingTo("30.00");
+        assertThat(order.getCurrentMemberCount()).isEqualTo(1);
+
+        ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
+        verify(capitalRecordMapper).insert(capitalCaptor.capture());
+        assertThat(capitalCaptor.getValue().getType()).isEqualTo("REFUND_EXIT");
+        assertThat(capitalCaptor.getValue().getAmount()).isEqualByComparingTo("30.00");
     }
 
     @Test

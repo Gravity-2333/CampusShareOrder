@@ -599,6 +599,21 @@
   padding: 1.2rem;
 }
 
+.order-card.is-canceled-order {
+  background:
+    linear-gradient(180deg, rgba(244, 241, 235, 0.9), rgba(232, 226, 216, 0.82)),
+    var(--color-surface);
+  border-color: rgba(150, 143, 132, 0.44);
+  filter: grayscale(0.28);
+  opacity: 0.78;
+}
+
+.order-card.is-canceled-order .section-kicker,
+.order-card.is-canceled-order h3,
+.order-card.is-canceled-order .detail-list {
+  color: var(--color-text-muted);
+}
+
 .detail-panel {
   align-content: start;
   min-height: 100%;
@@ -665,6 +680,13 @@
 
 .action-summary-card.is-enabled strong {
   color: var(--color-primary);
+}
+
+.member-role-cell {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .admin-quick-grid {

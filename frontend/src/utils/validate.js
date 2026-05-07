@@ -64,3 +64,6 @@ export const validatePositiveNumber = (value, message) =>
   Number(value) > 0 ? '' : message
 
 export const firstValidationError = (messages) => messages.find(Boolean) || ''
+
+export const validationSummary = (messages) =>
+  messages.filter(Boolean).join('；')

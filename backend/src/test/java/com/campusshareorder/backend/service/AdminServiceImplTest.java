@@ -148,6 +148,7 @@ class AdminServiceImplTest {
         assertThat(complaint.getStatus()).isEqualTo("PROCESSED");
         assertThat(order.getStatus()).isEqualTo("CANCELED");
         assertThat(member.getJoinStatus()).isEqualTo("CANCELED");
+        assertThat(member.getPayStatus()).isEqualTo("REFUNDED");
         assertThat(member.getRefundAmountTotal()).isEqualByComparingTo("30.00");
         assertThat(accused.getCreditScore()).isEqualTo(80);
 

@@ -319,11 +319,23 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (Boolean.TRUE.equals(member.getIsCreator())) {
             throw new BusinessException(ErrorCode.INITIATOR_EXIT_NOT_ALLOWED);
         }
-        if (!"ACTIVE".equals(member.getJoinStatus()) || !"UNPAID".equals(member.getPayStatus())) {
+        if (!"ACTIVE".equals(member.getJoinStatus()) || !List.of("UNPAID", "PAID").contains(member.getPayStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许退出");
         }
 
-        groupOrderMemberMapper.deleteById(member.getId());
+        if ("PAID".equals(member.getPayStatus())) {
+            BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+            BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+            BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+            member.setRefundAmountTotal(refunded.add(netRefund));
+            member.setPayStatus("REFUNDED");
+            member.setJoinStatus("REFUNDED");
+            insertCapitalRecord("RFE-M" + member.getId(), userId, orderId, member.getId(),
+                    "REFUND_EXIT", netRefund, "成员退出拼单退款");
+        } else {
+            member.setJoinStatus("EXITED");
+        }
+        groupOrderMemberMapper.updateById(member);
         order.setCurrentMemberCount(Math.max(order.getCurrentMemberCount() - 1, 1));
         groupOrderMapper.updateById(order);
         insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_EXITED", null);
@@ -613,6 +625,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
                 BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
                 member.setRefundAmountTotal(refunded.add(netRefund));
+                member.setPayStatus("REFUNDED");
                 insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
                         member.getId(), "REFUND_CANCEL", netRefund, "订单取消净退款");
             }
@@ -877,7 +890,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 && "OPEN".equals(order.getStatus())
                 && "ACTIVE".equals(currentMember.getJoinStatus())
                 && !Boolean.TRUE.equals(currentMember.getIsCreator())
-                && "UNPAID".equals(currentMember.getPayStatus()));
+                && List.of("UNPAID", "PAID").contains(currentMember.getPayStatus()));
         actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
         actionFlags.setCanMarkDelivered("WAIT_DELIVERY".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
         actionFlags.setCanConfirmReceived(currentMember != null

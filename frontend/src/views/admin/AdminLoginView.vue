@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { useUserStore } from '../../stores/user'
-import { firstValidationError, validatePassword, requireValue } from '../../utils/validate'
+import { validatePassword, requireValue, validationSummary } from '../../utils/validate'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -21,7 +21,7 @@ const adminFocus = [
 ]
 
 const handleSubmit = async () => {
-  const errorMessage = firstValidationError([
+  const errorMessage = validationSummary([
     requireValue(form.username, '请输入管理员账号'),
     validatePassword(form.password, '管理员密码'),
   ])

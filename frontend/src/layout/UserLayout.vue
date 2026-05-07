@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 
 import { useAppStore } from '../stores/app'
 import { useUserStore } from '../stores/user'
@@ -36,9 +37,20 @@ const handleNavSelect = () => {
 }
 
 const handleLogout = async () => {
-  appStore.closeMobileNav()
-  await userStore.logoutCurrent()
-  router.push('/login')
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出确认', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确定退出',
+      type: 'warning',
+    })
+    appStore.closeMobileNav()
+    await userStore.logoutCurrent()
+    router.push('/login')
+  } catch (error) {
+    if (error !== 'cancel' && error?.message !== 'cancel') {
+      throw error
+    }
+  }
 }
 
 watch(

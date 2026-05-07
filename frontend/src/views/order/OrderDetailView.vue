@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElImage, ElMessage, ElMessageBox } from 'element-plus'
 
@@ -24,6 +24,8 @@ const orderStore = useOrderStore()
 
 const receiptDialogVisible = ref(false)
 const activeReceiptUrl = ref('')
+const now = ref(Date.now())
+let countdownTimer = null
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
@@ -50,6 +52,33 @@ const receivedMemberCount = computed(
       ['RECEIVED', 'AUTO_RECEIVED'].includes(member.receiveStatus),
     ).length,
 )
+
+const deadlineRemainingText = computed(() => {
+  const deadlineAt = detail.value?.basicInfo?.deadlineAt
+  if (!deadlineAt) {
+    return '--'
+  }
+
+  if (detail.value?.basicInfo?.status !== 'OPEN') {
+    return '已结束'
+  }
+
+  const remainingMs = new Date(deadlineAt).getTime() - now.value
+  if (Number.isNaN(remainingMs) || remainingMs <= 0) {
+    return '已截止'
+  }
+
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}小时${String(minutes).padStart(2, '0')}分${String(seconds).padStart(2, '0')}秒`
+  }
+
+  return `${minutes}分${String(seconds).padStart(2, '0')}秒`
+})
 
 const paymentDeltaText = computed(() => {
   if (!detail.value || !hasActualAmount.value) {
@@ -316,7 +345,7 @@ const stats = computed(() => {
 
   return [
     {
-      hint: '来自 basicInfo.status',
+      hint: '当前拼单所处阶段',
       label: '订单状态',
       value: formatOrderStatus(detail.value.basicInfo.status),
     },
@@ -334,6 +363,11 @@ const stats = computed(() => {
       hint: '当前成员数 / 目标成员数',
       label: '成员进度',
       value: `${detail.value.basicInfo.currentMemberCount}/${detail.value.basicInfo.totalMemberCount}`,
+    },
+    {
+      hint: '招募截止倒计时',
+      label: '剩余时间',
+      value: deadlineRemainingText.value,
     },
   ]
 })
@@ -530,7 +564,16 @@ watch(
 )
 
 onMounted(() => {
+  countdownTimer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
   loadDetail()
+})
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer)
+  }
 })
 </script>
 
@@ -698,7 +741,17 @@ onMounted(() => {
               />
               <el-table-column label="角色">
                 <template #default="{ row }">
-                  {{ formatRole(row.role) }}
+                  <div class="member-role-cell">
+                    <span>{{ formatRole(row.role) }}</span>
+                    <el-tag
+                      v-if="row.isCreator"
+                      size="small"
+                      type="warning"
+                      effect="light"
+                    >
+                      团长
+                    </el-tag>
+                  </div>
                 </template>
               </el-table-column>
               <el-table-column label="加入状态">
@@ -751,7 +804,17 @@ onMounted(() => {
             >
               <div class="mobile-record-header">
                 <div class="mobile-record-title">
-                  <span>{{ formatRole(row.role) }}</span>
+                  <span>
+                    {{ formatRole(row.role) }}
+                    <el-tag
+                      v-if="row.isCreator"
+                      size="small"
+                      type="warning"
+                      effect="light"
+                    >
+                      团长
+                    </el-tag>
+                  </span>
                   <strong>{{ row.nickname || '--' }}</strong>
                 </div>
                 <StatusTag

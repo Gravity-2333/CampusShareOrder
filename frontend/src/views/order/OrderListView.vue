@@ -247,6 +247,7 @@ onMounted(loadOrders)
             v-for="order in visibleOrders"
             :key="order.orderId"
             class="surface-card order-card"
+            :class="{ 'is-canceled-order': order.status === 'CANCELED' }"
           >
             <div class="card-header-row">
               <div>

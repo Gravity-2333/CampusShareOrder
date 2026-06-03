@@ -79,7 +79,13 @@ const handleSubmit = async () => {
       totalMemberCount: Number(form.totalMemberCount),
     })
     ElMessage.success('创建成功')
-    router.push(`/orders/${result.orderId}`)
+
+    if (result?.orderId) {
+      router.push(`/orders/${result.orderId}`)
+      return
+    }
+
+    router.push('/my-orders')
   } catch (error) {
     ElMessage.error(error.message)
   } finally {

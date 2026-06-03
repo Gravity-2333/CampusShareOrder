@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
@@ -13,10 +13,11 @@ const route = useRoute()
 const router = useRouter()
 const complaintStore = useComplaintStore()
 const loading = ref(false)
-const isOrderIdLocked = Number(route.query.orderId || 0) > 0
+const getRouteOrderId = () => Number(route.query.orderId || 0)
+const isOrderIdLocked = computed(() => getRouteOrderId() > 0)
 const form = reactive({
   content: '',
-  orderId: Number(route.query.orderId || 0),
+  orderId: getRouteOrderId(),
   type: 'NOT_PURCHASED',
 })
 
@@ -44,13 +45,29 @@ const handleSubmit = async () => {
       content: form.content.trim(),
     })
     ElMessage.success('投诉已提交')
-    router.push(`/complaints/${result.complaintId}`)
+
+    if (result?.complaintId) {
+      router.push(`/complaints/${result.complaintId}`)
+      return
+    }
+
+    router.push('/complaints')
   } catch (error) {
     ElMessage.error(error.message)
   } finally {
     loading.value = false
   }
 }
+
+watch(
+  () => route.query.orderId,
+  () => {
+    const routeOrderId = getRouteOrderId()
+    if (routeOrderId > 0) {
+      form.orderId = routeOrderId
+    }
+  },
+)
 </script>
 
 <template>

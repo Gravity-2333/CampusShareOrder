@@ -39,6 +39,7 @@ const profileRows = computed(() => [
   { label: '手机号', value: userStore.profile?.phone || '--' },
   { label: '学号', value: userStore.profile?.studentNo || '--' },
 ])
+const isAlreadyVerified = computed(() => Boolean(userStore.session.isVerified || userStore.profile?.isVerified))
 
 const loadProfile = async () => {
   try {
@@ -51,6 +52,12 @@ const loadProfile = async () => {
 
 const handleSubmit = async () => {
   if (userStore.verifyingStudent) {
+    return
+  }
+
+  if (isAlreadyVerified.value) {
+    ElMessage.info('当前账号已完成实名认证')
+    router.push('/profile')
     return
   }
 
@@ -91,6 +98,13 @@ onMounted(loadProfile)
       title="实名认证"
       description="完成学号认证后，即可发起拼单并参与完整订单流程。"
     >
+      <el-alert
+        v-if="isAlreadyVerified"
+        title="当前账号已完成实名认证，无需重复提交。"
+        type="success"
+        :closable="false"
+      />
+
       <el-form
         label-position="top"
         :model="form"
@@ -113,9 +127,10 @@ onMounted(loadProfile)
         <el-button
           type="primary"
           :loading="userStore.verifyingStudent"
+          :disabled="isAlreadyVerified"
           @click="handleSubmit"
         >
-          提交认证
+          {{ isAlreadyVerified ? '已完成认证' : '提交认证' }}
         </el-button>
       </div>
     </PageSection>

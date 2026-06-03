@@ -29,6 +29,10 @@ const navItems = computed(() => {
 })
 
 const activePath = computed(() => {
+  if (route.path === '/orders/create') {
+    return '/orders/create'
+  }
+
   if (route.path.startsWith('/orders/')) {
     return '/orders'
   }

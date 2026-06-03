@@ -361,7 +361,13 @@ const navigateToComplaint = () => {
   }
 
   if (detail.value.actionFlags.canCreateComplaint) {
-    router.push(`/complaints/create?orderId=${detail.value.basicInfo.orderId}`)
+    const orderId = Number(detail.value.basicInfo.orderId || 0)
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      ElMessage.warning('当前订单 ID 无效，请返回详情页重新加载')
+      return
+    }
+
+    router.push(`/complaints/create?orderId=${orderId}`)
     return
   }
 

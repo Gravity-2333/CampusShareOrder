@@ -28,7 +28,17 @@ const navItems = computed(() => {
   return items
 })
 
-const activePath = computed(() => route.path)
+const activePath = computed(() => {
+  if (route.path.startsWith('/orders/')) {
+    return '/orders'
+  }
+
+  if (route.path.startsWith('/complaints/')) {
+    return '/complaints'
+  }
+
+  return route.path
+})
 const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
 const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '收起导航'))
 

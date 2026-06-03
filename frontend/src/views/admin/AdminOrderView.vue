@@ -55,10 +55,17 @@ const summaryText = computed(() => {
 
 const loadOrders = async () => {
   try {
-    await adminStore.loadOrders(filters)
+    const page = await adminStore.loadOrders(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const submitFilters = async () => {
+  filters.page = 1
+  await loadOrders()
 }
 
 const resetFilters = async () => {
@@ -70,6 +77,10 @@ const resetFilters = async () => {
 }
 
 const handleCancel = async (row) => {
+  if (adminStore.submitting) {
+    return
+  }
+
   try {
     const { value } = await ElMessageBox.prompt('请输入取消原因', '取消订单', {
       cancelButtonText: '取消',
@@ -78,6 +89,10 @@ const handleCancel = async (row) => {
       inputValidator: (inputValue) => {
         if (!inputValue?.trim()) {
           return '请输入取消原因'
+        }
+
+        if (inputValue.trim().length > 255) {
+          return '取消原因长度不能超过 255 个字符'
         }
 
         return true
@@ -126,9 +141,9 @@ onMounted(loadOrders)
       <div class="toolbar-row">
         <el-input
           v-model="filters.keyword"
-          placeholder="Search order no, product or pickup point"
+          placeholder="搜索订单号、商品或取货点"
           clearable
-          @keyup.enter="loadOrders"
+          @keyup.enter="submitFilters"
         />
         <el-select
           v-model="filters.status"
@@ -162,7 +177,8 @@ onMounted(loadOrders)
         </el-select>
         <el-button
           type="primary"
-          @click="loadOrders"
+          :loading="adminStore.ordersLoading"
+          @click="submitFilters"
         >
           查询
         </el-button>
@@ -171,7 +187,10 @@ onMounted(loadOrders)
       <div class="table-toolbar">
         <span class="table-caption">共 {{ adminStore.ordersPage.total }} 条订单，优先处理待送达和待收货状态。</span>
         <div class="page-actions">
-          <el-button @click="resetFilters">
+          <el-button
+            :disabled="adminStore.ordersLoading"
+            @click="resetFilters"
+          >
             恢复默认筛选
           </el-button>
         </div>
@@ -234,6 +253,7 @@ onMounted(loadOrders)
                     v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
                     link
                     type="danger"
+                    :disabled="adminStore.submitting"
                     @click="handleCancel(row)"
                   >
                     取消订单
@@ -277,6 +297,7 @@ onMounted(loadOrders)
                 v-if="row.status !== 'CANCELED' && row.status !== 'COMPLETED'"
                 type="danger"
                 plain
+                :loading="adminStore.submitting"
                 @click="handleCancel(row)"
               >
                 取消订单
@@ -294,7 +315,7 @@ onMounted(loadOrders)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!adminStore.ordersLoading"
         title="暂无订单"
         description="订单列表统一通过 store -> api 层消费，便于持续维护。"
       />

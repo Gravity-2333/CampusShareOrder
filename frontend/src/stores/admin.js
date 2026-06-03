@@ -15,14 +15,7 @@ import {
   handleAdminComplaint,
   unbanUser,
 } from '../api/admin'
-
-const defaultPageData = () => ({
-  list: [],
-  page: 1,
-  pageSize: 10,
-  pages: 0,
-  total: 0,
-})
+import { defaultPageData, loadNormalizedPage } from '../utils/page'
 
 export const useAdminStore = defineStore('admin', {
   state: () => ({
@@ -86,7 +79,7 @@ export const useAdminStore = defineStore('admin', {
     usersPage: defaultPageData(),
   }),
   actions: {
-    async loadUsers(params = { page: 1, pageSize: 10 }) {
+    async loadUsers(params = this.usersFilters) {
       this.usersLoading = true
 
       try {
@@ -94,7 +87,9 @@ export const useAdminStore = defineStore('admin', {
           ...this.usersFilters,
           ...params,
         }
-        this.usersPage = await getAdminUsers(this.usersFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getAdminUsers, this.usersFilters)
+        this.usersFilters = resolvedFilters
+        this.usersPage = pageData
         return this.usersPage
       } finally {
         this.usersLoading = false
@@ -102,6 +97,7 @@ export const useAdminStore = defineStore('admin', {
     },
     async loadUserDetail(userId) {
       this.userDetailLoading = true
+      this.userDetail = null
 
       try {
         this.userDetail = await getAdminUserDetail(userId)
@@ -111,6 +107,10 @@ export const useAdminStore = defineStore('admin', {
       }
     },
     async toggleUserStatus(row, payload = { reason: '管理员封禁用户' }) {
+      if (this.submitting) {
+        return this.usersPage
+      }
+
       this.submitting = true
 
       try {
@@ -135,7 +135,7 @@ export const useAdminStore = defineStore('admin', {
         this.submitting = false
       }
     },
-    async loadOrders(params = { page: 1, pageSize: 10, status: '' }) {
+    async loadOrders(params = this.ordersFilters) {
       this.ordersLoading = true
 
       try {
@@ -143,7 +143,9 @@ export const useAdminStore = defineStore('admin', {
           ...this.ordersFilters,
           ...params,
         }
-        this.ordersPage = await getAdminOrders(this.ordersFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getAdminOrders, this.ordersFilters)
+        this.ordersFilters = resolvedFilters
+        this.ordersPage = pageData
         return this.ordersPage
       } finally {
         this.ordersLoading = false
@@ -151,6 +153,7 @@ export const useAdminStore = defineStore('admin', {
     },
     async loadOrderDetail(orderId) {
       this.orderDetailLoading = true
+      this.orderDetail = null
 
       try {
         this.orderDetail = await getAdminOrderDetail(orderId)
@@ -160,6 +163,10 @@ export const useAdminStore = defineStore('admin', {
       }
     },
     async cancelOrder(orderId, payload = { reason: '管理员取消订单' }) {
+      if (this.submitting) {
+        return this.ordersPage
+      }
+
       this.submitting = true
 
       try {
@@ -180,7 +187,7 @@ export const useAdminStore = defineStore('admin', {
         this.submitting = false
       }
     },
-    async loadComplaints(params = { page: 1, pageSize: 10 }) {
+    async loadComplaints(params = this.complaintsFilters) {
       this.complaintsLoading = true
 
       try {
@@ -188,7 +195,12 @@ export const useAdminStore = defineStore('admin', {
           ...this.complaintsFilters,
           ...params,
         }
-        this.complaintsPage = await getAdminComplaints(this.complaintsFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(
+          getAdminComplaints,
+          this.complaintsFilters,
+        )
+        this.complaintsFilters = resolvedFilters
+        this.complaintsPage = pageData
         return this.complaintsPage
       } finally {
         this.complaintsLoading = false
@@ -196,6 +208,7 @@ export const useAdminStore = defineStore('admin', {
     },
     async loadComplaintDetail(complaintId) {
       this.complaintDetailLoading = true
+      this.complaintDetail = null
 
       try {
         this.complaintDetail = await getAdminComplaintDetail(complaintId)
@@ -205,6 +218,10 @@ export const useAdminStore = defineStore('admin', {
       }
     },
     async processComplaint(complaintId, payload = { handleResult: '管理员已介入处理' }) {
+      if (this.submitting) {
+        return this.complaintsPage
+      }
+
       this.submitting = true
 
       try {
@@ -226,7 +243,7 @@ export const useAdminStore = defineStore('admin', {
         this.submitting = false
       }
     },
-    async loadCapitalRecords(params = { page: 1, pageSize: 10 }) {
+    async loadCapitalRecords(params = this.recordsFilters) {
       this.recordsLoading = true
 
       try {
@@ -234,13 +251,15 @@ export const useAdminStore = defineStore('admin', {
           ...this.recordsFilters,
           ...params,
         }
-        this.recordsPage = await getCapitalRecords(this.recordsFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getCapitalRecords, this.recordsFilters)
+        this.recordsFilters = resolvedFilters
+        this.recordsPage = pageData
         return this.recordsPage
       } finally {
         this.recordsLoading = false
       }
     },
-    async loadOperationLogs(params = { page: 1, pageSize: 10 }) {
+    async loadOperationLogs(params = this.logsFilters) {
       this.logsLoading = true
 
       try {
@@ -248,7 +267,9 @@ export const useAdminStore = defineStore('admin', {
           ...this.logsFilters,
           ...params,
         }
-        this.logsPage = await getOperationLogs(this.logsFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getOperationLogs, this.logsFilters)
+        this.logsFilters = resolvedFilters
+        this.logsPage = pageData
         return this.logsPage
       } finally {
         this.logsLoading = false

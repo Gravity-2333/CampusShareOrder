@@ -60,9 +60,14 @@ const loadProfile = async () => {
 }
 
 const handleSubmit = async () => {
+  if (userStore.savingProfile) {
+    return
+  }
+
   const errorMessage = firstValidationError([
     validateNickname(form.nickname),
     requireValue(form.contactInfo, '请填写联系方式'),
+    form.contactInfo.trim().length > 50 ? '联系方式长度不能超过 50 个字符' : '',
   ])
 
   if (errorMessage) {
@@ -171,6 +176,8 @@ onMounted(loadProfile)
         <el-form-item label="联系方式">
           <el-input
             v-model="form.contactInfo"
+            maxlength="50"
+            show-word-limit
             placeholder="例如：微信 zhangsan_01"
           />
         </el-form-item>

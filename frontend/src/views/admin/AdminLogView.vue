@@ -22,7 +22,7 @@ const filters = reactive({
 
 const stats = computed(() => {
   const list = adminStore.logsPage.list
-  const adminActions = list.filter((item) => String(item.operatorName || '').includes('管理员')).length
+  const adminActions = list.filter((item) => item.operatorType === 'ADMIN').length
   const complaintActions = list.filter((item) => String(item.action).includes('COMPLAINT')).length
 
   return [
@@ -58,7 +58,9 @@ const summaryText = computed(() => {
 
 const loadLogs = async () => {
   try {
-    await adminStore.loadOperationLogs(filters)
+    const page = await adminStore.loadOperationLogs(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -155,6 +157,7 @@ onMounted(loadLogs)
         </el-select>
         <el-button
           type="primary"
+          :loading="adminStore.logsLoading"
           @click="submitFilters"
         >
           查询
@@ -166,7 +169,10 @@ onMounted(loadLogs)
           共 {{ adminStore.logsPage.total }} 条日志{{ filters.action ? `，当前关键字：${filters.action}` : '' }}。
         </span>
         <div class="page-actions">
-          <el-button @click="resetFilters">
+          <el-button
+            :disabled="adminStore.logsLoading"
+            @click="resetFilters"
+          >
             恢复默认筛选
           </el-button>
         </div>
@@ -243,7 +249,7 @@ onMounted(loadLogs)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!adminStore.logsLoading"
         title="暂无操作日志"
         description="订单、投诉和后台处理动作会在这里持续沉淀。"
       />

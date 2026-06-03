@@ -69,8 +69,7 @@ export const normalizeOrderDetail = (detail = {}) => {
       deadlineAt: detail.basicInfo?.deadlineAt || '',
       estimatedTotalAmount:
         Number(detail.basicInfo?.estimatedTotalAmount || detail.paymentSummary?.estimatedTotalAmount || 0),
-      expectedDeliveryEndAt:
-        detail.basicInfo?.expectedDeliveryEndAt || detail.basicInfo?.expectedDeliveryStartAt || '',
+      expectedDeliveryEndAt: detail.basicInfo?.expectedDeliveryEndAt || '',
       orderId: Number(detail.basicInfo?.orderId || 0),
       orderNo: detail.basicInfo?.orderNo || '',
       pickupPoint: detail.basicInfo?.pickupPoint || '',

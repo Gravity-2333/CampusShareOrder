@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -60,7 +61,7 @@ const loadDetail = async (orderId = route.params.orderId) => {
 }
 
 const handleCancel = async () => {
-  if (!detail.value) {
+  if (!detail.value || adminStore.submitting) {
     return
   }
 
@@ -72,6 +73,10 @@ const handleCancel = async () => {
       inputValidator: (inputValue) => {
         if (!inputValue?.trim()) {
           return '请输入取消原因'
+        }
+
+        if (inputValue.trim().length > 255) {
+          return '取消原因长度不能超过 255 个字符'
         }
 
         return true
@@ -259,6 +264,24 @@ onMounted(() => {
           </el-button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="!adminStore.orderDetailLoading"
+        title="订单详情不可用"
+        description="当前未能加载到订单详情，请返回列表重新选择。"
+      >
+        <div class="page-actions">
+          <el-button @click="router.push('/admin/orders')">
+            返回订单管理
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="loadDetail()"
+          >
+            重新加载
+          </el-button>
+        </div>
+      </EmptyState>
     </PageSection>
   </div>
 </template>

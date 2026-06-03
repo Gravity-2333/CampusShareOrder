@@ -50,6 +50,10 @@ const loadProfile = async () => {
 }
 
 const handleSubmit = async () => {
+  if (userStore.verifyingStudent) {
+    return
+  }
+
   const errorMessage = validateStudentNo(form.studentNo)
 
   if (errorMessage) {

@@ -137,6 +137,10 @@ const routes = [
       },
     ],
   },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/orders',
+  },
 ]
 
 const router = createRouter({

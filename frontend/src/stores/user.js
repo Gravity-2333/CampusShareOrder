@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { adminLogin, getCurrentLoginInfo, login, logout, register } from '../api/auth'
 import { getUserCredit, getUserProfile, updateUserProfile, verifyStudent } from '../api/user'
 import { clearSessionStorage, getStoredSession, saveSessionStorage } from '../utils/auth'
+import { loadNormalizedPage } from '../utils/page'
 
 const defaultSession = () => ({
   adminId: null,
@@ -27,6 +28,10 @@ const defaultCredit = () => ({
 export const useUserStore = defineStore('user', {
   state: () => ({
     credit: defaultCredit(),
+    creditFilters: {
+      page: 1,
+      pageSize: 10,
+    },
     creditLoading: false,
     initialized: false,
     initializing: false,
@@ -101,13 +106,20 @@ export const useUserStore = defineStore('user', {
       clearSessionStorage()
     },
     async initializeSession() {
+      const cached = getStoredSession()
+
+      if (this.initialized) {
+        if (!cached?.token && this.session.token) {
+          this.clearSession()
+        }
+        return
+      }
+
       if (this.initialized || this.initializing) {
         return
       }
 
       this.initializing = true
-
-      const cached = getStoredSession()
 
       if (!cached?.token) {
         this.initialized = true
@@ -162,6 +174,8 @@ export const useUserStore = defineStore('user', {
     async logoutCurrent() {
       try {
         await logout()
+      } catch {
+        // Local logout should still complete when the server session is already gone.
       } finally {
         this.clearSession()
       }
@@ -202,17 +216,35 @@ export const useUserStore = defineStore('user', {
         this.savingProfile = false
       }
     },
-    async loadCredit(params = { page: 1, pageSize: 10 }) {
+    async loadCredit(params = this.creditFilters) {
       this.creditLoading = true
 
       try {
-        const credit = await getUserCredit(params)
+        this.creditFilters = {
+          ...this.creditFilters,
+          ...params,
+        }
+
+        let resolvedCredit = null
+        const { filters: resolvedFilters, pageData: page } = await loadNormalizedPage(async (filters) => {
+          resolvedCredit = await getUserCredit(filters)
+          return {
+            ...resolvedCredit,
+            list: resolvedCredit.records,
+          }
+        }, this.creditFilters)
+        this.creditFilters = resolvedFilters
+
         this.credit = {
           ...defaultCredit(),
-          ...credit,
-          records: Array.isArray(credit.records) ? credit.records : [],
+          ...resolvedCredit,
+          page: page.page,
+          pageSize: page.pageSize,
+          pages: page.pages,
+          records: page.list,
+          total: page.total,
         }
-        return credit
+        return resolvedCredit
       } finally {
         this.creditLoading = false
       }

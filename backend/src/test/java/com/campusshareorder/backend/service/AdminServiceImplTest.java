@@ -158,7 +158,7 @@ class AdminServiceImplTest {
 
         ArgumentCaptor<CreditChangeRecord> creditCaptor = ArgumentCaptor.forClass(CreditChangeRecord.class);
         verify(creditChangeRecordMapper).insert(creditCaptor.capture());
-        assertThat(creditCaptor.getValue().getReasonType()).isEqualTo("COMPLAINT_PENALTY");
+        assertThat(creditCaptor.getValue().getReasonType()).isEqualTo("COMPLAINT_CONFIRMED");
         assertThat(creditCaptor.getValue().getChangeValue()).isEqualTo(-10);
     }
 

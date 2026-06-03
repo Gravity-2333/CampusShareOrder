@@ -9,10 +9,13 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
+import { useUserStore } from '../../stores/user'
 import { formatJoinStatus, formatOrderStatus, formatPayStatus, formatReceiveStatus, formatRole } from '../../utils/format'
 
 const router = useRouter()
 const orderStore = useOrderStore()
+const userStore = useUserStore()
+const canCreateOrder = computed(() => userStore.session.isVerified)
 
 const stats = computed(() => [
   {
@@ -48,6 +51,16 @@ const handlePageChange = async ({ page, pageSize }) => {
   }
 }
 
+const goCreateOrder = () => {
+  if (canCreateOrder.value) {
+    router.push('/orders/create')
+    return
+  }
+
+  ElMessage.warning('请先完成实名认证，再发起拼单')
+  router.push('/verify-student')
+}
+
 onMounted(loadOrders)
 </script>
 
@@ -76,9 +89,9 @@ onMounted(loadOrders)
           <el-button
             type="primary"
             plain
-            @click="router.push('/orders/create')"
+            @click="goCreateOrder"
           >
-            发起新拼单
+            {{ canCreateOrder ? '发起新拼单' : '先去认证再发起' }}
           </el-button>
         </div>
       </div>
@@ -186,7 +199,7 @@ onMounted(loadOrders)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!orderStore.myOrdersLoading"
         title="还没有参与的拼单"
         description="加入或创建拼单后，这里会展示你的订单记录。"
       >
@@ -197,9 +210,9 @@ onMounted(loadOrders)
           <el-button
             type="primary"
             plain
-            @click="router.push('/orders/create')"
+            @click="goCreateOrder"
           >
-            直接发起拼单
+            {{ canCreateOrder ? '直接发起拼单' : '去完成认证' }}
           </el-button>
         </div>
       </EmptyState>

@@ -21,6 +21,10 @@ const adminFocus = [
 ]
 
 const handleSubmit = async () => {
+  if (loading.value) {
+    return
+  }
+
   const errorMessage = validationSummary([
     requireValue(form.username, '请输入管理员账号'),
     validatePassword(form.password, '管理员密码'),

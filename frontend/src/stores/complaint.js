@@ -1,14 +1,7 @@
 import { defineStore } from 'pinia'
 
 import { createComplaint, getComplaintDetail, getMyComplaints } from '../api/complaint'
-
-const defaultPageData = () => ({
-  list: [],
-  page: 1,
-  pageSize: 10,
-  pages: 0,
-  total: 0,
-})
+import { defaultPageData, loadNormalizedPage } from '../utils/page'
 
 export const useComplaintStore = defineStore('complaint', {
   state: () => ({
@@ -23,7 +16,7 @@ export const useComplaintStore = defineStore('complaint', {
     submitting: false,
   }),
   actions: {
-    async loadMyComplaints(params = { page: 1, pageSize: 10 }) {
+    async loadMyComplaints(params = this.myComplaintsFilters) {
       this.myComplaintsLoading = true
 
       try {
@@ -31,7 +24,12 @@ export const useComplaintStore = defineStore('complaint', {
           ...this.myComplaintsFilters,
           ...params,
         }
-        this.myComplaintsPage = await getMyComplaints(this.myComplaintsFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(
+          getMyComplaints,
+          this.myComplaintsFilters,
+        )
+        this.myComplaintsFilters = resolvedFilters
+        this.myComplaintsPage = pageData
         return this.myComplaintsPage
       } finally {
         this.myComplaintsLoading = false
@@ -39,6 +37,7 @@ export const useComplaintStore = defineStore('complaint', {
     },
     async loadComplaintDetail(complaintId) {
       this.complaintDetailLoading = true
+      this.complaintDetail = null
 
       try {
         this.complaintDetail = await getComplaintDetail(complaintId)

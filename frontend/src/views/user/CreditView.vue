@@ -54,7 +54,7 @@ const formatRelatedBiz = (row) => {
   return '--'
 }
 
-const loadCredit = async (params = { page: 1, pageSize: 10 }) => {
+const loadCredit = async (params) => {
   try {
     await Promise.all([userStore.loadCredit(params), userStore.ensureProfileLoaded()])
   } catch (error) {
@@ -172,7 +172,7 @@ onMounted(loadCredit)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!userStore.creditLoading"
         title="暂无信用分记录"
         description="信用分记录会在投诉处理等场景后自动同步。"
       />

@@ -58,7 +58,9 @@ const stats = computed(() => {
 
 const loadOrders = async () => {
   try {
-    await orderStore.loadHallOrders(filters)
+    const page = await orderStore.loadHallOrders(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -102,6 +104,10 @@ const getJoinButtonText = (order) => {
 }
 
 const handleJoin = async (order) => {
+  if (orderStore.submitting) {
+    return
+  }
+
   if (!canJoinOrder(order)) {
     if (order.status !== 'OPEN') {
       ElMessage.warning('当前订单已不可直接加入')
@@ -121,6 +127,10 @@ const handleJoin = async (order) => {
 }
 
 const handleJoinAndView = async (order) => {
+  if (orderStore.submitting) {
+    return
+  }
+
   if (!canJoinOrder(order)) {
     ElMessage.warning('当前订单已不可直接加入')
     return
@@ -207,7 +217,10 @@ onMounted(loadOrders)
       </div>
 
       <div class="page-actions wrap-actions">
-        <el-button @click="resetFilters">
+        <el-button
+          :disabled="orderStore.hallLoading"
+          @click="resetFilters"
+        >
           重置筛选
         </el-button>
         <el-button
@@ -295,7 +308,7 @@ onMounted(loadOrders)
         />
       </template>
       <EmptyState
-        v-else
+        v-else-if="!orderStore.hallLoading"
         title="暂无匹配的拼单"
         description="可以调整筛选条件，或在完成实名认证后自己发起一个新的拼单。"
       >

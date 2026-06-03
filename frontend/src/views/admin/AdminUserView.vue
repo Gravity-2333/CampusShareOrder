@@ -53,10 +53,17 @@ const summaryText = computed(() => {
 
 const loadUsers = async () => {
   try {
-    await adminStore.loadUsers(filters)
+    const page = await adminStore.loadUsers(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const submitFilters = async () => {
+  filters.page = 1
+  await loadUsers()
 }
 
 const resetFilters = async () => {
@@ -68,6 +75,10 @@ const resetFilters = async () => {
 }
 
 const toggleStatus = async (row) => {
+  if (adminStore.submitting) {
+    return
+  }
+
   try {
     if (row.status === 'NORMAL') {
       const { value } = await ElMessageBox.prompt('请输入封禁原因', '封禁用户', {
@@ -77,6 +88,10 @@ const toggleStatus = async (row) => {
         inputValidator: (inputValue) => {
           if (!inputValue?.trim()) {
             return '请输入封禁原因'
+          }
+
+          if (inputValue.trim().length > 255) {
+            return '封禁原因长度不能超过 255 个字符'
           }
 
           return true
@@ -132,7 +147,7 @@ onMounted(loadUsers)
           v-model="filters.keyword"
           placeholder="按昵称或手机号搜索"
           clearable
-          @keyup.enter="loadUsers"
+          @keyup.enter="submitFilters"
         />
         <el-select
           v-model="filters.status"
@@ -150,7 +165,8 @@ onMounted(loadUsers)
         </el-select>
         <el-button
           type="primary"
-          @click="loadUsers"
+          :loading="adminStore.usersLoading"
+          @click="submitFilters"
         >
           查询
         </el-button>
@@ -159,7 +175,10 @@ onMounted(loadUsers)
       <div class="table-toolbar">
         <span class="table-caption">共 {{ adminStore.usersPage.total }} 个账号，详情页承接认证和信用记录等完整信息。</span>
         <div class="page-actions">
-          <el-button @click="resetFilters">
+          <el-button
+            :disabled="adminStore.usersLoading"
+            @click="resetFilters"
+          >
             恢复默认筛选
           </el-button>
         </div>
@@ -227,6 +246,7 @@ onMounted(loadUsers)
                   <el-button
                     link
                     :type="row.status === 'NORMAL' ? 'danger' : 'primary'"
+                    :disabled="adminStore.submitting"
                     @click="toggleStatus(row)"
                   >
                     {{ row.status === 'NORMAL' ? '封禁' : '解封' }}
@@ -270,6 +290,7 @@ onMounted(loadUsers)
               <el-button
                 :type="row.status === 'NORMAL' ? 'danger' : 'primary'"
                 plain
+                :loading="adminStore.submitting"
                 @click="toggleStatus(row)"
               >
                 {{ row.status === 'NORMAL' ? '封禁用户' : '解封用户' }}
@@ -287,7 +308,7 @@ onMounted(loadUsers)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!adminStore.usersLoading"
         title="暂无用户"
         description="用户列表统一通过 store -> api 层消费，便于持续维护。"
       />

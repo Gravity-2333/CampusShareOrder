@@ -28,6 +28,10 @@ const registerTips = [
 ]
 
 const handleSubmit = async () => {
+  if (loading.value) {
+    return
+  }
+
   const errorMessage = validationSummary([
     validateNickname(form.nickname),
     validatePhone(form.phone),

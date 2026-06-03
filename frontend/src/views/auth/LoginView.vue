@@ -16,6 +16,10 @@ const form = reactive({
 const loading = ref(false)
 
 const handleSubmit = async () => {
+  if (loading.value) {
+    return
+  }
+
   const errorMessage = firstValidationError([
     validatePhone(form.phone),
     validatePassword(form.password),

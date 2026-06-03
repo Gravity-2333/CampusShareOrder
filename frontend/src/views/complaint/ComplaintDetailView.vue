@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -147,6 +148,24 @@ onMounted(() => {
           </el-button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="!complaintStore.complaintDetailLoading"
+        title="投诉详情不可用"
+        description="当前未能加载到投诉详情，请返回列表重新选择。"
+      >
+        <div class="page-actions">
+          <el-button @click="router.push('/complaints')">
+            返回我的投诉
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="loadDetail()"
+          >
+            重新加载
+          </el-button>
+        </div>
+      </EmptyState>
     </PageSection>
   </div>
 </template>

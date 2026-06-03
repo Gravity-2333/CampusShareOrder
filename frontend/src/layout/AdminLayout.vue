@@ -20,7 +20,21 @@ const navItems = [
   { label: '操作日志', path: '/admin/records/logs' },
 ]
 
-const activePath = computed(() => route.path)
+const activePath = computed(() => {
+  if (route.path.startsWith('/admin/users/')) {
+    return '/admin/users'
+  }
+
+  if (route.path.startsWith('/admin/orders/')) {
+    return '/admin/orders'
+  }
+
+  if (route.path.startsWith('/admin/complaints/')) {
+    return '/admin/complaints'
+  }
+
+  return route.path
+})
 const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
 const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '收起导航'))
 

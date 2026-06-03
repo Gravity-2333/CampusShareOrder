@@ -26,6 +26,12 @@ defineProps({
           {{ kicker }}
         </p>
         <h3>{{ title }}</h3>
+        <p
+          v-if="description"
+          class="section-description"
+        >
+          {{ description }}
+        </p>
       </div>
     </div>
     <div class="section-body">

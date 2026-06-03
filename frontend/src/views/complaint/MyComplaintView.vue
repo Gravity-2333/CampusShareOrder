@@ -32,17 +32,9 @@ const stats = computed(() => [
   },
 ])
 
-const summaryText = computed(() => {
-  if (!complaintStore.myComplaintsPage.list.length) {
-    return '当前没有投诉记录。'
-  }
-
-  return '投诉列表优先帮助你快速区分待处理和已处理项目，详细结果在详情页继续查看。'
-})
-
 const loadComplaints = async () => {
   try {
-    await complaintStore.loadMyComplaints({ page: 1, pageSize: 10 })
+    await complaintStore.loadMyComplaints()
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -75,10 +67,6 @@ onMounted(loadComplaints)
       title="我的投诉"
       description="查看投诉处理进度、处理结果和关联订单信息。"
     >
-      <p class="muted-text">
-        {{ summaryText }}
-      </p>
-
       <div class="table-toolbar">
         <span class="table-caption">共 {{ complaintStore.myComplaintsPage.total }} 条投诉记录，建议优先查看待处理项。</span>
         <div class="page-actions">
@@ -190,7 +178,7 @@ onMounted(loadComplaints)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!complaintStore.myComplaintsLoading"
         title="暂无投诉"
         description="订单出现异常时，你可以从订单详情页发起投诉。"
       />

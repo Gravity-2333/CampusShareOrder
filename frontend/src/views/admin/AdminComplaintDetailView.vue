@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -52,7 +53,7 @@ const loadDetail = async (complaintId = route.params.complaintId) => {
 }
 
 const handleProcess = async () => {
-  if (!complaint.value) {
+  if (!complaint.value || adminStore.submitting) {
     return
   }
 
@@ -64,6 +65,10 @@ const handleProcess = async () => {
       inputValidator: (inputValue) => {
         if (!inputValue?.trim()) {
           return '请输入处理结果'
+        }
+
+        if (inputValue.trim().length > 500) {
+          return '处理结果长度不能超过 500 个字符'
         }
 
         return true
@@ -166,9 +171,9 @@ onMounted(() => {
           <el-button
             type="primary"
             plain
-            @click="router.push('/admin/orders')"
+            @click="router.push(`/admin/orders/${complaint.orderId}`)"
           >
-            查看订单管理
+            查看关联订单
           </el-button>
           <el-button
             v-if="complaint.status === 'PENDING'"
@@ -180,6 +185,24 @@ onMounted(() => {
           </el-button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="!adminStore.complaintDetailLoading"
+        title="投诉详情不可用"
+        description="当前未能加载到投诉详情，请返回列表重新选择。"
+      >
+        <div class="page-actions">
+          <el-button @click="router.push('/admin/complaints')">
+            返回投诉管理
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            @click="loadDetail()"
+          >
+            重新加载
+          </el-button>
+        </div>
+      </EmptyState>
     </PageSection>
   </div>
 </template>

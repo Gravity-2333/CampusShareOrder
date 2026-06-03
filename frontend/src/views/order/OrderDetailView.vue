@@ -17,6 +17,7 @@ import {
   formatReceiveStatus,
   formatRole,
 } from '../../utils/format'
+import { validateApiDateTime } from '../../utils/validate'
 
 const route = useRoute()
 const router = useRouter()
@@ -63,7 +64,7 @@ const deadlineRemainingText = computed(() => {
     return '已结束'
   }
 
-  const remainingMs = new Date(deadlineAt).getTime() - now.value
+  const remainingMs = new Date(String(deadlineAt).replace(' ', 'T')).getTime() - now.value
   if (Number.isNaN(remainingMs) || remainingMs <= 0) {
     return '已截止'
   }
@@ -270,6 +271,7 @@ const confirmAction = async (action) => {
 }
 
 const toApiDateTime = (value) => String(value || '').trim()
+const parseApiDateTime = (value) => new Date(String(value || '').trim().replace(' ', 'T')).getTime()
 
 const promptReceiptPayload = async () => {
   const { value: imageUrl } = await ElMessageBox.prompt('请输入凭证图片地址', '上传凭证', {
@@ -279,6 +281,10 @@ const promptReceiptPayload = async () => {
     inputValidator: (inputValue) => {
       if (!inputValue?.trim()) {
         return '请输入凭证图片地址'
+      }
+
+      if (inputValue.trim().length > 500) {
+        return '凭证图片地址长度不能超过 500 个字符'
       }
 
       return true
@@ -307,28 +313,23 @@ const promptReceiptPayload = async () => {
   const { value: startAt } = await ElMessageBox.prompt('请输入预计开始送达时间', '上传凭证', {
     cancelButtonText: '取消',
     confirmButtonText: '下一步',
-    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
     inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
     inputValidator: (inputValue) => {
-      if (!inputValue?.trim()) {
-        return '请输入预计开始送达时间'
-      }
-
-      return true
+      return validateApiDateTime(inputValue, '预计开始送达时间格式应为 yyyy-MM-dd HH:mm:ss') || true
     },
   })
 
   const { value: endAt } = await ElMessageBox.prompt('请输入预计最晚送达时间', '上传凭证', {
     cancelButtonText: '取消',
     confirmButtonText: '提交',
-    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
     inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
     inputValidator: (inputValue) => {
-      if (!inputValue?.trim()) {
-        return '请输入预计最晚送达时间'
+      const formatError = validateApiDateTime(inputValue, '预计最晚送达时间格式应为 yyyy-MM-dd HH:mm:ss')
+      if (formatError) {
+        return formatError
       }
 
-      return true
+      return parseApiDateTime(inputValue) > parseApiDateTime(startAt) || '预计最晚送达时间必须晚于开始送达时间'
     },
   })
 
@@ -366,6 +367,10 @@ const navigateToComplaint = () => {
 }
 
 const runAction = async (action) => {
+  if (orderStore.submitting && action !== 'viewReceipt') {
+    return
+  }
+
   if (!currentOrderId.value) {
     return
   }

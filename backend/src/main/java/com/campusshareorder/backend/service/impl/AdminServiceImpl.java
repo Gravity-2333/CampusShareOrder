@@ -537,7 +537,7 @@ public class AdminServiceImpl implements AdminService {
         Long existingCount = creditChangeRecordMapper.selectCount(
                 new LambdaQueryWrapper<CreditChangeRecord>()
                         .eq(CreditChangeRecord::getRelatedComplaintId, complaint.getId())
-                        .eq(CreditChangeRecord::getReasonType, "COMPLAINT_PENALTY")
+                        .in(CreditChangeRecord::getReasonType, List.of("COMPLAINT_CONFIRMED", "COMPLAINT_PENALTY"))
         );
         if (existingCount != null && existingCount > 0) {
             return;
@@ -556,7 +556,7 @@ public class AdminServiceImpl implements AdminService {
         CreditChangeRecord record = new CreditChangeRecord();
         record.setUserId(accusedUser.getId());
         record.setChangeValue(delta);
-        record.setReasonType("COMPLAINT_PENALTY");
+        record.setReasonType("COMPLAINT_CONFIRMED");
         record.setRelatedOrderId(complaint.getGroupOrderId());
         record.setRelatedComplaintId(complaint.getId());
         record.setRemark("投诉成立扣减信用分");

@@ -43,7 +43,9 @@ const summaryText = computed(() => {
 
 const loadComplaints = async () => {
   try {
-    await adminStore.loadComplaints(filters)
+    const page = await adminStore.loadComplaints(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -62,6 +64,10 @@ const handleReset = async () => {
 }
 
 const handleComplaint = async (row) => {
+  if (adminStore.submitting) {
+    return
+  }
+
   try {
     const { value } = await ElMessageBox.prompt('请输入处理结果摘要', '处理投诉', {
       cancelButtonText: '取消',
@@ -70,6 +76,10 @@ const handleComplaint = async (row) => {
       inputValidator: (inputValue) => {
         if (!inputValue?.trim()) {
           return '请输入处理结果'
+        }
+
+        if (inputValue.trim().length > 500) {
+          return '处理结果长度不能超过 500 个字符'
         }
 
         return true
@@ -88,13 +98,9 @@ const handleComplaint = async (row) => {
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
-  try {
-    filters.page = page
-    filters.pageSize = pageSize
-    await adminStore.loadComplaints(filters)
-  } catch (error) {
-    ElMessage.error(error.message)
-  }
+  filters.page = page
+  filters.pageSize = pageSize
+  await loadComplaints()
 }
 
 onMounted(loadComplaints)
@@ -141,11 +147,15 @@ onMounted(loadComplaints)
           </el-select>
           <el-button
             type="primary"
+            :loading="adminStore.complaintsLoading"
             @click="handleSearch"
           >
             查询
           </el-button>
-          <el-button @click="handleReset">
+          <el-button
+            :disabled="adminStore.complaintsLoading"
+            @click="handleReset"
+          >
             重置
           </el-button>
         </div>
@@ -208,6 +218,7 @@ onMounted(loadComplaints)
                     v-if="row.status === 'PENDING'"
                     link
                     type="danger"
+                    :disabled="adminStore.submitting"
                     @click="handleComplaint(row)"
                   >
                     标记处理
@@ -251,6 +262,7 @@ onMounted(loadComplaints)
                 v-if="row.status === 'PENDING'"
                 type="danger"
                 plain
+                :loading="adminStore.submitting"
                 @click="handleComplaint(row)"
               >
                 处理投诉
@@ -268,7 +280,7 @@ onMounted(loadComplaints)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!adminStore.complaintsLoading"
         title="暂无投诉"
         description="当前没有投诉记录，可在用户端提交投诉后回到这里处理。"
       />

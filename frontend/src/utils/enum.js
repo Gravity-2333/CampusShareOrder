@@ -59,8 +59,10 @@ export const capitalRecordTypeTextMap = {
 }
 
 export const creditReasonTypeTextMap = {
+  COMPLAINT_CONFIRMED: '投诉扣分',
   COMPLAINT_PENALTY: '投诉扣分',
   INITIAL: '初始信用分',
+  ORDER_FINISHED: '完成订单奖励',
 }
 
 export const statusToneMap = {

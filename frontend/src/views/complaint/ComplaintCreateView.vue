@@ -13,6 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const complaintStore = useComplaintStore()
 const loading = ref(false)
+const isOrderIdLocked = Number(route.query.orderId || 0) > 0
 const form = reactive({
   content: '',
   orderId: Number(route.query.orderId || 0),
@@ -20,9 +21,14 @@ const form = reactive({
 })
 
 const handleSubmit = async () => {
+  if (loading.value || complaintStore.submitting) {
+    return
+  }
+
   const errorMessage = firstValidationError([
     validatePositiveNumber(form.orderId, '请填写正确的订单 ID'),
     requireValue(form.content, '请填写投诉内容'),
+    form.content.trim().length > 500 ? '投诉内容长度不能超过 500 个字符' : '',
   ])
 
   if (errorMessage) {
@@ -64,7 +70,7 @@ const handleSubmit = async () => {
       description="提交后平台会进入处理流程，你可以在我的投诉中跟踪进展。"
     >
       <el-alert
-        title="投诉提交后将进入待处理状态，后续可在我的投诉中查看处理结果。"
+        :title="isOrderIdLocked ? '已从订单详情带入投诉订单，提交前请确认投诉类型和说明。' : '投诉提交后将进入待处理状态，后续可在我的投诉中查看处理结果。'"
         type="warning"
         :closable="false"
       />
@@ -83,6 +89,7 @@ const handleSubmit = async () => {
           <el-input-number
             v-model="form.orderId"
             :min="1"
+            :disabled="isOrderIdLocked"
           />
         </el-form-item>
         <el-form-item label="投诉类型">
@@ -104,6 +111,8 @@ const handleSubmit = async () => {
           <el-input
             v-model="form.content"
             type="textarea"
+            maxlength="500"
+            show-word-limit
             :rows="5"
             placeholder="请简要描述订单异常、发生时间和你希望平台介入处理的原因"
           />
@@ -113,6 +122,13 @@ const handleSubmit = async () => {
       <div class="page-actions">
         <el-button @click="router.push('/complaints')">
           返回我的投诉
+        </el-button>
+        <el-button
+          v-if="isOrderIdLocked"
+          plain
+          @click="router.push(`/orders/${form.orderId}`)"
+        >
+          返回关联订单
         </el-button>
         <el-button
           type="danger"

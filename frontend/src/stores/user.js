@@ -45,19 +45,23 @@ export const useUserStore = defineStore('user', {
     creditLevel(state) {
       const score = Number(state.credit.creditScore || state.profile?.creditScore || 0)
 
-      if (score >= 95) {
-        return '优秀'
+      if (score >= 81) {
+        return 'A'
       }
 
-      if (score >= 80) {
-        return '良好'
+      if (score >= 61) {
+        return 'B'
       }
 
-      if (score >= 60) {
-        return '观察'
+      if (score >= 41) {
+        return 'C'
       }
 
-      return '预警'
+      if (score >= 21) {
+        return 'D'
+      }
+
+      return 'E'
     },
     displayName(state) {
       return state.session.nickname || state.session.username || '未登录'

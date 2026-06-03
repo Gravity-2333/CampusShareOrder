@@ -48,6 +48,10 @@ export const complaintStatusTextMap = {
 export const complaintTypeTextMap = {
   FAKE_RECEIPT: '伪造凭证',
   NOT_PURCHASED: '未购买',
+  NO_SHIP: '未发货',
+  NO_DELIVERY: '未送达',
+  QUALITY: '商品质量',
+  OTHER: '其他',
 }
 
 export const capitalRecordTypeTextMap = {

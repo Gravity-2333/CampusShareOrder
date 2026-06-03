@@ -145,8 +145,8 @@ onMounted(() => {
         </div>
 
         <div class="detail-grid">
-          <div class="surface-card detail-panel">
-            <h3>基础信息</h3>
+          <div class="detail-panel">
+            <h4>基础信息</h4>
             <ul class="detail-list">
               <li><span>手机号</span><strong>{{ user.phone || '--' }}</strong></li>
               <li><span>联系方式</span><strong>{{ user.contactInfo || '--' }}</strong></li>
@@ -156,8 +156,8 @@ onMounted(() => {
             </ul>
           </div>
 
-          <div class="surface-card detail-panel">
-            <h3>治理信息</h3>
+          <div class="detail-panel">
+            <h4>治理信息</h4>
             <ul class="detail-list">
               <li><span>账号状态</span><strong>{{ formatUserStatus(user.status) }}</strong></li>
               <li><span>信用分</span><strong>{{ user.creditScore }}</strong></li>
@@ -165,10 +165,11 @@ onMounted(() => {
           </div>
         </div>
 
-        <PageSection
-          title="信用记录"
-          description="便于后台查看该用户过往信用变化。"
+        <div
+          class="detail-panel"
+          style="margin-top: 1rem;"
         >
+          <h4>信用记录</h4>
           <template v-if="user.creditRecords?.length">
             <div class="desktop-table">
               <el-table
@@ -196,7 +197,7 @@ onMounted(() => {
               <article
                 v-for="(row, index) in user.creditRecords"
                 :key="`${row.createdAt}-${index}`"
-                class="surface-card mobile-record-card"
+                class="mobile-record-card"
               >
                 <div class="mobile-record-title">
                   <span>{{ formatDateTime(row.createdAt) }}</span>
@@ -214,9 +215,12 @@ onMounted(() => {
             title="暂无信用记录"
             description="该用户当前没有可展示的信用分变更记录。"
           />
-        </PageSection>
+        </div>
 
-        <div class="page-actions wrap-actions">
+        <div
+          class="page-actions wrap-actions"
+          style="margin-top: 1.5rem; padding: 1rem; background: #f8f6f2; border-radius: 10px;"
+        >
           <el-button @click="router.push('/admin/users')">
             返回用户管理
           </el-button>

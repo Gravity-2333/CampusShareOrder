@@ -16,7 +16,7 @@ public class CreateComplaintRequest {
     private Long accusedUserId;
 
     @NotBlank(message = "投诉类型不能为空")
-    @Pattern(regexp = "NOT_PURCHASED|FAKE_RECEIPT", message = "投诉类型不合法")
+    @Pattern(regexp = "NOT_PURCHASED|FAKE_RECEIPT|NO_SHIP|NO_DELIVERY|QUALITY|OTHER", message = "投诉类型不合法")
     private String type;
 
     @NotBlank(message = "投诉内容不能为空")

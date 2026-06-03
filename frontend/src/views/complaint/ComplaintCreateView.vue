@@ -1,25 +1,64 @@
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import PageSection from '../../components/common/PageSection.vue'
-import StatCard from '../../components/common/StatCard.vue'
 import { useComplaintStore } from '../../stores/complaint'
-import { formatComplaintType } from '../../utils/format'
-import { firstValidationError, validatePositiveNumber, requireValue } from '../../utils/validate'
+import { useOrderStore } from '../../stores/order'
+import { firstValidationError, requireValue } from '../../utils/validate'
 
-const route = useRoute()
 const router = useRouter()
 const complaintStore = useComplaintStore()
+const orderStore = useOrderStore()
 const loading = ref(false)
-const getRouteOrderId = () => Number(route.query.orderId || 0)
-const isOrderIdLocked = computed(() => getRouteOrderId() > 0)
+const loadingOrders = ref(false)
+const complaintableOrders = ref([])
+
 const form = reactive({
   content: '',
-  orderId: getRouteOrderId(),
-  type: 'NOT_PURCHASED',
+  orderId: null,
+  type: '',
 })
+
+// 投诉类型选项
+const complaintTypes = [
+  { label: '未购买', value: 'NOT_PURCHASED' },
+  { label: '伪造凭证', value: 'FAKE_RECEIPT' },
+  { label: '未发货', value: 'NO_SHIP' },
+  { label: '未送达', value: 'NO_DELIVERY' },
+  { label: '商品质量', value: 'QUALITY' },
+  { label: '其他', value: 'OTHER' },
+]
+
+// 是否有可投诉订单
+const hasComplaintableOrders = computed(() => complaintableOrders.value.length > 0)
+
+// 加载可投诉的订单列表
+const loadComplaintableOrders = async () => {
+  loadingOrders.value = true
+  try {
+    // 获取我的订单列表
+    await orderStore.loadMyOrders({ page: 1, pageSize: 100 })
+
+    // 筛选可投诉的订单（状态为已完成或特定状态的订单）
+    complaintableOrders.value = orderStore.myOrdersPage.list
+      .filter(order => {
+        // 可以投诉的订单状态：已成团、待送达、待收货、已完成
+        const complaintableStatuses = ['GROUPED', 'WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED']
+        return complaintableStatuses.includes(order.status)
+      })
+      .map(order => ({
+        orderId: order.orderId,
+        orderNo: order.orderNo,
+        productName: order.productName,
+        label: `${order.orderNo} - ${order.productName}`,
+      }))
+  } catch (error) {
+    ElMessage.error('加载订单列表失败：' + error.message)
+  } finally {
+    loadingOrders.value = false
+  }
+}
 
 const handleSubmit = async () => {
   if (loading.value || complaintStore.submitting) {
@@ -27,9 +66,10 @@ const handleSubmit = async () => {
   }
 
   const errorMessage = firstValidationError([
-    validatePositiveNumber(form.orderId, '请填写正确的订单 ID'),
-    requireValue(form.content, '请填写投诉内容'),
-    form.content.trim().length > 500 ? '投诉内容长度不能超过 500 个字符' : '',
+    requireValue(form.orderId, '请选择要投诉的订单'),
+    requireValue(form.type, '请选择投诉类型'),
+    requireValue(form.content, '请填写投诉描述'),
+    form.content.trim().length > 500 ? '投诉描述长度不能超过 500 个字符' : '',
   ])
 
   if (errorMessage) {
@@ -41,7 +81,8 @@ const handleSubmit = async () => {
 
   try {
     const result = await complaintStore.submitComplaint({
-      ...form,
+      orderId: form.orderId,
+      type: form.type,
       content: form.content.trim(),
     })
     ElMessage.success('投诉已提交')
@@ -59,105 +100,100 @@ const handleSubmit = async () => {
   }
 }
 
-watch(
-  () => route.query.orderId,
-  () => {
-    const routeOrderId = getRouteOrderId()
-    if (routeOrderId > 0) {
-      form.orderId = routeOrderId
-    }
-  },
-)
+const handleCancel = () => {
+  router.push('/complaints')
+}
+
+onMounted(() => {
+  loadComplaintableOrders()
+})
 </script>
 
 <template>
   <div class="stack-page">
-    <div class="stats-grid">
-      <StatCard
-        label="投诉订单"
-        :value="form.orderId || '--'"
-        hint="请确认投诉对象与实际订单一致"
-      />
-      <StatCard
-        label="投诉类型"
-        :value="formatComplaintType(form.type)"
-        hint="选择最贴近当前问题的处理原因"
-      />
-    </div>
-
-    <PageSection
-      title="发起投诉"
-      description="提交后平台会进入处理流程，你可以在我的投诉中跟踪进展。"
-    >
-      <el-alert
-        :title="isOrderIdLocked ? '已从订单详情带入投诉订单，提交前请确认投诉类型和说明。' : '投诉提交后将进入待处理状态，后续可在我的投诉中查看处理结果。'"
-        type="warning"
-        :closable="false"
-      />
-
-      <div class="form-intro surface-card">
-        <strong>投诉说明</strong>
-        <p>请尽量说明异常发生的时间、涉及的成员和你希望平台协助处理的事项，便于管理员快速判断。</p>
+    <div class="section">
+      <div class="section-header">
+        <h3>发起投诉</h3>
       </div>
 
+      <!-- 无可投诉订单提示 -->
+      <el-alert
+        v-if="!loadingOrders && !hasComplaintableOrders"
+        title="目前没有可以投诉的订单"
+        description="只有已成团、待送达、待收货或已完成的订单才能发起投诉。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+
       <el-form
+        v-else
         label-position="top"
         :model="form"
         class="form-grid"
       >
-        <el-form-item label="订单 ID">
-          <el-input-number
+        <el-form-item label="选择订单">
+          <el-select
             v-model="form.orderId"
-            :min="1"
-            :disabled="isOrderIdLocked"
-          />
-        </el-form-item>
-        <el-form-item label="投诉类型">
-          <el-select v-model="form.type">
+            placeholder="请选择要投诉的订单"
+            :loading="loadingOrders"
+            :disabled="!hasComplaintableOrders"
+            style="width: 100%"
+          >
             <el-option
-              label="未购买"
-              value="NOT_PURCHASED"
-            />
-            <el-option
-              label="伪造凭证"
-              value="FAKE_RECEIPT"
+              v-for="order in complaintableOrders"
+              :key="order.orderId"
+              :label="order.label"
+              :value="order.orderId"
             />
           </el-select>
         </el-form-item>
+
+        <el-form-item label="投诉类型">
+          <el-select
+            v-model="form.type"
+            placeholder="请选择投诉类型"
+            :disabled="!hasComplaintableOrders"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="type in complaintTypes"
+              :key="type.value"
+              :label="type.label"
+              :value="type.value"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item
+          label="投诉描述"
           class="full-span"
-          label="投诉内容"
         >
           <el-input
             v-model="form.content"
             type="textarea"
             maxlength="500"
             show-word-limit
-            :rows="5"
-            placeholder="请简要描述订单异常、发生时间和你希望平台介入处理的原因"
+            :rows="6"
+            placeholder="请详细描述投诉内容..."
+            :disabled="!hasComplaintableOrders"
           />
         </el-form-item>
       </el-form>
 
       <div class="page-actions">
-        <el-button @click="router.push('/complaints')">
-          返回我的投诉
+        <el-button @click="handleCancel">
+          取消
         </el-button>
         <el-button
-          v-if="isOrderIdLocked"
-          plain
-          @click="router.push(`/orders/${form.orderId}`)"
-        >
-          返回关联订单
-        </el-button>
-        <el-button
-          type="danger"
+          type="primary"
           :loading="loading"
+          :disabled="!hasComplaintableOrders"
           @click="handleSubmit"
         >
           提交投诉
         </el-button>
       </div>
-    </PageSection>
+    </div>
   </div>
 </template>

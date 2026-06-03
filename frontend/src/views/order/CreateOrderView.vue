@@ -121,7 +121,7 @@ const handleSubmit = async () => {
       <el-form
         label-position="top"
         :model="form"
-        class="form-grid"
+        class="form-grid create-order-form"
       >
         <el-form-item label="商品名称">
           <el-input
@@ -131,7 +131,10 @@ const handleSubmit = async () => {
             placeholder="例如：晚饭拼单、奶茶拼单"
           />
         </el-form-item>
-        <el-form-item label="商品描述">
+        <el-form-item
+          label="商品描述"
+          class="description-field"
+        >
           <el-input
             v-model="form.productDesc"
             type="textarea"
@@ -172,7 +175,7 @@ const handleSubmit = async () => {
         </el-form-item>
       </el-form>
 
-      <div class="page-actions">
+      <div class="page-actions create-order-actions">
         <el-button
           type="primary"
           :loading="loading"

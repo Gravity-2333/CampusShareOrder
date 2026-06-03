@@ -1,44 +1,19 @@
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
+import { onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
-import AppPagination from '../../components/common/AppPagination.vue'
-import EmptyState from '../../components/common/EmptyState.vue'
-import PageSection from '../../components/common/PageSection.vue'
-import StatCard from '../../components/common/StatCard.vue'
-import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
-import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
+import { formatComplaintStatus, formatComplaintType } from '../../utils/format'
 
 const router = useRouter()
 const adminStore = useAdminStore()
 
 const filters = reactive({
+  keyword: '',
   page: 1,
   pageSize: 10,
   status: '',
-})
-
-const stats = computed(() => [
-  {
-    label: '投诉总量',
-    value: adminStore.complaintsPage.total,
-    hint: '管理端列表与用户端列表共用固定分页协议',
-  },
-  {
-    label: '待处理',
-    value: adminStore.complaintsPage.list.filter((item) => item.status === 'PENDING').length,
-    hint: '优先关注待处理投诉',
-  },
-])
-
-const summaryText = computed(() => {
-  if (!adminStore.complaintsPage.list.length) {
-    return '当前没有待展示的投诉记录。'
-  }
-
-  return '投诉管理页建议先看详情，再填写处理结果，避免只在列表里做过度判断。'
 })
 
 const loadComplaints = async () => {
@@ -56,50 +31,8 @@ const handleSearch = async () => {
   await loadComplaints()
 }
 
-const handleReset = async () => {
-  filters.status = ''
-  filters.page = 1
-  filters.pageSize = 10
-  await loadComplaints()
-}
-
-const handleComplaint = async (row) => {
-  if (adminStore.submitting) {
-    return
-  }
-
-  try {
-    const { value } = await ElMessageBox.prompt('请输入处理结果摘要', '处理投诉', {
-      cancelButtonText: '取消',
-      confirmButtonText: '确认处理',
-      inputPlaceholder: '例如：投诉成立，订单已取消',
-      inputValidator: (inputValue) => {
-        if (!inputValue?.trim()) {
-          return '请输入处理结果'
-        }
-
-        if (inputValue.trim().length > 500) {
-          return '处理结果长度不能超过 500 个字符'
-        }
-
-        return true
-      },
-    })
-
-    await adminStore.processComplaint(row.complaintId, { handleResult: value.trim() })
-    ElMessage.success('投诉已处理')
-  } catch (error) {
-    if (error === 'cancel' || error?.message === 'cancel') {
-      return
-    }
-
-    ElMessage.error(error.message || '处理失败，请稍后重试')
-  }
-}
-
-const handlePageChange = async ({ page, pageSize }) => {
+const handlePageChange = async (page) => {
   filters.page = page
-  filters.pageSize = pageSize
   await loadComplaints()
 }
 
@@ -108,182 +41,114 @@ onMounted(loadComplaints)
 
 <template>
   <div class="stack-page">
-    <div class="stats-grid">
-      <StatCard
-        v-for="item in stats"
-        :key="item.label"
-        :label="item.label"
-        :value="item.value"
-        :hint="item.hint"
-      />
-    </div>
-
-    <PageSection
-      title="投诉管理"
-      description="管理员处理投诉前，先查看详情，再决定处理结果。"
-    >
-      <p class="muted-text">
-        {{ summaryText }}
-      </p>
-
-      <div class="table-toolbar">
-        <span class="table-caption">
-          共 {{ adminStore.complaintsPage.total }} 条投诉，当前待处理 {{ stats[1].value }} 条。
-        </span>
-        <div class="filter-panel compact-filter-panel">
-          <el-select
-            v-model="filters.status"
-            clearable
-            placeholder="按状态筛选"
-          >
-            <el-option
-              label="待处理"
-              value="PENDING"
-            />
-            <el-option
-              label="已处理"
-              value="PROCESSED"
-            />
-          </el-select>
-          <el-button
-            type="primary"
-            :loading="adminStore.complaintsLoading"
-            @click="handleSearch"
-          >
-            查询
-          </el-button>
-          <el-button
-            :disabled="adminStore.complaintsLoading"
-            @click="handleReset"
-          >
-            重置
-          </el-button>
-        </div>
+    <div class="section">
+      <div class="section-header">
+        <h3>投诉列表</h3>
       </div>
 
-      <div
-        v-if="adminStore.complaintsPage.list.length"
-        class="table-stack"
-      >
-        <div class="desktop-table">
-          <el-table
-            v-loading="adminStore.complaintsLoading"
-            :data="adminStore.complaintsPage.list"
-            stripe
-          >
-            <el-table-column
-              prop="complaintNo"
-              label="投诉单号"
-            />
-            <el-table-column label="类型">
-              <template #default="{ row }">
-                {{ formatComplaintType(row.type) }}
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="productName"
-              label="商品"
-            />
-            <el-table-column
-              prop="accusedNickname"
-              label="被投诉人"
-            />
-            <el-table-column label="状态">
-              <template #default="{ row }">
-                <StatusTag
-                  :value="row.status"
-                  :text="formatComplaintStatus(row.status)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="提交时间">
-              <template #default="{ row }">
-                {{ formatDateTime(row.createdAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column
-              label="操作"
-              width="220"
-            >
-              <template #default="{ row }">
-                <div class="row-action-group">
-                  <el-button
-                    link
-                    type="primary"
-                    @click="router.push(`/admin/complaints/${row.complaintId}`)"
-                  >
-                    查看详情
-                  </el-button>
-                  <el-button
-                    v-if="row.status === 'PENDING'"
-                    link
-                    type="danger"
-                    :disabled="adminStore.submitting"
-                    @click="handleComplaint(row)"
-                  >
-                    标记处理
-                  </el-button>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+      <div class="toolbar">
+        <input
+          v-model="filters.keyword"
+          type="text"
+          placeholder="搜索投诉单号或订单号"
+          @keyup.enter="handleSearch"
+        >
+        <select v-model="filters.status">
+          <option value="">
+            全部状态
+          </option>
+          <option value="PENDING">
+            待处理
+          </option>
+          <option value="PROCESSING">
+            处理中
+          </option>
+          <option value="RESOLVED">
+            已处理
+          </option>
+        </select>
+        <button
+          class="btn btn-primary"
+          :disabled="adminStore.complaintsLoading"
+          @click="handleSearch"
+        >
+          查询
+        </button>
+      </div>
 
-        <div class="mobile-record-list">
-          <article
+      <table
+        v-if="adminStore.complaintsPage.list.length"
+        class="table"
+      >
+        <thead>
+          <tr>
+            <th>投诉单号</th>
+            <th>关联订单</th>
+            <th>投诉人</th>
+            <th>类型</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
             v-for="row in adminStore.complaintsPage.list"
             :key="row.complaintId"
-            class="surface-card mobile-record-card"
           >
-            <div class="mobile-record-header">
-              <div class="mobile-record-title">
-                <span>{{ row.complaintNo }}</span>
-                <strong>{{ row.productName }}</strong>
-              </div>
-              <StatusTag
-                :value="row.status"
-                :text="formatComplaintStatus(row.status)"
-              />
-            </div>
-            <ul class="mobile-record-fields">
-              <li><span>投诉类型</span><strong>{{ formatComplaintType(row.type) }}</strong></li>
-              <li><span>被投诉人</span><strong>{{ row.accusedNickname || '--' }}</strong></li>
-              <li><span>提交时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
-            </ul>
-            <div class="page-actions">
-              <el-button
-                type="primary"
-                plain
-                @click="router.push(`/admin/complaints/${row.complaintId}`)"
+            <td>{{ row.complaintNo }}</td>
+            <td>{{ row.orderNo || '--' }}</td>
+            <td>{{ row.complainantNickname || '--' }}</td>
+            <td>{{ formatComplaintType(row.type) }}</td>
+            <td>
+              <span
+                class="tag"
+                :class="`tag-${row.status === 'PENDING' ? 'warning' : 'success'}`"
               >
-                查看详情
-              </el-button>
-              <el-button
-                v-if="row.status === 'PENDING'"
-                type="danger"
-                plain
-                :loading="adminStore.submitting"
-                @click="handleComplaint(row)"
-              >
-                处理投诉
-              </el-button>
-            </div>
-          </article>
-        </div>
-
-        <AppPagination
-          :page="adminStore.complaintsPage.page"
-          :page-size="adminStore.complaintsPage.pageSize"
-          :pages="adminStore.complaintsPage.pages"
-          :total="adminStore.complaintsPage.total"
-          @change="handlePageChange"
-        />
-      </div>
-      <EmptyState
+                {{ formatComplaintStatus(row.status) }}
+              </span>
+            </td>
+            <td>
+              <a
+                href="#"
+                class="table-link"
+                @click.prevent="router.push(`/admin/complaints/${row.complaintId}`)"
+              >{{ row.status === 'PENDING' ? '处理' : '查看' }}</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p
         v-else-if="!adminStore.complaintsLoading"
-        title="暂无投诉"
-        description="当前没有投诉记录，可在用户端提交投诉后回到这里处理。"
-      />
-    </PageSection>
+        class="muted-text"
+      >
+        暂无投诉数据。
+      </p>
+
+      <div
+        v-if="adminStore.complaintsPage.pages > 1"
+        class="pagination"
+      >
+        <button
+          :disabled="adminStore.complaintsPage.page <= 1"
+          @click="handlePageChange(adminStore.complaintsPage.page - 1)"
+        >
+          上一页
+        </button>
+        <button
+          v-for="p in adminStore.complaintsPage.pages"
+          :key="p"
+          :class="{ active: p === adminStore.complaintsPage.page }"
+          @click="handlePageChange(p)"
+        >
+          {{ p }}
+        </button>
+        <button
+          :disabled="adminStore.complaintsPage.page >= adminStore.complaintsPage.pages"
+          @click="handlePageChange(adminStore.complaintsPage.page + 1)"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
   </div>
 </template>

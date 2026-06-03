@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>信用分 - 校园拼单平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f3ef; min-height: 100vh; }
+    .app-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar { background: linear-gradient(180deg, #2e3f34 0%, #24342b 100%); color: white; padding: 1rem; }
+    .sidebar .brand { padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; }
+    .sidebar .brand-mark { width: 40px; height: 40px; background: rgba(242,203,184,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .sidebar .brand h1 { font-size: 1.2rem; margin-top: 0.5rem; }
+    .sidebar .menu { list-style: none; }
+    .sidebar .menu li { margin-bottom: 0.3rem; }
+    .sidebar .menu a { display: block; padding: 0.7rem; border-radius: 10px; color: rgba(255,255,255,0.8); text-decoration: none; }
+    .sidebar .menu a:hover { background: rgba(255,255,255,0.1); }
+    .sidebar .menu a.active { background: rgba(242,203,184,0.2); color: white; }
+    .main { padding: 1rem; display: flex; flex-direction: column; }
+    .header { background: white; border-radius: 12px; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .header h2 { color: #2e3f34; }
+    .header .actions { display: flex; align-items: center; gap: 0.5rem; }
+    .header .welcome { color: #6b7c70; margin-right: 1rem; }
+    .content { flex: 1; }
+    .section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .section-header { margin-bottom: 1rem; }
+    .section-header h3 { color: #2e3f34; }
+    .credit-display { text-align: center; padding: 2rem; }
+    .credit-display .score { font-size: 4rem; font-weight: 700; color: #2e3f34; }
+    .credit-display .level { font-size: 1.5rem; color: #d87b4d; margin-top: 0.5rem; }
+    .credit-display .range { color: #6b7c70; margin-top: 0.3rem; }
+    .credit-bar { height: 20px; background: #f0ebe4; border-radius: 10px; margin: 1rem 0; overflow: hidden; }
+    .credit-bar-fill { height: 100%; background: linear-gradient(90deg, #3d5c4a, #5a7d69); border-radius: 10px; }
+    .level-info { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin-top: 1rem; }
+    .level-item { text-align: center; padding: 0.8rem; background: #f8f6f2; border-radius: 8px; }
+    .level-item.active { background: #e8f5ef; border: 1px solid #3d5c4a; }
+    .level-item .label { font-weight: 600; color: #2e3f34; }
+    .level-item .range { font-size: 0.8rem; color: #6b7c70; }
+    .table { width: 100%; border-collapse: collapse; }
+    .table th, .table td { padding: 0.8rem; text-align: left; border-bottom: 1px solid #f0ebe4; }
+    .table th { background: #f8f6f2; color: #4a6b5a; }
+    .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
+    .btn-secondary { background: #f0ebe4; color: #2e3f34; }
+    .tag { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+    .tag-success { background: #d4edda; color: #155724; }
+    .tag-danger { background: #f8d7da; color: #721c24; }
+    @media (max-width: 768px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .level-info { grid-template-columns: repeat(2, 1fr); }
+      .table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">CSO</div>
+        <h1>校园拼单平台</h1>
+      </div>
+      <ul class="menu">
+        <li><a href="orders.html">拼单大厅</a></li>
+        <li><a href="create-order.html">发起拼单</a></li>
+        <li><a href="my-orders.html">我的拼单</a></li>
+        <li><a href="complaints.html">我的投诉</a></li>
+        <li><a href="profile.html">个人资料</a></li>
+        <li><a href="credit.html" class="active">信用分</a></li>
+      </ul>
+    </div>
+    
+    <div class="main">
+      <div class="header">
+        <h2>信用分</h2>
+        <div class="actions">
+          <span class="welcome">欢迎，张三</span>
+          <button class="btn btn-secondary" onclick="location.href='login.html'">退出登录</button>
+        </div>
+      </div>
+      
+      <div class="content">
+        <div class="section">
+          <div class="credit-display">
+            <div class="score">95</div>
+            <div class="level">A</div>
+            <div class="range">当前信用分范围：80-100</div>
+            <div class="credit-bar">
+              <div class="credit-bar-fill" style="width: 95%;"></div>
+            </div>
+            <div class="level-info">
+              <div class="level-item"><div class="label">E</div><div class="range">0-20</div></div>
+              <div class="level-item"><div class="label">D</div><div class="range">21-40</div></div>
+              <div class="level-item"><div class="label">C</div><div class="range">41-60</div></div>
+              <div class="level-item"><div class="label">B</div><div class="range">61-80</div></div>
+              <div class="level-item active"><div class="label">A</div><div class="range">81-100</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-header">
+            <h3>信用记录</h3>
+          </div>
+
+          <table class="table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>类型</th>
+                <th>变更</th>
+                <th>描述</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>2024-01-10</td>
+                <td><span class="tag tag-success">加分</span></td>
+                <td>+5</td>
+                <td>完成订单并获得好评</td>
+              </tr>
+              <tr>
+                <td>2024-01-05</td>
+                <td><span class="tag tag-success">加分</span></td>
+                <td>+3</td>
+                <td>及时确认收货</td>
+              </tr>
+              <tr>
+                <td>2024-01-01</td>
+                <td><span class="tag tag-danger">扣分</span></td>
+                <td>-2</td>
+                <td>延迟确认收货</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

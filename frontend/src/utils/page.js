@@ -26,12 +26,18 @@ export const normalizePageData = (pageData = {}, fallback = {}) => {
   }
 }
 
+export const normalizePageFilters = (filters = {}) =>
+  Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [key, typeof value === 'string' ? value.trim() : value]),
+  )
+
 export const loadNormalizedPage = async (loader, filters = {}) => {
-  const pageData = normalizePageData(await loader(filters), filters)
+  const normalizedFilters = normalizePageFilters(filters)
+  const pageData = normalizePageData(await loader(normalizedFilters), normalizedFilters)
 
   if (pageData.pages > 0 && pageData.page > pageData.pages) {
     const fallbackFilters = {
-      ...filters,
+      ...normalizedFilters,
       page: pageData.pages,
     }
     return {
@@ -41,7 +47,7 @@ export const loadNormalizedPage = async (loader, filters = {}) => {
   }
 
   return {
-    filters,
+    filters: normalizedFilters,
     pageData,
   }
 }

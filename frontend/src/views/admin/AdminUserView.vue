@@ -10,6 +10,7 @@ import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
 import { formatDateTime, formatUserStatus } from '../../utils/format'
+import { normalizePageFilters } from '../../utils/page'
 
 const router = useRouter()
 const adminStore = useAdminStore()
@@ -61,7 +62,12 @@ const loadUsers = async () => {
   }
 }
 
+const normalizeFilters = () => {
+  Object.assign(filters, normalizePageFilters(filters))
+}
+
 const submitFilters = async () => {
+  normalizeFilters()
   filters.page = 1
   await loadUsers()
 }
@@ -115,6 +121,7 @@ const toggleStatus = async (row) => {
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
+  normalizeFilters()
   filters.page = page
   filters.pageSize = pageSize
   await loadUsers()

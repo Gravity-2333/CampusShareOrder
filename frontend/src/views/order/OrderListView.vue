@@ -11,6 +11,7 @@ import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
 import { useUserStore } from '../../stores/user'
 import { formatCurrency, formatDateTime, formatOrderStatus } from '../../utils/format'
+import { normalizePageFilters } from '../../utils/page'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -66,7 +67,12 @@ const loadOrders = async () => {
   }
 }
 
+const normalizeFilters = () => {
+  Object.assign(filters, normalizePageFilters(filters))
+}
+
 const submitFilters = async () => {
+  normalizeFilters()
   filters.page = 1
   await loadOrders()
 }
@@ -146,6 +152,7 @@ const handleJoinAndView = async (order) => {
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
+  normalizeFilters()
   filters.page = page
   filters.pageSize = pageSize
   await loadOrders()

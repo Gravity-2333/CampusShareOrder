@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useAdminStore } from '../../stores/admin'
 import { formatDateTime } from '../../utils/format'
+import { normalizePageFilters } from '../../utils/page'
 
 const adminStore = useAdminStore()
 
@@ -66,7 +67,12 @@ const loadLogs = async () => {
   }
 }
 
+const normalizeFilters = () => {
+  Object.assign(filters, normalizePageFilters(filters))
+}
+
 const submitFilters = async () => {
+  normalizeFilters()
   filters.page = 1
   await loadLogs()
 }
@@ -82,6 +88,7 @@ const resetFilters = async () => {
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
+  normalizeFilters()
   filters.page = page
   filters.pageSize = pageSize
   await loadLogs()

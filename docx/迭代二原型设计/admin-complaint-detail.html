@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>投诉处理 - 管理员后台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f3ef; min-height: 100vh; }
+    .app-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar { background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%); color: white; padding: 1rem; }
+    .sidebar .brand { padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; }
+    .sidebar .brand-mark { width: 40px; height: 40px; background: rgba(242,203,184,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .sidebar .brand h1 { font-size: 1.2rem; margin-top: 0.5rem; }
+    .sidebar .menu { list-style: none; }
+    .sidebar .menu li { margin-bottom: 0.3rem; }
+    .sidebar .menu a { display: block; padding: 0.7rem; border-radius: 10px; color: rgba(255,255,255,0.8); text-decoration: none; }
+    .sidebar .menu a:hover { background: rgba(255,255,255,0.1); }
+    .sidebar .menu a.active { background: rgba(242,203,184,0.2); color: white; }
+    .main { padding: 1rem; display: flex; flex-direction: column; }
+    .header { background: white; border-radius: 12px; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .header h2 { color: #2c3e50; }
+    .header .actions { display: flex; align-items: center; gap: 0.5rem; }
+    .content { flex: 1; }
+    .section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .section-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+    .section-header h3 { color: #2c3e50; margin: 0; }
+    .detail-panel { background: white; border-radius: 12px; padding: 1.2rem; margin-bottom: 1rem; border: 1px solid #e0d8cf; }
+    .detail-panel h4 { color: #2c3e50; margin-bottom: 1rem; }
+    .detail-list { list-style: none; }
+    .detail-list li { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f0ebe4; }
+    .detail-list li:last-child { border-bottom: none; }
+    .detail-list span { color: #6b7c70; }
+    .detail-list strong { color: #2c3e50; }
+    .tag { display: inline-block; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
+    .tag-success { background: #d4edda; color: #155724; }
+    .tag-warning { background: #fff3cd; color: #856404; }
+    .btn { padding: 0.6rem 1.2rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #d87b4d; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-secondary { background: #f0ebe4; color: #2c3e50; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: #4a6b5a; font-weight: 500; }
+    .form-group textarea { width: 100%; padding: 0.8rem; border: 1px solid #e0d8cf; border-radius: 10px; font-size: 1rem; resize: vertical; min-height: 100px; }
+    .timeline { position: relative; padding-left: 1.5rem; }
+    .timeline::before { content: ''; position: absolute; left: 4px; top: 0; bottom: 0; width: 2px; background: #e0d8cf; }
+    .timeline-item { position: relative; padding: 0.8rem 0; }
+    .timeline-item::before { content: ''; position: absolute; left: -19px; top: 1rem; width: 10px; height: 10px; border-radius: 50%; background: #d87b4d; }
+    @media (max-width: 768px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">ADMIN</div>
+        <h1>管理员后台</h1>
+      </div>
+      <ul class="menu">
+        <li><a href="admin-dashboard.html">仪表盘</a></li>
+        <li><a href="admin-orders.html">订单管理</a></li>
+        <li><a href="admin-complaints.html" class="active">投诉管理</a></li>
+        <li><a href="admin-users.html">用户管理</a></li>
+        <li><a href="admin-reports.html">数据报表</a></li>
+        <li><a href="login.html">退出登录</a></li>
+      </ul>
+    </div>
+    
+    <div class="main">
+      <div class="header">
+        <h2>投诉处理</h2>
+        <div class="actions">
+          <span style="color: #6b7c70; margin-right: 1rem;">管理员</span>
+          <button class="btn btn-secondary" onclick="location.href='login.html'">退出登录</button>
+        </div>
+      </div>
+      
+      <div class="content">
+        <div class="section">
+          <div class="section-header">
+            <div>
+              <span class="tag tag-warning">处理中</span>
+              <h3>投诉单号：COM2024001</h3>
+            </div>
+          </div>
+
+          <div class="detail-panel">
+            <h4>投诉信息</h4>
+            <ul class="detail-list">
+              <li><span>关联订单</span><strong>ORD2024006 - 外卖拼单</strong></li>
+              <li><span>投诉类型</span><strong>未送达</strong></li>
+              <li><span>投诉人</span><strong>张三</strong></li>
+              <li><span>创建时间</span><strong>2024-01-14 15:30</strong></li>
+            </ul>
+            <div style="border-top: 1px solid #e0d8cf; padding-top: 1rem; margin-top: 1rem;">
+              <span style="color: #6b7c70;">投诉描述</span>
+              <p style="color: #2c3e50; margin-top: 0.3rem;">订单约定12点送达，但至今未收到商品，联系发起人也未回复。</p>
+            </div>
+          </div>
+
+          <div>
+            <h4>处理进度</h4>
+            <div class="timeline">
+              <div class="timeline-item">
+                <strong>投诉已提交</strong>
+                <div>系统已记录投诉信息</div>
+                <div style="color: #6b7c70; font-size: 0.85rem;">2024-01-14 15:30</div>
+              </div>
+              <div class="timeline-item">
+                <strong>管理员已受理</strong>
+                <div>管理员正在处理中</div>
+                <div style="color: #6b7c70; font-size: 0.85rem;">2024-01-14 16:00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-panel" style="margin-top: 1rem;">
+            <h4>处理投诉</h4>
+            <div class="form-group">
+              <label>处理结果</label>
+              <textarea placeholder="请输入处理结果..."></textarea>
+            </div>
+            <div class="page-actions" style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-success">已解决</button>
+              <button class="btn btn-danger">驳回投诉</button>
+              <button class="btn btn-secondary" onclick="location.href='admin-complaints.html'">返回列表</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

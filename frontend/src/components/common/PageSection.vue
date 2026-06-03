@@ -27,12 +27,6 @@ defineProps({
         </p>
         <h3>{{ title }}</h3>
       </div>
-      <p
-        v-if="description"
-        class="section-description"
-      >
-        {{ description }}
-      </p>
     </div>
     <div class="section-body">
       <slot />

@@ -172,77 +172,6 @@ const primaryAction = computed(() => {
   return null
 })
 
-const nextStepHint = computed(() => {
-  if (!detail.value) {
-    return ''
-  }
-
-  const flags = detail.value.actionFlags
-
-  if (flags.canJoin) {
-    return '当前订单仍可加入，进入详情后可直接参与本次拼单。'
-  }
-
-  if (flags.canPay) {
-    return '你已经加入订单，但尚未支付；支付后才能推动订单进入成团流程。'
-  }
-
-  if (flags.canUploadReceipt) {
-    return '订单已成团，下一步应由发起人上传购买凭证。'
-  }
-
-  if (flags.canMarkDelivered) {
-    return '凭证已经上传，下一步应由发起人确认送达。'
-  }
-
-  if (flags.canConfirmReceived) {
-    return '订单已经送达，当前账号可以确认收货。'
-  }
-
-  if (flags.canCreateComplaint) {
-    return '如果订单存在异常，可直接从当前页面发起投诉。'
-  }
-
-  if (detail.value.complaintInfo.myComplaintId) {
-    return '当前账号已经提交投诉，可继续查看处理进度。'
-  }
-
-  return '当前页面主要用于查看订单聚合信息，操作入口会随订单状态自动变化。'
-})
-
-const timelineToneMap = {
-  COMPLAINT_CREATED: 'danger',
-  INITIATOR_JOINED: 'primary',
-  INITIATOR_PAID: 'success',
-  INITIATOR_RECEIVED: 'success',
-  MEMBER_EXITED: 'info',
-  MEMBER_JOINED: 'primary',
-  MEMBER_PAID: 'success',
-  MEMBER_RECEIVED: 'success',
-  ORDER_CREATED: 'primary',
-  ORDER_DELIVERED: 'success',
-  ORDER_STATUS: 'warning',
-  RECEIPT_UPLOADED: 'success',
-}
-
-const timelineActionTextMap = {
-  COMPLAINT_CREATED: '投诉创建',
-  INITIATOR_JOINED: '发起拼单',
-  INITIATOR_PAID: '发起人支付',
-  INITIATOR_RECEIVED: '发起人收货',
-  MEMBER_EXITED: '成员退出',
-  MEMBER_JOINED: '成员加入',
-  MEMBER_PAID: '成员支付',
-  MEMBER_RECEIVED: '成员收货',
-  ORDER_CREATED: '订单创建',
-  ORDER_DELIVERED: '确认送达',
-  ORDER_STATUS: '状态更新',
-  RECEIPT_UPLOADED: '上传凭证',
-}
-
-const getTimelineType = (action) => timelineToneMap[action] || 'info'
-const formatTimelineAction = (action) => timelineActionTextMap[action] || action
-
 const getMemberLatestEvent = (member) => {
   if (!member) {
     return '--'
@@ -266,77 +195,6 @@ const getMemberLatestEvent = (member) => {
 
   return '--'
 }
-
-const phaseItems = computed(() => {
-  if (!detail.value) {
-    return []
-  }
-
-  const status = detail.value.basicInfo.status
-  const items = [
-    {
-      key: 'open',
-      label: '招募阶段',
-      hint: '成员加入并完成支付',
-      done: ['GROUPED', 'WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'OPEN',
-    },
-    {
-      key: 'grouped',
-      label: '成团待凭证',
-      hint: '发起人上传购买凭证',
-      done: ['WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'GROUPED',
-    },
-    {
-      key: 'delivery',
-      label: '待确认送达',
-      hint: '凭证已上传，等待发起人确认送达',
-      done: ['WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'WAIT_DELIVERY',
-    },
-    {
-      key: 'receive',
-      label: '待确认收货',
-      hint: '成员确认收货或系统自动确认',
-      done: status === 'COMPLETED',
-      current: status === 'WAIT_RECEIVE',
-    },
-    {
-      key: 'completed',
-      label: '订单完成',
-      hint: '流程全部结束',
-      done: status === 'COMPLETED',
-      current: status === 'COMPLETED',
-    },
-  ]
-
-  if (status === 'CANCELED') {
-    return items.map((item) => ({
-      ...item,
-      current: false,
-    }))
-  }
-
-  return items
-})
-
-const phaseSummaryText = computed(() => {
-  if (!detail.value) {
-    return '--'
-  }
-
-  if (detail.value.basicInfo.status === 'CANCELED') {
-    return '订单已取消，当前不再继续推进后续阶段。'
-  }
-
-  if (detail.value.basicInfo.status === 'COMPLETED') {
-    return '订单已经完成，招募、凭证、送达、收货流程均已结束。'
-  }
-
-  const currentPhase = phaseItems.value.find((item) => item.current)
-  return currentPhase ? `当前处于“${currentPhase.label}”阶段。` : '--'
-})
 
 const stats = computed(() => {
   if (!detail.value) {
@@ -371,8 +229,6 @@ const stats = computed(() => {
     },
   ]
 })
-
-const compactTimelineItems = computed(() => detail.value?.timeline?.slice(0, 5) || [])
 
 const loadDetail = async (orderId = currentOrderId.value) => {
   if (!isValidOrderId.value) {
@@ -609,9 +465,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="surface-card detail-panel detail-hero-panel">
-          <h3>当前引导</h3>
+          <h3>订单概况</h3>
           <ul class="detail-list">
-            <li><span>下一步建议</span><strong>{{ nextStepHint }}</strong></li>
             <li><span>投诉状态</span><strong>{{ complaintActionText }}</strong></li>
             <li><span>凭证状态</span><strong>{{ receiptStatusText }}</strong></li>
           </ul>
@@ -698,33 +553,6 @@ onBeforeUnmount(() => {
             </p>
           </div>
         </div>
-
-        <PageSection
-          title="阶段进度"
-          description="按业务阶段展示订单当前所处位置，便于快速判断还差哪一步。"
-        >
-          <div class="action-summary-grid">
-            <div
-              v-for="item in phaseItems"
-              :key="item.key"
-              class="surface-card action-summary-card"
-              :class="{ 'is-enabled': item.done || item.current }"
-            >
-              <span>{{ item.label }}</span>
-              <el-tag
-                :type="item.done ? 'success' : item.current ? 'warning' : 'info'"
-                effect="light"
-                round
-              >
-                {{ item.done ? '已完成' : item.current ? '当前阶段' : '未开始' }}
-              </el-tag>
-              <strong>{{ item.hint }}</strong>
-            </div>
-          </div>
-          <p class="muted-text">
-            {{ phaseSummaryText }}
-          </p>
-        </PageSection>
 
         <PageSection
           title="成员列表"
@@ -933,23 +761,6 @@ onBeforeUnmount(() => {
                 </ul>
               </article>
             </div>
-          </PageSection>
-
-          <PageSection
-            title="时间线"
-            description="展示最近 5 条关键事件。"
-          >
-            <el-timeline>
-              <el-timeline-item
-                v-for="item in compactTimelineItems"
-                :key="`${item.action}-${item.at}`"
-                :timestamp="formatDateTime(item.at)"
-                :type="getTimelineType(item.action)"
-              >
-                <strong>{{ formatTimelineAction(item.action) }}</strong>
-                <div>{{ item.description }}</div>
-              </el-timeline-item>
-            </el-timeline>
           </PageSection>
         </div>
 

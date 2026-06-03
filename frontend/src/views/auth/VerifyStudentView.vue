@@ -87,17 +87,6 @@ onMounted(loadProfile)
       title="实名认证"
       description="完成学号认证后，即可发起拼单并参与完整订单流程。"
     >
-      <el-alert
-        title="认证后，路由守卫会允许你进入发起拼单页面。"
-        type="info"
-        :closable="false"
-      />
-
-      <div class="form-intro surface-card">
-        <strong>认证说明</strong>
-        <p>认证完成后会同步刷新你的登录状态和个人资料，未认证账号无法发起拼单。</p>
-      </div>
-
       <el-form
         label-position="top"
         :model="form"

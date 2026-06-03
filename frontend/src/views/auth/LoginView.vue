@@ -14,11 +14,6 @@ const form = reactive({
   phone: '',
 })
 const loading = ref(false)
-const heroMetrics = [
-  { label: '多人拼单', value: '一键发起和加入' },
-  { label: '流程透明', value: '支付、凭证、收货清晰可查' },
-  { label: '异常可追踪', value: '投诉与信用记录闭环' },
-]
 
 const handleSubmit = async () => {
   const errorMessage = firstValidationError([
@@ -55,22 +50,6 @@ const handleSubmit = async () => {
       <p>
         和同学一起凑单、分摊配送费、跟踪凭证与收货状态，把每一次拼单都放在清楚的流程里。
       </p>
-
-      <div class="auth-metric-grid">
-        <article
-          v-for="item in heroMetrics"
-          :key="item.label"
-          class="auth-metric-card"
-        >
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-        </article>
-      </div>
-
-      <div class="auth-side-note">
-        <strong>从发起到完成，全程有迹可循</strong>
-        <p>实名认证后即可发起拼单，成员加入、支付、上传凭证、确认送达和投诉处理都会被记录。</p>
-      </div>
     </section>
 
     <el-card
@@ -93,11 +72,6 @@ const handleSubmit = async () => {
           </el-button>
         </div>
       </template>
-
-      <div class="auth-card-summary">
-        <strong>欢迎回来</strong>
-        <p>登录后进入拼单大厅，查看正在招募的拼单，也可以管理自己的参与记录。</p>
-      </div>
 
       <el-form
         label-position="top"

@@ -32,17 +32,9 @@ const stats = computed(() => [
   },
 ])
 
-const summaryText = computed(() => {
-  if (!orderStore.myOrdersPage.list.length) {
-    return '当前还没有参与中的拼单。'
-  }
-
-  return '这里按“我的角色、支付状态、收货状态、订单状态”统一查看参与记录，详细动作仍在详情页完成。'
-})
-
 const loadOrders = async () => {
   try {
-    await orderStore.loadMyOrders({ page: 1, pageSize: 10 })
+    await orderStore.loadMyOrders()
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -75,10 +67,6 @@ onMounted(loadOrders)
       title="我的拼单"
       description="跟踪自己参与的拼单状态、支付进度和后续操作。"
     >
-      <p class="muted-text">
-        {{ summaryText }}
-      </p>
-
       <div class="table-toolbar">
         <span class="table-caption">共 {{ orderStore.myOrdersPage.total }} 条参与记录，可从这里继续进入订单详情。</span>
         <div class="page-actions">

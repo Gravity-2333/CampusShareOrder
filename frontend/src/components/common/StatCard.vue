@@ -21,6 +21,5 @@ defineProps({
       {{ label }}
     </p>
     <strong class="stat-value">{{ value }}</strong>
-    <span class="stat-hint">{{ hint }}</span>
   </article>
 </template>

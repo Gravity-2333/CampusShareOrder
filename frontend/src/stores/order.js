@@ -21,6 +21,20 @@ const defaultPageData = () => ({
   total: 0,
 })
 
+const normalizePageData = (pageData = {}, fallback = {}) => {
+  const pageSize = Number(pageData.pageSize ?? pageData.size ?? fallback.pageSize ?? 10)
+  const total = Number(pageData.total ?? 0)
+  const pages = Number(pageData.pages ?? Math.ceil(total / Math.max(pageSize, 1)) ?? 0)
+
+  return {
+    list: Array.isArray(pageData.list) ? pageData.list : Array.isArray(pageData.records) ? pageData.records : [],
+    page: Number(pageData.page ?? pageData.current ?? fallback.page ?? 1),
+    pageSize,
+    pages,
+    total,
+  }
+}
+
 export const useOrderStore = defineStore('order', {
   state: () => ({
     detail: null,
@@ -51,13 +65,13 @@ export const useOrderStore = defineStore('order', {
           ...this.hallFilters,
           ...filters,
         }
-        this.hallPage = await getOrderList(this.hallFilters)
+        this.hallPage = normalizePageData(await getOrderList(this.hallFilters), this.hallFilters)
         return this.hallPage
       } finally {
         this.hallLoading = false
       }
     },
-    async loadMyOrders(params = { page: 1, pageSize: 10 }) {
+    async loadMyOrders(params = this.myOrdersFilters) {
       this.myOrdersLoading = true
 
       try {
@@ -65,7 +79,7 @@ export const useOrderStore = defineStore('order', {
           ...this.myOrdersFilters,
           ...params,
         }
-        this.myOrdersPage = await getMyOrders(this.myOrdersFilters)
+        this.myOrdersPage = normalizePageData(await getMyOrders(this.myOrdersFilters), this.myOrdersFilters)
         return this.myOrdersPage
       } finally {
         this.myOrdersLoading = false

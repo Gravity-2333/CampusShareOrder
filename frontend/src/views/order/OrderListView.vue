@@ -56,18 +56,6 @@ const stats = computed(() => {
   ]
 })
 
-const hallTips = computed(() => {
-  if (!visibleOrders.value.length) {
-    return '当前筛选条件下没有可展示的拼单。'
-  }
-
-  if (!canCreateOrder.value) {
-    return '当前账号尚未实名认证，可以先浏览大厅，认证后再发起拼单。'
-  }
-
-  return '浏览正在进行的拼单，选择合适的订单加入，或发起自己的拼单。'
-})
-
 const loadOrders = async () => {
   try {
     await orderStore.loadHallOrders(filters)
@@ -172,10 +160,6 @@ onMounted(loadOrders)
       title="拼单大厅"
       description="浏览校园内正在招募的拼单，按商品或状态快速筛选。"
     >
-      <p class="muted-text">
-        {{ hallTips }}
-      </p>
-
       <div class="toolbar-row">
         <el-input
           v-model="filters.keyword"

@@ -299,11 +299,14 @@ const promptReceiptPayload = async () => {
     inputPlaceholder: '例如 54.00',
     inputType: 'number',
     inputValidator: (inputValue) => {
-      if (!inputValue) {
+      const normalizedValue = String(inputValue ?? '').trim()
+
+      if (!normalizedValue) {
         return '请输入实际总金额'
       }
 
-      if (Number(inputValue) <= 0) {
+      const actualAmount = Number(normalizedValue)
+      if (!Number.isFinite(actualAmount) || actualAmount <= 0) {
         return '金额必须大于 0'
       }
 
@@ -335,7 +338,7 @@ const promptReceiptPayload = async () => {
   })
 
   return {
-    actualTotalAmount: Number(amount),
+    actualTotalAmount: Number(String(amount).trim()),
     expectedDeliveryEndAt: toApiDateTime(endAt),
     expectedDeliveryStartAt: toApiDateTime(startAt),
     imageUrl: imageUrl.trim(),
@@ -372,7 +375,8 @@ const runAction = async (action) => {
     return
   }
 
-  if (!currentOrderId.value) {
+  if (!isValidOrderId.value) {
+    ElMessage.warning('当前订单 ID 无效，请返回大厅重新进入详情页')
     return
   }
 

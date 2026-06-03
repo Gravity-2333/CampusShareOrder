@@ -23,6 +23,8 @@ const isValidComplaintId = computed(
 const detailErrorText = computed(() =>
   isValidComplaintId.value ? '当前未能加载到投诉详情，请返回列表重新选择。' : '当前路由中的投诉 ID 无效，请返回投诉列表重新进入详情页。',
 )
+const relatedOrderId = computed(() => Number(complaint.value?.orderId || 0))
+const canViewRelatedOrder = computed(() => Number.isInteger(relatedOrderId.value) && relatedOrderId.value > 0)
 
 const stats = computed(() => {
   if (!complaint.value) {
@@ -93,6 +95,15 @@ const handleProcess = async () => {
 
     ElMessage.error(error.message || '处理失败，请稍后重试')
   }
+}
+
+const goRelatedOrder = () => {
+  if (!canViewRelatedOrder.value) {
+    ElMessage.warning('当前投诉缺少有效的关联订单')
+    return
+  }
+
+  router.push(`/admin/orders/${relatedOrderId.value}`)
 }
 
 watch(
@@ -180,7 +191,8 @@ onMounted(() => {
           <el-button
             type="primary"
             plain
-            @click="router.push(`/admin/orders/${complaint.orderId}`)"
+            :disabled="!canViewRelatedOrder"
+            @click="goRelatedOrder"
           >
             查看关联订单
           </el-button>

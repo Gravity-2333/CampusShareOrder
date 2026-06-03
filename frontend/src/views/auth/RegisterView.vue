@@ -51,9 +51,9 @@ const handleSubmit = async () => {
 
   try {
     await userStore.registerUser({
-      nickname: form.nickname,
+      nickname: form.nickname.trim(),
       password: form.password,
-      phone: form.phone,
+      phone: form.phone.trim(),
     })
     ElMessage.success('注册成功，请返回登录')
     router.push('/login')
@@ -129,12 +129,15 @@ const handleSubmit = async () => {
         <el-form-item label="昵称">
           <el-input
             v-model="form.nickname"
+            maxlength="20"
+            show-word-limit
             placeholder="请输入昵称"
           />
         </el-form-item>
         <el-form-item label="手机号">
           <el-input
             v-model="form.phone"
+            maxlength="11"
             placeholder="请输入手机号"
           />
         </el-form-item>

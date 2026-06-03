@@ -15,6 +15,14 @@ const router = useRouter()
 const complaintStore = useComplaintStore()
 
 const complaint = computed(() => complaintStore.complaintDetail)
+const currentComplaintId = computed(() => route.params.complaintId)
+const normalizedComplaintId = computed(() => Number(currentComplaintId.value || 0))
+const isValidComplaintId = computed(
+  () => Number.isInteger(normalizedComplaintId.value) && normalizedComplaintId.value > 0,
+)
+const detailErrorText = computed(() =>
+  isValidComplaintId.value ? '当前未能加载到投诉详情，请返回列表重新选择。' : '当前路由中的投诉 ID 无效，请返回我的投诉重新进入详情页。',
+)
 
 const stats = computed(() => {
   if (!complaint.value) {
@@ -34,14 +42,15 @@ const stats = computed(() => {
     },
     {
       label: '关联订单',
-      value: complaint.value.orderNo,
+      value: complaint.value.orderNo || '--',
       hint: '详情页继续沿用 complaint -> order 的固定字段关系',
     },
   ]
 })
 
 const loadDetail = async (complaintId = route.params.complaintId) => {
-  if (!complaintId) {
+  if (!isValidComplaintId.value) {
+    complaintStore.complaintDetail = null
     return
   }
 
@@ -89,7 +98,7 @@ onMounted(() => {
             <p class="section-kicker">
               {{ complaint.complaintNo }}
             </p>
-            <h2>{{ complaint.productName }}</h2>
+            <h2>{{ complaint.productName || '关联订单商品' }}</h2>
           </div>
           <StatusTag
             :value="complaint.status"
@@ -102,9 +111,9 @@ onMounted(() => {
             <h3>基础信息</h3>
             <ul class="detail-list">
               <li><span>投诉类型</span><strong>{{ formatComplaintType(complaint.type) }}</strong></li>
-              <li><span>关联订单</span><strong>{{ complaint.orderNo }}</strong></li>
-              <li><span>订单商品</span><strong>{{ complaint.productName }}</strong></li>
-              <li><span>被投诉人</span><strong>{{ complaint.accusedNickname }}</strong></li>
+              <li><span>关联订单</span><strong>{{ complaint.orderNo || '--' }}</strong></li>
+              <li><span>订单商品</span><strong>{{ complaint.productName || '--' }}</strong></li>
+              <li><span>被投诉人</span><strong>{{ complaint.accusedNickname || '--' }}</strong></li>
               <li><span>系统开启通道</span><strong>{{ complaint.openedBySystem ? '是' : '否' }}</strong></li>
               <li><span>创建时间</span><strong>{{ formatDateTime(complaint.createdAt) }}</strong></li>
             </ul>
@@ -151,7 +160,7 @@ onMounted(() => {
       <EmptyState
         v-else-if="!complaintStore.complaintDetailLoading"
         title="投诉详情不可用"
-        description="当前未能加载到投诉详情，请返回列表重新选择。"
+        :description="detailErrorText"
       >
         <div class="page-actions">
           <el-button @click="router.push('/complaints')">
@@ -160,6 +169,7 @@ onMounted(() => {
           <el-button
             type="primary"
             plain
+            :disabled="!isValidComplaintId"
             @click="loadDetail()"
           >
             重新加载

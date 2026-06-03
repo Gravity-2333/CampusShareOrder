@@ -99,6 +99,8 @@ onMounted(loadProfile)
         <el-form-item label="学号">
           <el-input
             v-model="form.studentNo"
+            maxlength="10"
+            show-word-limit
             placeholder="请输入学号"
           />
         </el-form-item>

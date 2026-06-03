@@ -38,7 +38,10 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    await userStore.loginAdmin(form)
+    await userStore.loginAdmin({
+      password: form.password,
+      username: form.username.trim(),
+    })
     ElMessage.success('管理员登录成功')
     router.push('/admin/dashboard')
   } catch (error) {

@@ -39,7 +39,10 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    const result = await complaintStore.submitComplaint(form)
+    const result = await complaintStore.submitComplaint({
+      ...form,
+      content: form.content.trim(),
+    })
     ElMessage.success('投诉已提交')
     router.push(`/complaints/${result.complaintId}`)
   } catch (error) {

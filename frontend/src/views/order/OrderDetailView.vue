@@ -12,6 +12,7 @@ import {
   formatCurrency,
   formatDateTime,
   formatJoinStatus,
+  formatOptionalCurrency,
   formatOrderStatus,
   formatPayStatus,
   formatReceiveStatus,
@@ -675,7 +676,7 @@ onBeforeUnmount(() => {
               <span>预计 / 实付</span>
               <strong>
                 {{ formatCurrency(detail.paymentSummary.estimatedTotalAmount) }} /
-                {{ formatCurrency(detail.paymentSummary.actualTotalAmount) }}
+                {{ formatOptionalCurrency(detail.paymentSummary.actualTotalAmount) }}
               </strong>
             </li>
             <li>
@@ -694,7 +695,7 @@ onBeforeUnmount(() => {
             <li>
               <span>凭证</span>
               <strong>
-                {{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}
+                {{ detail.receiptInfo ? formatOptionalCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}
                 · {{ detail.receiptInfo ? formatDateTime(detail.receiptInfo.uploadedAt) : formatDateTime(detail.basicInfo.receiptUploadDeadlineAt) }}
               </strong>
             </li>

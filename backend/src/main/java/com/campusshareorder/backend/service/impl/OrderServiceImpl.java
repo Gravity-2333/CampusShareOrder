@@ -960,7 +960,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         List<TimelineItemVO> timeline = new ArrayList<>();
         timeline.add(buildTimelineItem("ORDER_CREATED", "创建拼单", order.getCreatedAt(), creator == null ? "系统" : creator.getNickname()));
 
-        if (!"OPEN".equals(order.getStatus())) {
+        if (List.of("GROUPED", "WAIT_DELIVERY", "WAIT_RECEIVE", "COMPLETED").contains(order.getStatus())) {
             timeline.add(buildTimelineItem("ORDER_STATUS", "订单已成团", order.getUpdatedAt(), "系统"));
         }
         if (receipt != null) {

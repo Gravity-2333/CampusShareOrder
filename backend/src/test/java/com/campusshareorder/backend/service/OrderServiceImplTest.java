@@ -288,6 +288,26 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void canceledOrderTimelineDoesNotShowGroupedEvent() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("CANCELED");
+        GroupOrderMember creator = paidMember(12L, 102L, true);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(creator));
+        when(complaintMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(orderReceiptMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userAccountMapper.selectById(any())).thenAnswer(invocation -> user(invocation.getArgument(0), 80));
+
+        OrderDetailVO detail = orderService.getOrderDetail(1L, 102L);
+
+        assertThat(detail.getTimeline())
+                .extracting("description")
+                .contains("订单已取消")
+                .doesNotContain("订单已成团");
+    }
+
+    @Test
     void openReceiptTimeoutComplaintsOpensComplaintChannelWhenReceiptMissing() {
         GroupOrder order = groupedOrder();
         order.setComplaintOpened(false);

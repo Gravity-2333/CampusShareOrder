@@ -47,6 +47,10 @@ export const useComplaintStore = defineStore('complaint', {
       }
     },
     async submitComplaint(payload) {
+      if (this.submitting) {
+        return null
+      }
+
       this.submitting = true
 
       try {

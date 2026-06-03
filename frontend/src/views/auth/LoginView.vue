@@ -33,7 +33,10 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    await userStore.loginUser(form)
+    await userStore.loginUser({
+      password: form.password,
+      phone: form.phone.trim(),
+    })
     ElMessage.success('登录成功')
     router.push('/orders')
   } catch (error) {
@@ -85,6 +88,7 @@ const handleSubmit = async () => {
         <el-form-item label="手机号">
           <el-input
             v-model="form.phone"
+            maxlength="11"
             placeholder="请输入手机号"
           />
         </el-form-item>

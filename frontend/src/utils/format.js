@@ -16,6 +16,14 @@ export const formatCurrency = (value) => {
   return `¥ ${amount.toFixed(2)}`
 }
 
+export const formatOptionalCurrency = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return '--'
+  }
+
+  return formatCurrency(value)
+}
+
 export const formatDateTime = (value) => value || '--'
 
 export const formatSignedNumber = (value) => {

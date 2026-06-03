@@ -12,6 +12,7 @@ import {
   formatCurrency,
   formatDateTime,
   formatJoinStatus,
+  formatOptionalCurrency,
   formatOrderStatus,
   formatPayStatus,
   formatReceiveStatus,
@@ -23,6 +24,12 @@ const router = useRouter()
 const adminStore = useAdminStore()
 
 const detail = computed(() => adminStore.orderDetail)
+const currentOrderId = computed(() => route.params.orderId)
+const normalizedOrderId = computed(() => Number(currentOrderId.value || 0))
+const isValidOrderId = computed(() => Number.isInteger(normalizedOrderId.value) && normalizedOrderId.value > 0)
+const detailErrorText = computed(() =>
+  isValidOrderId.value ? '当前未能加载到订单详情，请返回列表重新选择。' : '当前路由中的订单 ID 无效，请返回订单列表重新进入详情页。',
+)
 
 const stats = computed(() => {
   if (!detail.value) {
@@ -49,7 +56,8 @@ const stats = computed(() => {
 })
 
 const loadDetail = async (orderId = route.params.orderId) => {
-  if (!orderId) {
+  if (!isValidOrderId.value) {
+    adminStore.orderDetail = null
     return
   }
 
@@ -160,7 +168,7 @@ onMounted(() => {
             <h3>支付与凭证</h3>
             <ul class="detail-list">
               <li><span>预计总额</span><strong>{{ formatCurrency(detail.paymentSummary.estimatedTotalAmount) }}</strong></li>
-              <li><span>实付总额</span><strong>{{ formatCurrency(detail.paymentSummary.actualTotalAmount) }}</strong></li>
+              <li><span>实付总额</span><strong>{{ formatOptionalCurrency(detail.paymentSummary.actualTotalAmount) }}</strong></li>
               <li><span>累计支付</span><strong>{{ formatCurrency(detail.paymentSummary.totalPaidAmount) }}</strong></li>
               <li><span>退款总额</span><strong>{{ formatCurrency(detail.paymentSummary.refundAmountTotal) }}</strong></li>
               <li><span>凭证上传时间</span><strong>{{ formatDateTime(detail.receiptInfo?.uploadedAt) }}</strong></li>
@@ -172,55 +180,63 @@ onMounted(() => {
           title="成员列表"
           description="后台可直接查看角色、支付和收货状态。"
         >
-          <div class="desktop-table">
-            <el-table
-              :data="detail.memberList"
-              stripe
-            >
-              <el-table-column
-                prop="nickname"
-                label="成员"
-              />
-              <el-table-column label="角色">
-                <template #default="{ row }">
-                  {{ formatRole(row.role) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="加入状态">
-                <template #default="{ row }">
-                  {{ formatJoinStatus(row.joinStatus) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="支付状态">
-                <template #default="{ row }">
-                  {{ formatPayStatus(row.payStatus) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="收货状态">
-                <template #default="{ row }">
-                  {{ formatReceiveStatus(row.receiveStatus) }}
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+          <template v-if="detail.memberList.length">
+            <div class="desktop-table">
+              <el-table
+                :data="detail.memberList"
+                stripe
+              >
+                <el-table-column
+                  prop="nickname"
+                  label="成员"
+                />
+                <el-table-column label="角色">
+                  <template #default="{ row }">
+                    {{ formatRole(row.role) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="加入状态">
+                  <template #default="{ row }">
+                    {{ formatJoinStatus(row.joinStatus) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="支付状态">
+                  <template #default="{ row }">
+                    {{ formatPayStatus(row.payStatus) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="收货状态">
+                  <template #default="{ row }">
+                    {{ formatReceiveStatus(row.receiveStatus) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
 
-          <div class="mobile-record-list">
-            <article
-              v-for="(row, index) in detail.memberList"
-              :key="`${row.nickname}-${index}`"
-              class="surface-card mobile-record-card"
-            >
-              <div class="mobile-record-title">
-                <span>{{ formatRole(row.role) }}</span>
-                <strong>{{ row.nickname || '--' }}</strong>
-              </div>
-              <ul class="mobile-record-fields">
-                <li><span>加入状态</span><strong>{{ formatJoinStatus(row.joinStatus) }}</strong></li>
-                <li><span>支付状态</span><strong>{{ formatPayStatus(row.payStatus) }}</strong></li>
-                <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.receiveStatus) }}</strong></li>
-              </ul>
-            </article>
-          </div>
+            <div class="mobile-record-list">
+              <article
+                v-for="(row, index) in detail.memberList"
+                :key="`${row.nickname}-${index}`"
+                class="surface-card mobile-record-card"
+              >
+                <div class="mobile-record-title">
+                  <span>{{ formatRole(row.role) }}</span>
+                  <strong>{{ row.nickname || '--' }}</strong>
+                </div>
+                <ul class="mobile-record-fields">
+                  <li><span>加入状态</span><strong>{{ formatJoinStatus(row.joinStatus) }}</strong></li>
+                  <li><span>支付状态</span><strong>{{ formatPayStatus(row.payStatus) }}</strong></li>
+                  <li><span>收货状态</span><strong>{{ formatReceiveStatus(row.receiveStatus) }}</strong></li>
+                </ul>
+              </article>
+            </div>
+          </template>
+
+          <EmptyState
+            v-else
+            title="暂无成员记录"
+            description="当前订单暂未返回成员明细，请刷新详情或返回列表重新进入。"
+          />
         </PageSection>
 
         <div class="detail-grid">
@@ -238,7 +254,7 @@ onMounted(() => {
             title="时间线"
             description="按时间顺序查看订单关键事件。"
           >
-            <el-timeline>
+            <el-timeline v-if="detail.timeline.length">
               <el-timeline-item
                 v-for="item in detail.timeline"
                 :key="`${item.action}-${item.at}`"
@@ -247,6 +263,11 @@ onMounted(() => {
                 {{ item.description }}
               </el-timeline-item>
             </el-timeline>
+            <EmptyState
+              v-else
+              title="暂无时间线"
+              description="当前订单暂未返回关键事件记录。"
+            />
           </PageSection>
         </div>
 
@@ -267,7 +288,7 @@ onMounted(() => {
       <EmptyState
         v-else-if="!adminStore.orderDetailLoading"
         title="订单详情不可用"
-        description="当前未能加载到订单详情，请返回列表重新选择。"
+        :description="detailErrorText"
       >
         <div class="page-actions">
           <el-button @click="router.push('/admin/orders')">
@@ -276,6 +297,7 @@ onMounted(() => {
           <el-button
             type="primary"
             plain
+            :disabled="!isValidOrderId"
             @click="loadDetail()"
           >
             重新加载

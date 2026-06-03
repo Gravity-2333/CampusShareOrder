@@ -70,7 +70,14 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    const result = await orderStore.createNewOrder(form)
+    const result = await orderStore.createNewOrder({
+      deadlineAt: form.deadlineAt.trim(),
+      estimatedTotalAmount: Number(form.estimatedTotalAmount),
+      pickupPoint: form.pickupPoint.trim(),
+      productDesc: form.productDesc.trim(),
+      productName: form.productName.trim(),
+      totalMemberCount: Number(form.totalMemberCount),
+    })
     ElMessage.success('创建成功')
     router.push(`/orders/${result.orderId}`)
   } catch (error) {
@@ -138,8 +145,9 @@ const handleSubmit = async () => {
         <el-form-item label="预计金额">
           <el-input-number
             v-model="form.estimatedTotalAmount"
-            :min="1"
+            :min="0.01"
             :precision="2"
+            :step="1"
           />
         </el-form-item>
         <el-form-item label="取货点">

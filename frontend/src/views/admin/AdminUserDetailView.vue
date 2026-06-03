@@ -15,6 +15,12 @@ const router = useRouter()
 const adminStore = useAdminStore()
 
 const user = computed(() => adminStore.userDetail)
+const currentUserId = computed(() => route.params.userId)
+const normalizedUserId = computed(() => Number(currentUserId.value || 0))
+const isValidUserId = computed(() => Number.isInteger(normalizedUserId.value) && normalizedUserId.value > 0)
+const detailErrorText = computed(() =>
+  isValidUserId.value ? '当前未能加载到用户详情，请返回列表重新选择。' : '当前路由中的用户 ID 无效，请返回用户列表重新进入详情页。',
+)
 
 const stats = computed(() => {
   if (!user.value) {
@@ -41,7 +47,8 @@ const stats = computed(() => {
 })
 
 const loadDetail = async (userId = route.params.userId) => {
-  if (!userId) {
+  if (!isValidUserId.value) {
+    adminStore.userDetail = null
     return
   }
 
@@ -162,43 +169,51 @@ onMounted(() => {
           title="信用记录"
           description="便于后台查看该用户过往信用变化。"
         >
-          <div class="desktop-table">
-            <el-table
-              :data="user.creditRecords || []"
-              stripe
-            >
-              <el-table-column label="时间">
-                <template #default="{ row }">
-                  {{ formatDateTime(row.createdAt) }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                prop="changeReason"
-                label="变更原因"
-              />
-              <el-table-column label="变更值">
-                <template #default="{ row }">
-                  {{ formatSignedNumber(row.delta) }}
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+          <template v-if="user.creditRecords?.length">
+            <div class="desktop-table">
+              <el-table
+                :data="user.creditRecords"
+                stripe
+              >
+                <el-table-column label="时间">
+                  <template #default="{ row }">
+                    {{ formatDateTime(row.createdAt) }}
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  prop="changeReason"
+                  label="变更原因"
+                />
+                <el-table-column label="变更值">
+                  <template #default="{ row }">
+                    {{ formatSignedNumber(row.delta) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
 
-          <div class="mobile-record-list">
-            <article
-              v-for="(row, index) in user.creditRecords || []"
-              :key="`${row.createdAt}-${index}`"
-              class="surface-card mobile-record-card"
-            >
-              <div class="mobile-record-title">
-                <span>{{ formatDateTime(row.createdAt) }}</span>
-                <strong>{{ row.changeReason || '信用分变更' }}</strong>
-              </div>
-              <ul class="mobile-record-fields">
-                <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
-              </ul>
-            </article>
-          </div>
+            <div class="mobile-record-list">
+              <article
+                v-for="(row, index) in user.creditRecords"
+                :key="`${row.createdAt}-${index}`"
+                class="surface-card mobile-record-card"
+              >
+                <div class="mobile-record-title">
+                  <span>{{ formatDateTime(row.createdAt) }}</span>
+                  <strong>{{ row.changeReason || '信用分变更' }}</strong>
+                </div>
+                <ul class="mobile-record-fields">
+                  <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+                </ul>
+              </article>
+            </div>
+          </template>
+
+          <EmptyState
+            v-else
+            title="暂无信用记录"
+            description="该用户当前没有可展示的信用分变更记录。"
+          />
         </PageSection>
 
         <div class="page-actions wrap-actions">
@@ -217,7 +232,7 @@ onMounted(() => {
       <EmptyState
         v-else-if="!adminStore.userDetailLoading"
         title="用户详情不可用"
-        description="当前未能加载到用户详情，请返回列表重新选择。"
+        :description="detailErrorText"
       >
         <div class="page-actions">
           <el-button @click="router.push('/admin/users')">
@@ -226,6 +241,7 @@ onMounted(() => {
           <el-button
             type="primary"
             plain
+            :disabled="!isValidUserId"
             @click="loadDetail()"
           >
             重新加载

@@ -148,6 +148,7 @@ class AdminServiceImplTest {
         assertThat(complaint.getStatus()).isEqualTo("PROCESSED");
         assertThat(order.getStatus()).isEqualTo("CANCELED");
         assertThat(member.getJoinStatus()).isEqualTo("CANCELED");
+        assertThat(member.getPayStatus()).isEqualTo("REFUNDED");
         assertThat(member.getRefundAmountTotal()).isEqualByComparingTo("30.00");
         assertThat(accused.getCreditScore()).isEqualTo(80);
 
@@ -157,7 +158,7 @@ class AdminServiceImplTest {
 
         ArgumentCaptor<CreditChangeRecord> creditCaptor = ArgumentCaptor.forClass(CreditChangeRecord.class);
         verify(creditChangeRecordMapper).insert(creditCaptor.capture());
-        assertThat(creditCaptor.getValue().getReasonType()).isEqualTo("COMPLAINT_PENALTY");
+        assertThat(creditCaptor.getValue().getReasonType()).isEqualTo("COMPLAINT_CONFIRMED");
         assertThat(creditCaptor.getValue().getChangeValue()).isEqualTo(-10);
     }
 

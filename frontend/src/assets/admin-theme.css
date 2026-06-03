@@ -1,0 +1,897 @@
+/* Admin theme overrides — matches prototype HTML */
+/* Sidebar */
+.app-admin-shell {
+  --admin-sidebar-bg-start: #2c3e50;
+  --admin-sidebar-bg-end: #1a252f;
+  --admin-primary: #d87b4d;
+  --admin-primary-hover: #c4683a;
+  --admin-secondary-bg: #f0ebe4;
+  --admin-secondary-text: #2c3e50;
+  --admin-danger: #dc3545;
+  --admin-success: #28a745;
+  --admin-bg: #f5f3ef;
+  --admin-card-bg: #ffffff;
+  --admin-text: #2c3e50;
+  --admin-text-muted: #6b7c70;
+  --admin-border: #f0ebe4;
+  --admin-border-strong: #e0d8cf;
+  --admin-th-bg: #f8f6f2;
+  --admin-th-color: #4a6b5a;
+}
+
+.app-admin-shell {
+  background: var(--admin-bg);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Sidebar restyle */
+.app-admin-shell .app-sidebar {
+  background: linear-gradient(180deg, var(--admin-sidebar-bg-start) 0%, var(--admin-sidebar-bg-end) 100%) !important;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  padding: 1rem;
+}
+
+.app-admin-shell .brand-mark {
+  background: rgba(242, 203, 184, 0.2) !important;
+  border: 1px solid rgba(255,255,255,0.16);
+  color: #fff;
+  height: 40px;
+  width: 40px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.9rem;
+}
+
+.app-admin-shell .brand-kicker {
+  color: #f2cbb8;
+}
+
+.app-admin-shell .brand-block h1 {
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.2rem;
+}
+
+.app-admin-shell .brand-block {
+  border-bottom-color: rgba(255,255,255,0.1);
+}
+
+.app-admin-shell .shell-menu.el-menu {
+  --el-menu-bg-color: transparent;
+  --el-menu-text-color: rgba(255,255,255,0.8);
+  --el-menu-active-color: #ffffff;
+  --el-menu-hover-bg-color: rgba(255,255,255,0.1);
+  --el-menu-border-color: transparent;
+}
+
+.app-admin-shell .shell-menu .el-menu-item {
+  border-radius: 10px;
+  margin-bottom: 0.3rem;
+  min-height: 44px;
+}
+
+.app-admin-shell .shell-menu .el-menu-item.is-active {
+  background: rgba(242, 203, 184, 0.2) !important;
+  box-shadow: none;
+}
+
+.app-admin-shell .shell-menu .el-menu-item:hover {
+  background: rgba(255,255,255,0.1);
+  transform: none;
+}
+
+/* Header restyle */
+.app-admin-shell .app-header {
+  background: #ffffff;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  padding: 1rem 1.5rem;
+  top: 1rem;
+}
+
+.app-admin-shell .app-header h2 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.3rem;
+}
+
+.app-admin-shell .app-header::after {
+  display: none;
+}
+
+.app-admin-shell .welcome-text {
+  color: var(--admin-text-muted);
+}
+
+/* Buttons */
+.app-admin-shell .el-button {
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.app-admin-shell .el-button.el-button--primary {
+  --el-button-bg-color: var(--admin-primary);
+  --el-button-border-color: var(--admin-primary);
+  --el-button-hover-bg-color: var(--admin-primary-hover);
+  --el-button-hover-border-color: var(--admin-primary-hover);
+  --el-button-active-bg-color: var(--admin-primary-hover);
+  --el-button-active-border-color: var(--admin-primary-hover);
+}
+
+.app-admin-shell .el-button.el-button--danger {
+  --el-button-bg-color: var(--admin-danger);
+  --el-button-border-color: var(--admin-danger);
+}
+
+.app-admin-shell .el-button.is-link {
+  --el-button-text-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+
+.app-admin-shell .el-button:not(.el-button--primary):not(.el-button--danger):not(.is-link):not(.el-button--text) {
+  background: var(--admin-secondary-bg);
+  color: var(--admin-secondary-text);
+  border-color: var(--admin-secondary-bg);
+}
+
+/* Buttons in page-actions need explicit restyle */
+.app-admin-shell .page-actions .el-button {
+  border-radius: 8px;
+}
+
+/* Stat cards */
+.app-admin-shell .stat-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  padding: 1.2rem;
+}
+
+.app-admin-shell .stat-card::after {
+  display: none;
+}
+
+.app-admin-shell .stat-label {
+  color: var(--admin-text-muted);
+  font-size: 0.9rem;
+}
+
+.app-admin-shell .stat-value {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 2rem;
+  font-weight: 700;
+}
+
+.app-admin-shell .stat-hint {
+  color: var(--admin-text-muted);
+}
+
+/* Section / page-section */
+.app-admin-shell .page-section,
+.app-admin-shell .surface-card {
+  background: #ffffff;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  backdrop-filter: none;
+}
+
+.app-admin-shell .page-section::before {
+  display: none;
+}
+
+.app-admin-shell .section-header h3,
+.app-admin-shell .page-section h3 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .section-kicker {
+  color: var(--admin-primary);
+}
+
+.app-admin-shell .muted-text {
+  color: var(--admin-text-muted);
+}
+
+/* Detail panels */
+.app-admin-shell .detail-panel {
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.app-admin-shell .detail-panel h3,
+.app-admin-shell .detail-panel h4 {
+  color: var(--admin-text);
+}
+
+.app-admin-shell .detail-list span {
+  color: var(--admin-text-muted);
+}
+
+.app-admin-shell .detail-list strong {
+  color: var(--admin-text);
+}
+
+.app-admin-shell .detail-note {
+  border-top-color: var(--admin-border-strong);
+}
+
+/* Quick cards */
+.app-admin-shell .admin-quick-card {
+  background: #ffffff;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  color: var(--admin-text);
+}
+
+.app-admin-shell .admin-quick-card:hover {
+  border-color: var(--admin-primary);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  transform: translateY(-2px);
+}
+
+.app-admin-shell .admin-quick-card span {
+  color: var(--admin-text-muted);
+}
+
+/* Table styling */
+.app-admin-shell .table-stack .el-table {
+  border-radius: 8px;
+  box-shadow: none;
+  border: 1px solid var(--admin-border);
+}
+
+.app-admin-shell .table-stack .el-table th.el-table__cell {
+  background: var(--admin-th-bg);
+  color: var(--admin-th-color);
+}
+
+.app-admin-shell .table-stack .el-table tr {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.app-admin-shell .table-stack .el-table td.el-table__cell {
+  border-bottom: 1px solid var(--admin-border);
+}
+
+/* Tags */
+.app-admin-shell .el-tag {
+  border-radius: 20px;
+  font-weight: 500;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.8rem;
+}
+
+/* Status tags specific colors */
+.app-admin-shell .status-tag {
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* Input & Select */
+.app-admin-shell .el-input__wrapper,
+.app-admin-shell .el-textarea__inner,
+.app-admin-shell .el-select__wrapper {
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px var(--admin-border-strong);
+}
+
+.app-admin-shell .el-input__wrapper.is-focus,
+.app-admin-shell .el-textarea__inner:focus,
+.app-admin-shell .el-select__wrapper.is-focused {
+  box-shadow: inset 0 0 0 1px var(--admin-primary);
+}
+
+/* Filter panel */
+.app-admin-shell .filter-panel,
+.app-admin-shell .compact-filter-panel {
+  background: #ffffff;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 10px;
+}
+
+/* Toolbar row */
+.app-admin-shell .toolbar-row {
+  gap: 0.5rem;
+}
+
+/* Table caption */
+.app-admin-shell .table-caption {
+  color: var(--admin-text-muted);
+}
+
+/* Pagination */
+.app-admin-shell .el-pagination.is-background .btn-next,
+.app-admin-shell .el-pagination.is-background .btn-prev,
+.app-admin-shell .el-pagination.is-background .el-pager li {
+  border-radius: 6px;
+  border: 1px solid var(--admin-border-strong);
+}
+
+.app-admin-shell .el-pagination.is-background .el-pager li.is-active {
+  background: var(--admin-text);
+  color: #fff;
+}
+
+/* Detail actions bar */
+.app-admin-shell .detail-actions-bar {
+  background: var(--admin-th-bg);
+  border: none;
+  border-radius: 10px;
+}
+
+/* Form intro */
+.app-admin-shell .form-intro {
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* Empty state */
+.app-admin-shell .empty-state {
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* Timeline */
+.app-admin-shell .el-timeline-item__timestamp {
+  color: var(--admin-text-muted);
+}
+
+/* Mobile record cards */
+.app-admin-shell .mobile-record-card {
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+/* Drawer sidebar */
+.app-admin-shell .mobile-drawer-sidebar {
+  background: linear-gradient(180deg, var(--admin-sidebar-bg-start) 0%, var(--admin-sidebar-bg-end) 100%) !important;
+}
+
+/* Hover effects */
+.app-admin-shell .stat-card:hover,
+.app-admin-shell .detail-panel:hover,
+.app-admin-shell .empty-state:hover {
+  border-color: var(--admin-border-strong);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  transform: none;
+}
+
+.app-admin-shell .order-card:hover,
+.app-admin-shell .stat-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Card header row */
+.app-admin-shell .card-header-row h2 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Score plus/minus */
+.app-admin-shell .score-plus {
+  color: var(--admin-success);
+}
+
+.app-admin-shell .score-minus {
+  color: var(--admin-danger);
+}
+
+/* Detail note */
+.app-admin-shell .detail-note span {
+  color: var(--admin-text-muted);
+}
+
+/* Section header */
+.app-admin-shell .section-header h3 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Toolbar row overrides */
+.app-admin-shell .toolbar-row .el-input__wrapper,
+.app-admin-shell .toolbar-row .el-select__wrapper {
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+/* Create order form overrides for admin */
+.app-admin-shell .create-order-form {
+  background: #ffffff;
+  border: 1px solid var(--admin-border-strong);
+}
+
+/* Override any Element Plus blue to admin primary */
+.app-admin-shell .el-button--primary.is-plain {
+  --el-button-text-color: var(--admin-primary);
+  --el-button-border-color: var(--admin-primary);
+}
+
+/* Prototype button classes */
+.app-admin-shell .btn-primary {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--admin-primary);
+  color: white;
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .btn-primary:hover {
+  background: var(--admin-primary-hover);
+}
+
+.app-admin-shell .btn-secondary {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--admin-secondary-bg);
+  color: var(--admin-secondary-text);
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .btn-secondary:hover {
+  background: #e5ddd3;
+}
+
+.app-admin-shell .btn-danger {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--admin-danger);
+  color: white;
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .btn-danger:hover {
+  background: #c82333;
+}
+
+.app-admin-shell .btn-success {
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--admin-success);
+  color: white;
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .btn-success:hover {
+  background: #218838;
+}
+
+/* Toolbar inputs matching prototype */
+.app-admin-shell .toolbar-input {
+  padding: 0.6rem;
+  border: 1px solid #e0d8cf;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  flex: 1;
+  min-width: 180px;
+}
+
+.app-admin-shell .toolbar-input:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 2px rgba(216, 123, 77, 0.2);
+}
+
+.app-admin-shell .toolbar-select {
+  padding: 0.6rem;
+  border: 1px solid #e0d8cf;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-width: 140px;
+  background: white;
+}
+
+.app-admin-shell .toolbar-select:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+}
+
+/* Toolbar row admin variant */
+.app-admin-shell .toolbar-admin {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Section container */
+.app-admin-shell .section {
+  align-content: flex-start;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Admin table base styles — matching prototype */
+.app-admin-shell .section .table,
+.app-admin-shell .table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.app-admin-shell .section .table th,
+.app-admin-shell .section .table td,
+.app-admin-shell .table th,
+.app-admin-shell .table td {
+  padding: 0.8rem;
+  text-align: left;
+  border-bottom: 1px solid #f0ebe4;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.app-admin-shell .section .table th,
+.app-admin-shell .table th {
+  background: #f8f6f2;
+  color: #4a6b5a;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.app-admin-shell .section .table tbody tr:hover,
+.app-admin-shell .table tbody tr:hover {
+  background: #faf9f7;
+}
+
+/* Ensure stack-page and app-content fill width */
+.app-admin-shell .stack-page {
+  width: 100%;
+}
+
+.app-admin-shell .app-content {
+  width: 100%;
+}
+
+.app-admin-shell .app-main {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Stats grid full width */
+.app-admin-shell .stats-grid {
+  width: 100%;
+}
+
+/* Force full-width content flow */
+.app-admin-shell .app-content {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-admin-shell .app-content > * {
+  min-width: 0;
+  width: 100%;
+}
+
+.app-admin-shell .section > .table {
+  width: 100%;
+  min-width: 100%;
+}
+
+.app-admin-shell .section .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.app-admin-shell .section .section-header h3 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Tag classes matching prototype */
+.app-admin-shell .tag {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.app-admin-shell .tag-success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.app-admin-shell .tag-warning {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.app-admin-shell .tag-danger {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.app-admin-shell .tag-info {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.app-admin-shell .tag-primary {
+  background: #cce5ff;
+  color: #004085;
+}
+
+/* Timeline styles */
+.app-admin-shell .timeline {
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.app-admin-shell .timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #e0d8cf;
+}
+
+.app-admin-shell .timeline-item {
+  position: relative;
+  padding: 0.8rem 0;
+}
+
+.app-admin-shell .timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -19px;
+  top: 1rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+}
+
+.app-admin-shell .timeline-item strong {
+  color: var(--admin-text);
+}
+
+.app-admin-shell .timeline-item div {
+  color: var(--admin-text-muted);
+}
+
+/* Detail panel h4 */
+.app-admin-shell .detail-panel h4 {
+  color: var(--admin-text);
+  margin-bottom: 1rem;
+  font-size: 1.05rem;
+}
+
+/* PageSection title override */
+.app-admin-shell .page-section .section-header h3 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.2rem;
+}
+
+/* Logout button styling */
+.app-admin-shell .btn-logout {
+  background: var(--admin-secondary-bg) !important;
+  color: var(--admin-secondary-text) !important;
+  border: none !important;
+  font-weight: 600;
+}
+
+.app-admin-shell .btn-logout:hover {
+  background: #e5ddd3 !important;
+}
+
+/* Stat card hover override */
+.app-admin-shell .stat-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Ensure mobile record cards in admin have proper border */
+.app-admin-shell .mobile-record-card {
+  background: white;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+/* Admin h2 in card header */
+.app-admin-shell .card-header-row h2 {
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 1.3rem;
+}
+
+/* Ensure el-table in sections has border */
+.app-admin-shell .section .el-table {
+  border: 1px solid var(--admin-border);
+  border-radius: 4px;
+}
+
+/* Table links */
+.app-admin-shell .table-link {
+  color: var(--admin-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.app-admin-shell .table-link:hover {
+  text-decoration: underline;
+}
+
+.app-admin-shell .table a {
+  color: var(--admin-primary);
+  text-decoration: none;
+}
+
+.app-admin-shell .table a:hover {
+  text-decoration: underline;
+}
+
+/* Small button variant */
+.app-admin-shell .btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+/* Form group styles */
+.app-admin-shell .form-group {
+  margin-bottom: 1rem;
+}
+
+.app-admin-shell .form-group label {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: #4a6b5a;
+  font-weight: 500;
+}
+
+.app-admin-shell .form-group textarea {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #e0d8cf;
+  border-radius: 10px;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 100px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .form-group textarea:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 2px rgba(216, 123, 77, 0.2);
+}
+
+/* Toolbar - the prototype uses .toolbar not .toolbar-admin */
+.app-admin-shell .toolbar {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.app-admin-shell .toolbar input,
+.app-admin-shell .toolbar select {
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #e0d8cf;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .toolbar input {
+  flex: 0 0 210px;
+  width: 210px;
+}
+
+.app-admin-shell .toolbar input:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 2px rgba(216, 123, 77, 0.2);
+}
+
+.app-admin-shell .toolbar select {
+  background: white;
+  flex: 0 0 120px;
+  width: 120px;
+}
+
+.app-admin-shell .toolbar select:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+}
+
+.app-admin-shell .toolbar .btn,
+.app-admin-shell .toolbar button {
+  box-sizing: border-box;
+  height: 34px;
+  min-height: 34px;
+  padding: 0.4rem 1.2rem;
+}
+
+/* Pagination matching prototype */
+.app-admin-shell .pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.app-admin-shell .pagination button {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid #e0d8cf;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.app-admin-shell .pagination button:hover:not(:disabled) {
+  background: var(--admin-secondary-bg);
+}
+
+.app-admin-shell .pagination button.active {
+  background: #2c3e50;
+  color: white;
+  border-color: #2c3e50;
+}
+
+.app-admin-shell .pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Row action group for table action links/buttons */
+.app-admin-shell .row-action-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.65rem;
+  align-items: center;
+}
+
+/* Chart container for reports page */
+.app-admin-shell .chart-container {
+  height: 300px;
+  background: #f8f6f2;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

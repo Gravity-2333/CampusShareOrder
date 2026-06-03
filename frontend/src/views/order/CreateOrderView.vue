@@ -10,6 +10,7 @@ import { formatCurrency } from '../../utils/format'
 import {
   firstValidationError,
   requireValue,
+  validateFutureApiDateTime,
   validatePositiveNumber,
 } from '../../utils/validate'
 
@@ -45,12 +46,20 @@ const form = reactive({
 })
 
 const handleSubmit = async () => {
+  if (loading.value) {
+    return
+  }
+
   const errorMessage = firstValidationError([
     requireValue(form.productName, '请填写商品名称'),
-    validatePositiveNumber(form.totalMemberCount, '拼单人数必须大于 0'),
+    form.productName.trim().length > 50 ? '商品名称长度不能超过 50 个字符' : '',
+    form.productDesc.trim().length > 255 ? '商品描述长度不能超过 255 个字符' : '',
+    Number(form.totalMemberCount) < 2 ? '拼单人数不能少于 2 人' : '',
+    Number(form.totalMemberCount) > 20 ? '拼单人数不能超过 20 人' : '',
     validatePositiveNumber(form.estimatedTotalAmount, '预计金额必须大于 0'),
     requireValue(form.pickupPoint, '请填写取货点'),
-    requireValue(form.deadlineAt, '请填写截止时间'),
+    form.pickupPoint.trim().length > 100 ? '取货点长度不能超过 100 个字符' : '',
+    validateFutureApiDateTime(form.deadlineAt, '截止时间必须晚于当前时间'),
   ])
 
   if (errorMessage) {
@@ -61,9 +70,22 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    const result = await orderStore.createNewOrder(form)
+    const result = await orderStore.createNewOrder({
+      deadlineAt: form.deadlineAt.trim(),
+      estimatedTotalAmount: Number(form.estimatedTotalAmount),
+      pickupPoint: form.pickupPoint.trim(),
+      productDesc: form.productDesc.trim(),
+      productName: form.productName.trim(),
+      totalMemberCount: Number(form.totalMemberCount),
+    })
     ElMessage.success('创建成功')
-    router.push(`/orders/${result.orderId}`)
+
+    if (result?.orderId) {
+      router.push(`/orders/${result.orderId}`)
+      return
+    }
+
+    router.push('/my-orders')
   } catch (error) {
     ElMessage.error(error.message)
   } finally {
@@ -99,18 +121,25 @@ const handleSubmit = async () => {
       <el-form
         label-position="top"
         :model="form"
-        class="form-grid"
+        class="form-grid create-order-form"
       >
         <el-form-item label="商品名称">
           <el-input
             v-model="form.productName"
+            maxlength="50"
+            show-word-limit
             placeholder="例如：晚饭拼单、奶茶拼单"
           />
         </el-form-item>
-        <el-form-item label="商品描述">
+        <el-form-item
+          label="商品描述"
+          class="description-field"
+        >
           <el-input
             v-model="form.productDesc"
             type="textarea"
+            maxlength="255"
+            show-word-limit
             :rows="4"
             placeholder="可补充口味、备注、配送说明等"
           />
@@ -119,19 +148,22 @@ const handleSubmit = async () => {
           <el-input-number
             v-model="form.totalMemberCount"
             :min="2"
-            :max="6"
+            :max="20"
           />
         </el-form-item>
         <el-form-item label="预计金额">
           <el-input-number
             v-model="form.estimatedTotalAmount"
-            :min="1"
+            :min="0.01"
             :precision="2"
+            :step="1"
           />
         </el-form-item>
         <el-form-item label="取货点">
           <el-input
             v-model="form.pickupPoint"
+            maxlength="100"
+            show-word-limit
             placeholder="例如：东区宿舍门口、图书馆南门"
           />
         </el-form-item>
@@ -143,7 +175,7 @@ const handleSubmit = async () => {
         </el-form-item>
       </el-form>
 
-      <div class="page-actions">
+      <div class="page-actions create-order-actions">
         <el-button
           type="primary"
           :loading="loading"

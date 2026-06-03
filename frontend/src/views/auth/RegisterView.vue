@@ -5,16 +5,17 @@ import { ElMessage } from 'element-plus'
 
 import { useUserStore } from '../../stores/user'
 import {
-  firstValidationError,
   validateNickname,
   validatePassword,
   validatePhone,
+  validationSummary,
 } from '../../utils/validate'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const form = reactive({
+  confirmPassword: '',
   nickname: '',
   password: '',
   phone: '',
@@ -27,10 +28,18 @@ const registerTips = [
 ]
 
 const handleSubmit = async () => {
-  const errorMessage = firstValidationError([
+  if (loading.value) {
+    return
+  }
+
+  const errorMessage = validationSummary([
     validateNickname(form.nickname),
     validatePhone(form.phone),
     validatePassword(form.password),
+    validatePassword(form.confirmPassword, '确认密码'),
+    form.password && form.confirmPassword && form.password !== form.confirmPassword
+      ? '两次输入密码不一致'
+      : '',
   ])
 
   if (errorMessage) {
@@ -41,7 +50,11 @@ const handleSubmit = async () => {
   loading.value = true
 
   try {
-    await userStore.registerUser(form)
+    await userStore.registerUser({
+      nickname: form.nickname.trim(),
+      password: form.password,
+      phone: form.phone.trim(),
+    })
     ElMessage.success('注册成功，请返回登录')
     router.push('/login')
   } catch (error) {
@@ -116,12 +129,15 @@ const handleSubmit = async () => {
         <el-form-item label="昵称">
           <el-input
             v-model="form.nickname"
+            maxlength="20"
+            show-word-limit
             placeholder="请输入昵称"
           />
         </el-form-item>
         <el-form-item label="手机号">
           <el-input
             v-model="form.phone"
+            maxlength="11"
             placeholder="请输入手机号"
           />
         </el-form-item>
@@ -130,6 +146,13 @@ const handleSubmit = async () => {
             v-model="form.password"
             show-password
             placeholder="请输入密码"
+          />
+        </el-form-item>
+        <el-form-item label="确认密码">
+          <el-input
+            v-model="form.confirmPassword"
+            show-password
+            placeholder="请再次输入密码"
           />
         </el-form-item>
         <div class="page-actions">

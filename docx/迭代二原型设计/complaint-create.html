@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发起投诉 - 校园拼单平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f3ef; min-height: 100vh; }
+    .app-shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+    .sidebar { background: linear-gradient(180deg, #2e3f34 0%, #24342b 100%); color: white; padding: 1rem; }
+    .sidebar .brand { padding-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; }
+    .sidebar .brand-mark { width: 40px; height: 40px; background: rgba(242,203,184,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    .sidebar .brand h1 { font-size: 1.2rem; margin-top: 0.5rem; }
+    .sidebar .menu { list-style: none; }
+    .sidebar .menu li { margin-bottom: 0.3rem; }
+    .sidebar .menu a { display: block; padding: 0.7rem; border-radius: 10px; color: rgba(255,255,255,0.8); text-decoration: none; }
+    .sidebar .menu a:hover { background: rgba(255,255,255,0.1); }
+    .sidebar .menu a.active { background: rgba(242,203,184,0.2); color: white; }
+    .main { padding: 1rem; display: flex; flex-direction: column; }
+    .header { background: white; border-radius: 12px; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+    .header h2 { color: #2e3f34; }
+    .header .actions { display: flex; align-items: center; gap: 0.5rem; }
+    .header .welcome { color: #6b7c70; margin-right: 1rem; }
+    .content { flex: 1; }
+    .section { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+    .section-header { margin-bottom: 1rem; }
+    .section-header h3 { color: #2e3f34; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: #4a6b5a; font-weight: 500; }
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.8rem; border: 1px solid #e0d8cf; border-radius: 10px; font-size: 1rem; }
+    .form-group textarea { resize: vertical; min-height: 150px; }
+    .btn { padding: 0.8rem 1.5rem; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: #d87b4d; color: white; }
+    .btn-primary:hover { background: #c4683a; }
+    .btn-secondary { background: #f0ebe4; color: #2e3f34; }
+    @media (max-width: 768px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">CSO</div>
+        <h1>校园拼单平台</h1>
+      </div>
+      <ul class="menu">
+        <li><a href="orders.html">拼单大厅</a></li>
+        <li><a href="create-order.html">发起拼单</a></li>
+        <li><a href="my-orders.html">我的拼单</a></li>
+        <li><a href="complaints.html" class="active">我的投诉</a></li>
+        <li><a href="profile.html">个人资料</a></li>
+        <li><a href="credit.html">信用分</a></li>
+      </ul>
+    </div>
+    
+    <div class="main">
+      <div class="header">
+        <h2>发起投诉</h2>
+        <div class="actions">
+          <span class="welcome">欢迎，张三</span>
+          <button class="btn btn-secondary" onclick="location.href='login.html'">退出登录</button>
+        </div>
+      </div>
+      
+      <div class="content">
+        <div class="section">
+          <div class="section-header">
+            <h3>发起投诉</h3>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>选择订单</label>
+              <select>
+                <option value="">请选择要投诉的订单</option>
+                <option value="ORD2024006">ORD2024006 - 外卖拼单</option>
+                <option value="ORD2024001">ORD2024001 - 奶茶拼单</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>投诉类型</label>
+              <select>
+                <option value="">请选择投诉类型</option>
+                <option value="NO_SHIP">未发货</option>
+                <option value="NO_DELIVERY">未送达</option>
+                <option value="QUALITY">商品质量</option>
+                <option value="OTHER">其他</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>投诉描述</label>
+              <textarea placeholder="请详细描述投诉内容..."></textarea>
+            </div>
+          </div>
+
+          <div class="page-actions" style="margin-top: 1rem;">
+            <button class="btn btn-secondary" onclick="location.href='complaints.html'">取消</button>
+            <button class="btn btn-primary">提交投诉</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

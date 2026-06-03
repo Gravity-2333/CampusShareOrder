@@ -64,7 +64,11 @@ public class AuthServiceImpl implements AuthService {
         wrapper.eq(UserAccount::getPhone, request.getPhone());
         UserAccount user = userAccountMapper.selectOne(wrapper);
 
-        if (user == null || !BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
+        if (user == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+        }
+
+        if (!BCrypt.checkpw(request.getPassword(), user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "手机号或密码错误");
         }
 

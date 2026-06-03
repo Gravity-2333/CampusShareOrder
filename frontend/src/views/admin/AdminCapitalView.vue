@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import { useAdminStore } from '../../stores/admin'
 import { formatCapitalRecordType, formatCurrency, formatDateTime } from '../../utils/format'
+import { normalizePageFilters } from '../../utils/page'
 
 const adminStore = useAdminStore()
 
@@ -57,13 +58,20 @@ const summaryText = computed(() => {
 
 const loadRecords = async () => {
   try {
-    await adminStore.loadCapitalRecords(filters)
+    const page = await adminStore.loadCapitalRecords(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
 }
 
+const normalizeFilters = () => {
+  Object.assign(filters, normalizePageFilters(filters))
+}
+
 const submitFilters = async () => {
+  normalizeFilters()
   filters.page = 1
   await loadRecords()
 }
@@ -78,6 +86,7 @@ const resetFilters = async () => {
 }
 
 const handlePageChange = async ({ page, pageSize }) => {
+  normalizeFilters()
   filters.page = page
   filters.pageSize = pageSize
   await loadRecords()
@@ -127,6 +136,10 @@ onMounted(loadRecords)
             value="REFUND_CANCEL"
           />
           <el-option
+            label="退出退款"
+            value="REFUND_EXIT"
+          />
+          <el-option
             label="差额退款"
             value="REFUND_DIFF"
           />
@@ -147,6 +160,7 @@ onMounted(loadRecords)
         </el-select>
         <el-button
           type="primary"
+          :loading="adminStore.recordsLoading"
           @click="submitFilters"
         >
           查询
@@ -158,7 +172,10 @@ onMounted(loadRecords)
           共 {{ adminStore.recordsPage.total }} 条资金记录{{ filters.type ? `，当前筛选：${formatCapitalRecordType(filters.type)}` : '' }}。
         </span>
         <div class="page-actions">
-          <el-button @click="resetFilters">
+          <el-button
+            :disabled="adminStore.recordsLoading"
+            @click="resetFilters"
+          >
             恢复默认筛选
           </el-button>
         </div>
@@ -242,7 +259,7 @@ onMounted(loadRecords)
         />
       </div>
       <EmptyState
-        v-else
+        v-else-if="!adminStore.recordsLoading"
         title="暂无资金记录"
         description="支付、退款和结算动作会在这里形成资金流水。"
       />

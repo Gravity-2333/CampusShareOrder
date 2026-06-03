@@ -43,6 +43,10 @@ const normalizeResponseStrings = (payload) => {
 }
 
 const shouldClearSession = (code) => [401, 40101, 40102, 40302].includes(Number(code))
+const notifySessionExpired = (message = '登录状态已失效，请重新登录') => {
+  clearSessionStorage()
+  window.dispatchEvent(new CustomEvent('campus-session-expired', { detail: { message } }))
+}
 
 request.interceptors.request.use((config) => {
   const token = getAccessToken()
@@ -64,7 +68,7 @@ request.interceptors.response.use(
         error.code = payload.code
 
         if (shouldClearSession(payload.code)) {
-          clearSessionStorage()
+          notifySessionExpired(error.message)
         }
 
         throw error
@@ -83,7 +87,7 @@ request.interceptors.response.use(
       wrappedError.code = responsePayload.code
 
       if (shouldClearSession(wrappedError.code)) {
-        clearSessionStorage()
+        notifySessionExpired(wrappedError.message)
       }
 
       throw wrappedError
@@ -92,7 +96,7 @@ request.interceptors.response.use(
     const status = error.response?.status
 
     if (status === 401) {
-      clearSessionStorage()
+      notifySessionExpired()
     }
 
     const fallbackMessageMap = {

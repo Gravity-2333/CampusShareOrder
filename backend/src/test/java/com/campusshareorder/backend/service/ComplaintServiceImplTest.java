@@ -65,4 +65,25 @@ class ComplaintServiceImplTest {
 
         verify(complaintMapper, never()).insert(any(Complaint.class));
     }
+
+    @Test
+    void createComplaintRejectsInactiveComplainant() {
+        GroupOrder order = new GroupOrder();
+        order.setId(1L);
+        order.setCreatorUserId(100L);
+        order.setComplaintOpened(true);
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        CreateComplaintRequest request = new CreateComplaintRequest();
+        request.setOrderId(1L);
+        request.setType("NOT_PURCHASED");
+        request.setContent("发起人未按时上传凭证");
+
+        assertThatThrownBy(() -> complaintService.createComplaint(request, 101L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.FORBIDDEN.getCode()));
+
+        verify(complaintMapper, never()).insert(any(Complaint.class));
+    }
 }

@@ -1,48 +1,20 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import AppPagination from '../../components/common/AppPagination.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
-import PageSection from '../../components/common/PageSection.vue'
-import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useComplaintStore } from '../../stores/complaint'
-import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
+import { formatComplaintStatus, formatDateTime } from '../../utils/format'
 
 const router = useRouter()
 const complaintStore = useComplaintStore()
 
-const stats = computed(() => [
-  {
-    label: '投诉总数',
-    value: complaintStore.myComplaintsPage.total,
-    hint: '展示你发起过的投诉记录',
-  },
-  {
-    label: '待处理',
-    value: complaintStore.myComplaintsPage.list.filter((item) => item.status === 'PENDING').length,
-    hint: '便于快速识别仍在等待后台处理的投诉',
-  },
-  {
-    label: '当前页',
-    value: `${complaintStore.myComplaintsPage.page}/${complaintStore.myComplaintsPage.pages || 1}`,
-    hint: '便于快速定位历史处理记录',
-  },
-])
-
-const summaryText = computed(() => {
-  if (!complaintStore.myComplaintsPage.list.length) {
-    return '当前没有投诉记录。'
-  }
-
-  return '投诉列表优先帮助你快速区分待处理和已处理项目，详细结果在详情页继续查看。'
-})
-
 const loadComplaints = async () => {
   try {
-    await complaintStore.loadMyComplaints({ page: 1, pageSize: 10 })
+    await complaintStore.loadMyComplaints()
   } catch (error) {
     ElMessage.error(error.message)
   }
@@ -60,126 +32,78 @@ onMounted(loadComplaints)
 </script>
 
 <template>
-  <div class="stack-page">
-    <div class="stats-grid">
-      <StatCard
-        v-for="item in stats"
-        :key="item.label"
-        :label="item.label"
-        :value="item.value"
-        :hint="item.hint"
-      />
-    </div>
-
-    <PageSection
-      title="我的投诉"
-      description="查看投诉处理进度、处理结果和关联订单信息。"
-    >
-      <p class="muted-text">
-        {{ summaryText }}
-      </p>
-
-      <div class="table-toolbar">
-        <span class="table-caption">共 {{ complaintStore.myComplaintsPage.total }} 条投诉记录，建议优先查看待处理项。</span>
+  <div class="stack-page complaint-list-page">
+    <div class="section">
+      <div class="section-header">
+        <h3>我的投诉</h3>
         <div class="page-actions">
           <el-button
-            type="danger"
-            plain
+            type="primary"
             @click="router.push('/complaints/create')"
           >
-            发起新投诉
+            发起投诉
           </el-button>
         </div>
       </div>
 
       <div
         v-if="complaintStore.myComplaintsPage.list.length"
-        class="table-stack"
+        class="table-stack complaint-table-stack"
       >
-        <div class="desktop-table">
-          <el-table
-            v-loading="complaintStore.myComplaintsLoading"
-            :data="complaintStore.myComplaintsPage.list"
-            stripe
+        <el-table
+          v-loading="complaintStore.myComplaintsLoading"
+          :data="complaintStore.myComplaintsPage.list"
+          stripe
+        >
+          <el-table-column
+            prop="complaintNo"
+            label="投诉单号"
+            min-width="140"
+          />
+          <el-table-column
+            prop="orderNo"
+            label="关联订单"
+            min-width="140"
+          />
+          <el-table-column
+            prop="productName"
+            label="商品"
+            min-width="120"
+          />
+          <el-table-column
+            label="状态"
+            width="120"
           >
-            <el-table-column
-              prop="complaintNo"
-              label="投诉单号"
-            />
-            <el-table-column label="投诉类型">
-              <template #default="{ row }">
-                {{ formatComplaintType(row.type) }}
-              </template>
-            </el-table-column>
-            <el-table-column
-              prop="productName"
-              label="商品"
-            />
-            <el-table-column
-              prop="accusedNickname"
-              label="被投诉人"
-            />
-            <el-table-column label="状态">
-              <template #default="{ row }">
-                <StatusTag
-                  :value="row.status"
-                  :text="formatComplaintStatus(row.status)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="发起时间">
-              <template #default="{ row }">
-                {{ formatDateTime(row.createdAt) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="{ row }">
-                <div class="row-action-group">
-                  <el-button
-                    link
-                    type="primary"
-                    @click="router.push(`/complaints/${row.complaintId}`)"
-                  >
-                    查看详情
-                  </el-button>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <div class="mobile-record-list">
-          <article
-            v-for="row in complaintStore.myComplaintsPage.list"
-            :key="row.complaintId"
-            class="surface-card mobile-record-card"
-          >
-            <div class="mobile-record-header">
-              <div class="mobile-record-title">
-                <span>{{ row.complaintNo }}</span>
-                <strong>{{ row.productName }}</strong>
-              </div>
+            <template #default="{ row }">
               <StatusTag
                 :value="row.status"
                 :text="formatComplaintStatus(row.status)"
               />
-            </div>
-            <ul class="mobile-record-fields">
-              <li><span>投诉类型</span><strong>{{ formatComplaintType(row.type) }}</strong></li>
-              <li><span>被投诉人</span><strong>{{ row.accusedNickname || '--' }}</strong></li>
-              <li><span>发起时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
-            </ul>
-            <div class="page-actions">
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="创建时间"
+            width="180"
+          >
+            <template #default="{ row }">
+              {{ formatDateTime(row.createdAt) }}
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="操作"
+            width="120"
+          >
+            <template #default="{ row }">
               <el-button
+                link
                 type="primary"
-                plain
                 @click="router.push(`/complaints/${row.complaintId}`)"
               >
                 查看详情
               </el-button>
-            </div>
-          </article>
-        </div>
+            </template>
+          </el-table-column>
+        </el-table>
 
         <AppPagination
           :page="complaintStore.myComplaintsPage.page"
@@ -189,11 +113,12 @@ onMounted(loadComplaints)
           @change="handlePageChange"
         />
       </div>
+
       <EmptyState
-        v-else
+        v-else-if="!complaintStore.myComplaintsLoading"
         title="暂无投诉"
         description="订单出现异常时，你可以从订单详情页发起投诉。"
       />
-    </PageSection>
+    </div>
   </div>
 </template>

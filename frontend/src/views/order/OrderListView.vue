@@ -3,14 +3,12 @@ import { computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import AppPagination from '../../components/common/AppPagination.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
-import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
-import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
 import { useUserStore } from '../../stores/user'
 import { formatCurrency, formatDateTime, formatOrderStatus } from '../../utils/format'
+import { normalizePageFilters } from '../../utils/page'
 
 const router = useRouter()
 const orderStore = useOrderStore()
@@ -18,12 +16,16 @@ const userStore = useUserStore()
 const filters = reactive({
   keyword: '',
   page: 1,
-  pageSize: 10,
+  pageSize: 3,
   status: '',
 })
 
 const visibleOrders = computed(() => orderStore.hallPage.list)
 const canCreateOrder = computed(() => userStore.session.isVerified)
+const pageNumbers = computed(() => Array.from(
+  { length: orderStore.hallPage.pages || 1 },
+  (_, index) => index + 1,
+))
 
 const stats = computed(() => {
   const openCount = visibleOrders.value.filter((order) => order.status === 'OPEN').length
@@ -56,27 +58,22 @@ const stats = computed(() => {
   ]
 })
 
-const hallTips = computed(() => {
-  if (!visibleOrders.value.length) {
-    return '当前筛选条件下没有可展示的拼单。'
-  }
-
-  if (!canCreateOrder.value) {
-    return '当前账号尚未实名认证，可以先浏览大厅，认证后再发起拼单。'
-  }
-
-  return '浏览正在进行的拼单，选择合适的订单加入，或发起自己的拼单。'
-})
-
 const loadOrders = async () => {
   try {
-    await orderStore.loadHallOrders(filters)
+    const page = await orderStore.loadHallOrders(filters)
+    filters.page = page.page
+    filters.pageSize = page.pageSize
   } catch (error) {
     ElMessage.error(error.message)
   }
 }
 
+const normalizeFilters = () => {
+  Object.assign(filters, normalizePageFilters(filters))
+}
+
 const submitFilters = async () => {
+  normalizeFilters()
   filters.page = 1
   await loadOrders()
 }
@@ -84,7 +81,7 @@ const submitFilters = async () => {
 const resetFilters = async () => {
   filters.keyword = ''
   filters.page = 1
-  filters.pageSize = 10
+  filters.pageSize = 3
   filters.status = ''
   await loadOrders()
 }
@@ -113,7 +110,27 @@ const getJoinButtonText = (order) => {
   return '快速加入'
 }
 
+const getStatusTagClass = (status) => {
+  if (status === 'OPEN') {
+    return 'tag-warning'
+  }
+
+  if (status === 'GROUPED' || status === 'COMPLETED') {
+    return 'tag-success'
+  }
+
+  if (status === 'CANCELED') {
+    return 'tag-danger'
+  }
+
+  return 'tag-info'
+}
+
 const handleJoin = async (order) => {
+  if (orderStore.submitting) {
+    return
+  }
+
   if (!canJoinOrder(order)) {
     if (order.status !== 'OPEN') {
       ElMessage.warning('当前订单已不可直接加入')
@@ -132,24 +149,10 @@ const handleJoin = async (order) => {
   }
 }
 
-const handleJoinAndView = async (order) => {
-  if (!canJoinOrder(order)) {
-    ElMessage.warning('当前订单已不可直接加入')
-    return
-  }
-
-  try {
-    await orderStore.joinExistingOrder(order.orderId)
-    ElMessage.success('加入成功，已同步刷新大厅与我的拼单')
-    router.push(`/orders/${order.orderId}`)
-  } catch (error) {
-    ElMessage.error(error.message)
-  }
-}
-
-const handlePageChange = async ({ page, pageSize }) => {
+const handlePageChange = async (page) => {
+  normalizeFilters()
   filters.page = page
-  filters.pageSize = pageSize
+  filters.pageSize = 3
   await loadOrders()
 }
 
@@ -157,7 +160,7 @@ onMounted(loadOrders)
 </script>
 
 <template>
-  <div class="stack-page">
+  <div class="stack-page order-hall-page">
     <div class="stats-grid">
       <StatCard
         v-for="item in stats"
@@ -168,77 +171,68 @@ onMounted(loadOrders)
       />
     </div>
 
-    <PageSection
-      title="拼单大厅"
-      description="浏览校园内正在招募的拼单，按商品或状态快速筛选。"
-    >
-      <p class="muted-text">
-        {{ hallTips }}
-      </p>
+    <div class="section">
+      <div class="section-header">
+        <h3>拼单大厅</h3>
+        <div class="page-actions">
+          <button
+            class="btn btn-secondary"
+            :disabled="orderStore.hallLoading"
+            @click="resetFilters"
+          >
+            重置筛选
+          </button>
+          <button
+            class="btn btn-outline"
+            @click="goCreateOrder"
+          >
+            {{ canCreateOrder ? '发起拼单' : '先去认证再发起' }}
+          </button>
+          <button
+            class="btn btn-secondary"
+            @click="router.push('/my-orders')"
+          >
+            查看我的拼单
+          </button>
+        </div>
+      </div>
 
-      <div class="toolbar-row">
-        <el-input
+      <div class="toolbar">
+        <input
           v-model="filters.keyword"
+          type="text"
           placeholder="搜索商品名或订单号"
-          clearable
           @keyup.enter="submitFilters"
-        />
-        <el-select
-          v-model="filters.status"
-          placeholder="全部状态"
-          clearable
         >
-          <el-option
-            label="招募中"
-            value="OPEN"
-          />
-          <el-option
-            label="已成团"
-            value="GROUPED"
-          />
-          <el-option
-            label="待送达"
-            value="WAIT_DELIVERY"
-          />
-          <el-option
-            label="待收货"
-            value="WAIT_RECEIVE"
-          />
-          <el-option
-            label="已完成"
-            value="COMPLETED"
-          />
-          <el-option
-            label="已取消"
-            value="CANCELED"
-          />
-        </el-select>
-        <el-button
-          type="primary"
-          :loading="orderStore.hallLoading"
+        <select
+          v-model="filters.status"
+        >
+          <option value="">
+            全部状态
+          </option>
+          <option value="OPEN">
+            招募中
+          </option>
+          <option value="GROUPED">
+            已成团
+          </option>
+          <option value="WAIT_DELIVERY">
+            待送达
+          </option>
+          <option value="WAIT_RECEIVE">
+            待收货
+          </option>
+          <option value="COMPLETED">
+            已完成
+          </option>
+        </select>
+        <button
+          class="btn btn-primary"
+          :disabled="orderStore.hallLoading"
           @click="submitFilters"
         >
           查询
-        </el-button>
-      </div>
-
-      <div class="page-actions wrap-actions">
-        <el-button @click="resetFilters">
-          重置筛选
-        </el-button>
-        <el-button
-          type="primary"
-          plain
-          @click="goCreateOrder"
-        >
-          {{ canCreateOrder ? '发起拼单' : '先去认证再发起' }}
-        </el-button>
-        <el-button
-          plain
-          @click="router.push('/my-orders')"
-        >
-          查看我的拼单
-        </el-button>
+        </button>
       </div>
 
       <template v-if="visibleOrders.length">
@@ -246,19 +240,22 @@ onMounted(loadOrders)
           <article
             v-for="order in visibleOrders"
             :key="order.orderId"
-            class="surface-card order-card"
+            class="order-card"
+            :class="{ 'is-canceled-order': order.status === 'CANCELED' }"
           >
-            <div class="card-header-row">
+            <div class="header">
               <div>
-                <p class="section-kicker">
+                <div class="kicker">
                   {{ order.orderNo }}
-                </p>
-                <h3>{{ order.productName }}</h3>
+                </div>
+                <h4>{{ order.productName }}</h4>
               </div>
-              <StatusTag
-                :value="order.status"
-                :text="formatOrderStatus(order.status)"
-              />
+              <span
+                class="tag"
+                :class="getStatusTagClass(order.status)"
+              >
+                {{ formatOrderStatus(order.status) }}
+              </span>
             </div>
             <ul class="detail-list">
               <li><span>取货点</span><strong>{{ order.pickupPoint }}</strong></li>
@@ -269,48 +266,55 @@ onMounted(loadOrders)
                 <strong>{{ order.currentMemberCount }}/{{ order.totalMemberCount }}</strong>
               </li>
               <li>
-                <span>剩余名额</span>
-                <strong>{{ order.remainingCount }}</strong>
-              </li>
-              <li>
                 <span>预计金额</span>
                 <strong>{{ formatCurrency(order.estimatedTotalAmount) }}</strong>
               </li>
             </ul>
-            <div class="page-actions">
-              <el-button @click="router.push(`/orders/${order.orderId}`)">
+            <div class="actions">
+              <button
+                class="btn btn-secondary btn-sm"
+                @click="router.push(`/orders/${order.orderId}`)"
+              >
                 查看详情
-              </el-button>
-              <el-button
-                type="primary"
-                plain
+              </button>
+              <button
+                class="btn btn-primary btn-sm"
                 :disabled="!canJoinOrder(order)"
-                :loading="orderStore.submitting"
                 @click="handleJoin(order)"
               >
                 {{ getJoinButtonText(order) }}
-              </el-button>
-              <el-button
-                v-if="canJoinOrder(order)"
-                type="primary"
-                :loading="orderStore.submitting"
-                @click="handleJoinAndView(order)"
-              >
-                加入并查看详情
-              </el-button>
+              </button>
             </div>
           </article>
         </div>
-        <AppPagination
-          :page="orderStore.hallPage.page"
-          :page-size="orderStore.hallPage.pageSize"
-          :pages="orderStore.hallPage.pages"
-          :total="orderStore.hallPage.total"
-          @change="handlePageChange"
-        />
+        <div
+          v-if="orderStore.hallPage.total > 0"
+          class="pagination"
+        >
+          <button
+            :disabled="orderStore.hallPage.page <= 1"
+            @click="handlePageChange(orderStore.hallPage.page - 1)"
+          >
+            上一页
+          </button>
+          <button
+            v-for="page in pageNumbers"
+            :key="page"
+            :class="{ active: page === orderStore.hallPage.page }"
+            @click="handlePageChange(page)"
+          >
+            {{ page }}
+          </button>
+          <button
+            :disabled="orderStore.hallPage.page >= (orderStore.hallPage.pages || 1)"
+            @click="handlePageChange(orderStore.hallPage.page + 1)"
+          >
+            下一页
+          </button>
+        </div>
       </template>
       <EmptyState
-        v-else
+        v-else-if="!orderStore.hallLoading"
         title="暂无匹配的拼单"
         description="可以调整筛选条件，或在完成实名认证后自己发起一个新的拼单。"
       >
@@ -327,6 +331,6 @@ onMounted(loadOrders)
           </el-button>
         </div>
       </EmptyState>
-    </PageSection>
+    </div>
   </div>
 </template>

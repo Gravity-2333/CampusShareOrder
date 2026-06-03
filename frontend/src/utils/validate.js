@@ -63,4 +63,46 @@ export const validateStudentNo = (value) => {
 export const validatePositiveNumber = (value, message) =>
   Number(value) > 0 ? '' : message
 
+export const validateApiDateTime = (value, message = '时间格式应为 yyyy-MM-dd HH:mm:ss') => {
+  if (isBlank(value)) {
+    return message
+  }
+
+  const text = String(value).trim()
+  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) {
+    return message
+  }
+
+  const [datePart, timePart] = text.split(' ')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hours, minutes, seconds] = timePart.split(':').map(Number)
+  const normalized = text.replace(' ', 'T')
+  const date = new Date(normalized)
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() + 1 !== month ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes ||
+    date.getSeconds() !== seconds
+  ) {
+    return '请输入有效时间'
+  }
+
+  return ''
+}
+
+export const validateFutureApiDateTime = (value, message = '时间必须晚于当前时间') => {
+  const formatError = validateApiDateTime(value)
+  if (formatError) {
+    return formatError
+  }
+
+  return new Date(String(value).trim().replace(' ', 'T')).getTime() > Date.now() ? '' : message
+}
+
 export const firstValidationError = (messages) => messages.find(Boolean) || ''
+
+export const validationSummary = (messages) =>
+  messages.filter(Boolean).join('；')

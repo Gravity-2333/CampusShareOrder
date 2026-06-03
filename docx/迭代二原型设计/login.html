@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户登录 - 校园拼单平台</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f3ef; min-height: 100vh; }
+    .auth-page { display: grid; grid-template-columns: 1.1fr 1fr; gap: 2rem; min-height: 100vh; padding: 2rem; }
+    .auth-hero { display: flex; flex-direction: column; justify-content: center; }
+    .auth-hero .kicker { color: #d87b4d; font-size: 0.9rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 1rem; }
+    .auth-hero h1 { font-size: 3rem; line-height: 1.1; color: #2e3f34; margin-bottom: 1rem; }
+    .auth-hero p { color: #6b7c70; line-height: 1.6; max-width: 500px; }
+    .auth-card { background: white; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); align-self: center; }
+    .auth-card .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .auth-card .kicker { color: #d87b4d; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+    .auth-card h2 { color: #2e3f34; margin: 0; }
+    .auth-card a { color: #d87b4d; text-decoration: none; font-weight: 500; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.4rem; color: #4a6b5a; font-weight: 500; }
+    .form-group input { width: 100%; padding: 0.8rem; border: 1px solid #e0d8cf; border-radius: 10px; font-size: 1rem; }
+    .form-group input:focus { outline: none; border-color: #d87b4d; box-shadow: 0 0 0 2px rgba(216,123,77,0.2); }
+    .btn { display: block; width: 100%; padding: 0.8rem; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; font-size: 1rem; }
+    .btn-primary { background: #d87b4d; color: white; }
+    .btn-primary:hover { background: #c4683a; }
+    .btn-secondary { background: #f0ebe4; color: #2e3f34; margin-top: 0.5rem; }
+    .btn-secondary:hover { background: #e5ddd3; }
+    .footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e0d8cf; color: #6b7c70; }
+    .footer button { background: none; border: none; color: #d87b4d; cursor: pointer; font-weight: 500; }
+    @media (max-width: 768px) {
+      .auth-page { grid-template-columns: 1fr; }
+      .auth-hero h1 { font-size: 2rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="auth-page">
+    <div class="auth-hero">
+      <span class="kicker">CampusShareOrder</span>
+      <h1>让校园拼单更省心、更透明</h1>
+      <p>和同学一起凑单、分摊配送费、跟踪凭证与收货状态。</p>
+    </div>
+    
+    <div class="auth-card">
+      <div class="header">
+        <div>
+          <span class="kicker">用户入口</span>
+          <h2>用户登录</h2>
+        </div>
+        <a href="admin-login.html">管理员入口</a>
+      </div>
+
+      <div class="form-group">
+        <label>手机号</label>
+        <input type="text" placeholder="请输入手机号">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" placeholder="请输入密码">
+      </div>
+      
+      <button class="btn btn-primary">登录</button>
+      <button class="btn btn-secondary" onclick="location.href='register.html'">去注册</button>
+      
+      <div class="footer">
+        <span>还没有账号？注册后即可完善资料</span>
+        <button onclick="location.href='admin-login.html'">切换到管理员登录</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

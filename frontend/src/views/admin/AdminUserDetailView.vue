@@ -3,6 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
+import EmptyState from '../../components/common/EmptyState.vue'
 import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
@@ -14,6 +15,12 @@ const router = useRouter()
 const adminStore = useAdminStore()
 
 const user = computed(() => adminStore.userDetail)
+const currentUserId = computed(() => route.params.userId)
+const normalizedUserId = computed(() => Number(currentUserId.value || 0))
+const isValidUserId = computed(() => Number.isInteger(normalizedUserId.value) && normalizedUserId.value > 0)
+const detailErrorText = computed(() =>
+  isValidUserId.value ? '当前未能加载到用户详情，请返回列表重新选择。' : '当前路由中的用户 ID 无效，请返回用户列表重新进入详情页。',
+)
 
 const stats = computed(() => {
   if (!user.value) {
@@ -40,7 +47,8 @@ const stats = computed(() => {
 })
 
 const loadDetail = async (userId = route.params.userId) => {
-  if (!userId) {
+  if (!isValidUserId.value) {
+    adminStore.userDetail = null
     return
   }
 
@@ -52,7 +60,7 @@ const loadDetail = async (userId = route.params.userId) => {
 }
 
 const toggleStatus = async () => {
-  if (!user.value) {
+  if (!user.value || adminStore.submitting) {
     return
   }
 
@@ -65,6 +73,10 @@ const toggleStatus = async () => {
         inputValidator: (inputValue) => {
           if (!inputValue?.trim()) {
             return '请输入封禁原因'
+          }
+
+          if (inputValue.trim().length > 255) {
+            return '封禁原因长度不能超过 255 个字符'
           }
 
           return true
@@ -133,8 +145,8 @@ onMounted(() => {
         </div>
 
         <div class="detail-grid">
-          <div class="surface-card detail-panel">
-            <h3>基础信息</h3>
+          <div class="detail-panel">
+            <h4>基础信息</h4>
             <ul class="detail-list">
               <li><span>手机号</span><strong>{{ user.phone || '--' }}</strong></li>
               <li><span>联系方式</span><strong>{{ user.contactInfo || '--' }}</strong></li>
@@ -144,8 +156,8 @@ onMounted(() => {
             </ul>
           </div>
 
-          <div class="surface-card detail-panel">
-            <h3>治理信息</h3>
+          <div class="detail-panel">
+            <h4>治理信息</h4>
             <ul class="detail-list">
               <li><span>账号状态</span><strong>{{ formatUserStatus(user.status) }}</strong></li>
               <li><span>信用分</span><strong>{{ user.creditScore }}</strong></li>
@@ -153,61 +165,93 @@ onMounted(() => {
           </div>
         </div>
 
-        <PageSection
-          title="信用记录"
-          description="便于后台查看该用户过往信用变化。"
+        <div
+          class="detail-panel"
+          style="margin-top: 1rem;"
         >
-          <div class="desktop-table">
-            <el-table
-              :data="user.creditRecords || []"
-              stripe
-            >
-              <el-table-column label="时间">
-                <template #default="{ row }">
-                  {{ formatDateTime(row.createdAt) }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                prop="changeReason"
-                label="变更原因"
-              />
-              <el-table-column label="变更值">
-                <template #default="{ row }">
-                  {{ formatSignedNumber(row.delta) }}
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
+          <h4>信用记录</h4>
+          <template v-if="user.creditRecords?.length">
+            <div class="desktop-table">
+              <el-table
+                :data="user.creditRecords"
+                stripe
+              >
+                <el-table-column label="时间">
+                  <template #default="{ row }">
+                    {{ formatDateTime(row.createdAt) }}
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  prop="changeReason"
+                  label="变更原因"
+                />
+                <el-table-column label="变更值">
+                  <template #default="{ row }">
+                    {{ formatSignedNumber(row.delta) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
 
-          <div class="mobile-record-list">
-            <article
-              v-for="(row, index) in user.creditRecords || []"
-              :key="`${row.createdAt}-${index}`"
-              class="surface-card mobile-record-card"
-            >
-              <div class="mobile-record-title">
-                <span>{{ formatDateTime(row.createdAt) }}</span>
-                <strong>{{ row.changeReason || '信用分变更' }}</strong>
-              </div>
-              <ul class="mobile-record-fields">
-                <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
-              </ul>
-            </article>
-          </div>
-        </PageSection>
+            <div class="mobile-record-list">
+              <article
+                v-for="(row, index) in user.creditRecords"
+                :key="`${row.createdAt}-${index}`"
+                class="mobile-record-card"
+              >
+                <div class="mobile-record-title">
+                  <span>{{ formatDateTime(row.createdAt) }}</span>
+                  <strong>{{ row.changeReason || '信用分变更' }}</strong>
+                </div>
+                <ul class="mobile-record-fields">
+                  <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+                </ul>
+              </article>
+            </div>
+          </template>
 
-        <div class="page-actions wrap-actions">
+          <EmptyState
+            v-else
+            title="暂无信用记录"
+            description="该用户当前没有可展示的信用分变更记录。"
+          />
+        </div>
+
+        <div
+          class="page-actions wrap-actions"
+          style="margin-top: 1.5rem; padding: 1rem; background: #f8f6f2; border-radius: 10px;"
+        >
           <el-button @click="router.push('/admin/users')">
             返回用户管理
           </el-button>
           <el-button
             :type="user.status === 'NORMAL' ? 'danger' : 'primary'"
+            :loading="adminStore.submitting"
             @click="toggleStatus"
           >
             {{ user.status === 'NORMAL' ? '封禁用户' : '解封用户' }}
           </el-button>
         </div>
       </template>
+      <EmptyState
+        v-else-if="!adminStore.userDetailLoading"
+        title="用户详情不可用"
+        :description="detailErrorText"
+      >
+        <div class="page-actions">
+          <el-button @click="router.push('/admin/users')">
+            返回用户管理
+          </el-button>
+          <el-button
+            type="primary"
+            plain
+            :disabled="!isValidUserId"
+            @click="loadDetail()"
+          >
+            重新加载
+          </el-button>
+        </div>
+      </EmptyState>
     </PageSection>
   </div>
 </template>

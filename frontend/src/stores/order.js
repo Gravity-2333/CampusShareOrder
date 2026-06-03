@@ -12,14 +12,7 @@ import {
   uploadReceipt,
 } from '../api/order'
 import { getMyOrders } from '../api/user'
-
-const defaultPageData = () => ({
-  list: [],
-  page: 1,
-  pageSize: 10,
-  pages: 0,
-  total: 0,
-})
+import { defaultPageData, loadNormalizedPage } from '../utils/page'
 
 export const useOrderStore = defineStore('order', {
   state: () => ({
@@ -51,13 +44,15 @@ export const useOrderStore = defineStore('order', {
           ...this.hallFilters,
           ...filters,
         }
-        this.hallPage = await getOrderList(this.hallFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getOrderList, this.hallFilters)
+        this.hallFilters = resolvedFilters
+        this.hallPage = pageData
         return this.hallPage
       } finally {
         this.hallLoading = false
       }
     },
-    async loadMyOrders(params = { page: 1, pageSize: 10 }) {
+    async loadMyOrders(params = this.myOrdersFilters) {
       this.myOrdersLoading = true
 
       try {
@@ -65,7 +60,9 @@ export const useOrderStore = defineStore('order', {
           ...this.myOrdersFilters,
           ...params,
         }
-        this.myOrdersPage = await getMyOrders(this.myOrdersFilters)
+        const { filters: resolvedFilters, pageData } = await loadNormalizedPage(getMyOrders, this.myOrdersFilters)
+        this.myOrdersFilters = resolvedFilters
+        this.myOrdersPage = pageData
         return this.myOrdersPage
       } finally {
         this.myOrdersLoading = false
@@ -95,6 +92,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
     async createNewOrder(payload) {
+      if (this.submitting) {
+        return null
+      }
+
       this.submitting = true
 
       try {
@@ -106,6 +107,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
     async joinExistingOrder(orderId) {
+      if (this.submitting) {
+        return null
+      }
+
       this.submitting = true
 
       try {
@@ -117,6 +122,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
     async joinOrderFromDetail(orderId) {
+      if (this.submitting) {
+        return this.detail
+      }
+
       this.submitting = true
 
       try {
@@ -127,6 +136,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
     async exitExistingOrder(orderId) {
+      if (this.submitting) {
+        return this.detail
+      }
+
       this.submitting = true
 
       try {
@@ -137,6 +150,10 @@ export const useOrderStore = defineStore('order', {
       }
     },
     async runDetailAction(orderId, action, payload = {}) {
+      if (this.submitting) {
+        return this.detail
+      }
+
       this.submitting = true
 
       try {

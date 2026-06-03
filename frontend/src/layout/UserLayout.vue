@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 
 import { useAppStore } from '../stores/app'
 import { useUserStore } from '../stores/user'
@@ -27,7 +28,21 @@ const navItems = computed(() => {
   return items
 })
 
-const activePath = computed(() => route.path)
+const activePath = computed(() => {
+  if (route.path === '/orders/create') {
+    return '/orders/create'
+  }
+
+  if (route.path.startsWith('/orders/')) {
+    return '/orders'
+  }
+
+  if (route.path.startsWith('/complaints/')) {
+    return '/complaints'
+  }
+
+  return route.path
+})
 const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
 const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '收起导航'))
 
@@ -36,9 +51,20 @@ const handleNavSelect = () => {
 }
 
 const handleLogout = async () => {
-  appStore.closeMobileNav()
-  await userStore.logoutCurrent()
-  router.push('/login')
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '退出确认', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确定退出',
+      type: 'warning',
+    })
+    appStore.closeMobileNav()
+    await userStore.logoutCurrent()
+    router.push('/login')
+  } catch (error) {
+    if (error !== 'cancel' && error?.message !== 'cancel') {
+      throw error
+    }
+  }
 }
 
 watch(

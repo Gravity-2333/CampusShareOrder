@@ -157,9 +157,20 @@ public class AdminServiceImpl implements AdminService {
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             String trimmedKeyword = keyword.trim();
-            wrapper.and(w -> w.like(GroupOrder::getOrderNo, trimmedKeyword)
-                    .or().like(GroupOrder::getProductName, trimmedKeyword)
-                    .or().like(GroupOrder::getPickupPoint, trimmedKeyword));
+            List<Long> matchedCreatorIds = userAccountMapper.selectList(
+                    new LambdaQueryWrapper<UserAccount>()
+                            .like(UserAccount::getNickname, trimmedKeyword)
+                            .or()
+                            .like(UserAccount::getPhone, trimmedKeyword)
+            ).stream().map(UserAccount::getId).collect(Collectors.toList());
+            wrapper.and(w -> {
+                w.like(GroupOrder::getOrderNo, trimmedKeyword)
+                        .or().like(GroupOrder::getProductName, trimmedKeyword)
+                        .or().like(GroupOrder::getPickupPoint, trimmedKeyword);
+                if (!matchedCreatorIds.isEmpty()) {
+                    w.or().in(GroupOrder::getCreatorUserId, matchedCreatorIds);
+                }
+            });
         }
 
         if (status != null && !status.trim().isEmpty()) {
@@ -482,6 +493,7 @@ public class AdminServiceImpl implements AdminService {
                 BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
                 BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
                 member.setRefundAmountTotal(refunded.add(netRefund));
+                member.setPayStatus("REFUNDED");
                 insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
                         member.getId(), "REFUND_CANCEL", netRefund, remark);
             }
@@ -525,7 +537,7 @@ public class AdminServiceImpl implements AdminService {
         Long existingCount = creditChangeRecordMapper.selectCount(
                 new LambdaQueryWrapper<CreditChangeRecord>()
                         .eq(CreditChangeRecord::getRelatedComplaintId, complaint.getId())
-                        .eq(CreditChangeRecord::getReasonType, "COMPLAINT_PENALTY")
+                        .in(CreditChangeRecord::getReasonType, List.of("COMPLAINT_CONFIRMED", "COMPLAINT_PENALTY"))
         );
         if (existingCount != null && existingCount > 0) {
             return;
@@ -544,7 +556,7 @@ public class AdminServiceImpl implements AdminService {
         CreditChangeRecord record = new CreditChangeRecord();
         record.setUserId(accusedUser.getId());
         record.setChangeValue(delta);
-        record.setReasonType("COMPLAINT_PENALTY");
+        record.setReasonType("COMPLAINT_CONFIRMED");
         record.setRelatedOrderId(complaint.getGroupOrderId());
         record.setRelatedComplaintId(complaint.getId());
         record.setRemark("投诉成立扣减信用分");

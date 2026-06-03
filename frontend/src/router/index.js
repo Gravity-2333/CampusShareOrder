@@ -126,6 +126,11 @@ const routes = [
         meta: { requiresAuth: true, role: 'ADMIN', title: '投诉详情' },
       },
       {
+        path: '/admin/reports',
+        component: () => import('../views/admin/AdminReportsView.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN', title: '数据报表' },
+      },
+      {
         path: '/admin/records/capital',
         component: () => import('../views/admin/AdminCapitalView.vue'),
         meta: { requiresAuth: true, role: 'ADMIN', title: '资金记录' },
@@ -136,6 +141,10 @@ const routes = [
         meta: { requiresAuth: true, role: 'ADMIN', title: '操作日志' },
       },
     ],
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/orders',
   },
 ]
 

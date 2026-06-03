@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessageBox } from 'element-plus'
 
 import { useAppStore } from '../stores/app'
 import { useUserStore } from '../stores/user'
@@ -11,15 +12,28 @@ const appStore = useAppStore()
 const userStore = useUserStore()
 
 const navItems = [
-  { label: '管理台', path: '/admin/dashboard' },
-  { label: '用户管理', path: '/admin/users' },
+  { label: '仪表盘', path: '/admin/dashboard' },
   { label: '订单管理', path: '/admin/orders' },
   { label: '投诉管理', path: '/admin/complaints' },
-  { label: '资金记录', path: '/admin/records/capital' },
-  { label: '操作日志', path: '/admin/records/logs' },
+  { label: '用户管理', path: '/admin/users' },
+  { label: '数据报表', path: '/admin/reports' },
 ]
 
-const activePath = computed(() => route.path)
+const activePath = computed(() => {
+  if (route.path.startsWith('/admin/users/')) {
+    return '/admin/users'
+  }
+
+  if (route.path.startsWith('/admin/orders/')) {
+    return '/admin/orders'
+  }
+
+  if (route.path.startsWith('/admin/complaints/')) {
+    return '/admin/complaints'
+  }
+
+  return route.path
+})
 const isDesktopCollapsed = computed(() => !appStore.isMobileViewport && appStore.sidebarCollapsed)
 const navButtonText = computed(() => (appStore.isMobileViewport ? '打开导航' : '收起导航'))
 
@@ -28,9 +42,20 @@ const handleNavSelect = () => {
 }
 
 const handleLogout = async () => {
-  appStore.closeMobileNav()
-  await userStore.logoutCurrent()
-  router.push('/admin/login')
+  try {
+    await ElMessageBox.confirm('确定要退出管理后台吗？', '退出确认', {
+      cancelButtonText: '取消',
+      confirmButtonText: '确定退出',
+      type: 'warning',
+    })
+    appStore.closeMobileNav()
+    await userStore.logoutCurrent()
+    router.push('/admin/login')
+  } catch (error) {
+    if (error !== 'cancel' && error?.message !== 'cancel') {
+      throw error
+    }
+  }
 }
 
 watch(
@@ -51,7 +76,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="app-shell admin-shell"
+    class="app-shell app-admin-shell"
     :class="{ 'is-collapsed': isDesktopCollapsed, 'is-mobile': appStore.isMobileViewport }"
   >
     <aside
@@ -61,10 +86,10 @@ onBeforeUnmount(() => {
     >
       <div class="brand-block">
         <div class="brand-mark">
-          {{ isDesktopCollapsed ? '管' : 'ADM' }}
+          {{ isDesktopCollapsed ? '管' : 'ADMIN' }}
         </div>
         <span class="brand-kicker">校园拼单后台</span>
-        <h1>平台管理端</h1>
+        <h1>管理员后台</h1>
       </div>
       <el-menu
         :default-active="activePath"
@@ -93,10 +118,10 @@ onBeforeUnmount(() => {
       <div class="app-sidebar mobile-drawer-sidebar">
         <div class="brand-block">
           <div class="brand-mark">
-            ADM
+            ADMIN
           </div>
           <span class="brand-kicker">校园拼单后台</span>
-          <h1>平台管理端</h1>
+          <h1>管理员后台</h1>
         </div>
         <el-menu
           :default-active="activePath"
@@ -121,7 +146,7 @@ onBeforeUnmount(() => {
           <h2>{{ route.meta.title || '管理后台' }}</h2>
         </div>
         <div class="header-actions">
-          <span class="welcome-text">{{ userStore.displayName }}</span>
+          <span class="welcome-text">管理员</span>
           <el-button
             text
             class="mobile-nav-trigger"
@@ -130,11 +155,10 @@ onBeforeUnmount(() => {
             {{ navButtonText }}
           </el-button>
           <el-button
-            type="danger"
-            plain
+            class="btn-logout"
             @click="handleLogout"
           >
-            退出管理
+            退出登录
           </el-button>
         </div>
       </header>

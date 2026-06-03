@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElImage, ElMessage, ElMessageBox } from 'element-plus'
 
@@ -17,6 +17,7 @@ import {
   formatReceiveStatus,
   formatRole,
 } from '../../utils/format'
+import { validateApiDateTime } from '../../utils/validate'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,17 +25,13 @@ const orderStore = useOrderStore()
 
 const receiptDialogVisible = ref(false)
 const activeReceiptUrl = ref('')
+const now = ref(Date.now())
+let countdownTimer = null
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
 const normalizedOrderId = computed(() => Number(currentOrderId.value || 0))
 const isValidOrderId = computed(() => Number.isInteger(normalizedOrderId.value) && normalizedOrderId.value > 0)
-
-const hasActualAmount = computed(
-  () =>
-    detail.value?.paymentSummary?.actualTotalAmount !== null &&
-    detail.value?.paymentSummary?.actualTotalAmount !== undefined,
-)
 
 const activeMemberList = computed(
   () => detail.value?.memberList?.filter((member) => member.joinStatus === 'ACTIVE') || [],
@@ -44,57 +41,31 @@ const paidMemberCount = computed(
   () => activeMemberList.value.filter((member) => member.payStatus === 'PAID').length,
 )
 
-const receivedMemberCount = computed(
-  () =>
-    activeMemberList.value.filter((member) =>
-      ['RECEIVED', 'AUTO_RECEIVED'].includes(member.receiveStatus),
-    ).length,
-)
-
-const paymentDeltaText = computed(() => {
-  if (!detail.value || !hasActualAmount.value) {
+const deadlineRemainingText = computed(() => {
+  const deadlineAt = detail.value?.basicInfo?.deadlineAt
+  if (!deadlineAt) {
     return '--'
   }
 
-  const estimated = Number(detail.value.paymentSummary.estimatedTotalAmount || 0)
-  const actual = Number(detail.value.paymentSummary.actualTotalAmount || 0)
-  return formatCurrency(estimated - actual)
-})
-
-const complaintActionText = computed(() => {
-  if (!detail.value) {
-    return '--'
+  if (detail.value?.basicInfo?.status !== 'OPEN') {
+    return '已结束'
   }
 
-  if (detail.value.actionFlags.canCreateComplaint) {
-    return '当前可直接发起投诉。'
+  const remainingMs = new Date(String(deadlineAt).replace(' ', 'T')).getTime() - now.value
+  if (Number.isNaN(remainingMs) || remainingMs <= 0) {
+    return '已截止'
   }
 
-  if (detail.value.complaintInfo.myComplaintId) {
-    return '当前账号已经发起过投诉，可直接查看详情。'
+  const totalSeconds = Math.floor(remainingMs / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}小时${String(minutes).padStart(2, '0')}分${String(seconds).padStart(2, '0')}秒`
   }
 
-  if (detail.value.complaintInfo.complaintOpened) {
-    return '投诉通道已开放，但当前账号此时不可再次创建投诉。'
-  }
-
-  return '投诉通道尚未开放。'
-})
-
-const receiptStatusText = computed(() => {
-  if (!detail.value) {
-    return '--'
-  }
-
-  if (detail.value.receiptInfo) {
-    return '已上传凭证。'
-  }
-
-  if (detail.value.actionFlags.canUploadReceipt) {
-    return '待发起人上传凭证。'
-  }
-
-  return '当前暂无凭证。'
+  return `${minutes}分${String(seconds).padStart(2, '0')}秒`
 })
 
 const detailErrorText = computed(() => {
@@ -104,115 +75,6 @@ const detailErrorText = computed(() => {
 
   return orderStore.detailError || '当前未能加载到订单详情，请稍后重试。'
 })
-
-const primaryAction = computed(() => {
-  if (!detail.value) {
-    return null
-  }
-
-  const flags = detail.value.actionFlags
-
-  if (flags.canJoin) {
-    return { key: 'join', label: '立即加入拼单', type: 'primary' }
-  }
-
-  if (flags.canPay) {
-    return { key: 'pay', label: '立即支付', type: 'primary' }
-  }
-
-  if (flags.canUploadReceipt) {
-    return { key: 'upload', label: '上传凭证', type: 'primary' }
-  }
-
-  if (flags.canMarkDelivered) {
-    return { key: 'delivered', label: '确认送达', type: 'success' }
-  }
-
-  if (flags.canConfirmReceived) {
-    return { key: 'received', label: '确认收货', type: 'success' }
-  }
-
-  if (flags.canCreateComplaint) {
-    return { key: 'complaint', label: '发起投诉', type: 'danger' }
-  }
-
-  if (flags.canViewReceipt) {
-    return { key: 'viewReceipt', label: '查看凭证', type: 'default' }
-  }
-
-  return null
-})
-
-const nextStepHint = computed(() => {
-  if (!detail.value) {
-    return ''
-  }
-
-  const flags = detail.value.actionFlags
-
-  if (flags.canJoin) {
-    return '当前订单仍可加入，进入详情后可直接参与本次拼单。'
-  }
-
-  if (flags.canPay) {
-    return '你已经加入订单，但尚未支付；支付后才能推动订单进入成团流程。'
-  }
-
-  if (flags.canUploadReceipt) {
-    return '订单已成团，下一步应由发起人上传购买凭证。'
-  }
-
-  if (flags.canMarkDelivered) {
-    return '凭证已经上传，下一步应由发起人确认送达。'
-  }
-
-  if (flags.canConfirmReceived) {
-    return '订单已经送达，当前账号可以确认收货。'
-  }
-
-  if (flags.canCreateComplaint) {
-    return '如果订单存在异常，可直接从当前页面发起投诉。'
-  }
-
-  if (detail.value.complaintInfo.myComplaintId) {
-    return '当前账号已经提交投诉，可继续查看处理进度。'
-  }
-
-  return '当前页面主要用于查看订单聚合信息，操作入口会随订单状态自动变化。'
-})
-
-const timelineToneMap = {
-  COMPLAINT_CREATED: 'danger',
-  INITIATOR_JOINED: 'primary',
-  INITIATOR_PAID: 'success',
-  INITIATOR_RECEIVED: 'success',
-  MEMBER_EXITED: 'info',
-  MEMBER_JOINED: 'primary',
-  MEMBER_PAID: 'success',
-  MEMBER_RECEIVED: 'success',
-  ORDER_CREATED: 'primary',
-  ORDER_DELIVERED: 'success',
-  ORDER_STATUS: 'warning',
-  RECEIPT_UPLOADED: 'success',
-}
-
-const timelineActionTextMap = {
-  COMPLAINT_CREATED: '投诉创建',
-  INITIATOR_JOINED: '发起拼单',
-  INITIATOR_PAID: '发起人支付',
-  INITIATOR_RECEIVED: '发起人收货',
-  MEMBER_EXITED: '成员退出',
-  MEMBER_JOINED: '成员加入',
-  MEMBER_PAID: '成员支付',
-  MEMBER_RECEIVED: '成员收货',
-  ORDER_CREATED: '订单创建',
-  ORDER_DELIVERED: '确认送达',
-  ORDER_STATUS: '状态更新',
-  RECEIPT_UPLOADED: '上传凭证',
-}
-
-const getTimelineType = (action) => timelineToneMap[action] || 'info'
-const formatTimelineAction = (action) => timelineActionTextMap[action] || action
 
 const getMemberLatestEvent = (member) => {
   if (!member) {
@@ -238,77 +100,6 @@ const getMemberLatestEvent = (member) => {
   return '--'
 }
 
-const phaseItems = computed(() => {
-  if (!detail.value) {
-    return []
-  }
-
-  const status = detail.value.basicInfo.status
-  const items = [
-    {
-      key: 'open',
-      label: '招募阶段',
-      hint: '成员加入并完成支付',
-      done: ['GROUPED', 'WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'OPEN',
-    },
-    {
-      key: 'grouped',
-      label: '成团待凭证',
-      hint: '发起人上传购买凭证',
-      done: ['WAIT_DELIVERY', 'WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'GROUPED',
-    },
-    {
-      key: 'delivery',
-      label: '待确认送达',
-      hint: '凭证已上传，等待发起人确认送达',
-      done: ['WAIT_RECEIVE', 'COMPLETED'].includes(status),
-      current: status === 'WAIT_DELIVERY',
-    },
-    {
-      key: 'receive',
-      label: '待确认收货',
-      hint: '成员确认收货或系统自动确认',
-      done: status === 'COMPLETED',
-      current: status === 'WAIT_RECEIVE',
-    },
-    {
-      key: 'completed',
-      label: '订单完成',
-      hint: '流程全部结束',
-      done: status === 'COMPLETED',
-      current: status === 'COMPLETED',
-    },
-  ]
-
-  if (status === 'CANCELED') {
-    return items.map((item) => ({
-      ...item,
-      current: false,
-    }))
-  }
-
-  return items
-})
-
-const phaseSummaryText = computed(() => {
-  if (!detail.value) {
-    return '--'
-  }
-
-  if (detail.value.basicInfo.status === 'CANCELED') {
-    return '订单已取消，当前不再继续推进后续阶段。'
-  }
-
-  if (detail.value.basicInfo.status === 'COMPLETED') {
-    return '订单已经完成，招募、凭证、送达、收货流程均已结束。'
-  }
-
-  const currentPhase = phaseItems.value.find((item) => item.current)
-  return currentPhase ? `当前处于“${currentPhase.label}”阶段。` : '--'
-})
-
 const stats = computed(() => {
   if (!detail.value) {
     return []
@@ -316,7 +107,7 @@ const stats = computed(() => {
 
   return [
     {
-      hint: '来自 basicInfo.status',
+      hint: '当前拼单所处阶段',
       label: '订单状态',
       value: formatOrderStatus(detail.value.basicInfo.status),
     },
@@ -335,10 +126,13 @@ const stats = computed(() => {
       label: '成员进度',
       value: `${detail.value.basicInfo.currentMemberCount}/${detail.value.basicInfo.totalMemberCount}`,
     },
+    {
+      hint: '招募截止倒计时',
+      label: '剩余时间',
+      value: deadlineRemainingText.value,
+    },
   ]
 })
-
-const compactTimelineItems = computed(() => detail.value?.timeline?.slice(0, 5) || [])
 
 const loadDetail = async (orderId = currentOrderId.value) => {
   if (!isValidOrderId.value) {
@@ -380,6 +174,7 @@ const confirmAction = async (action) => {
 }
 
 const toApiDateTime = (value) => String(value || '').trim()
+const parseApiDateTime = (value) => new Date(String(value || '').trim().replace(' ', 'T')).getTime()
 
 const promptReceiptPayload = async () => {
   const { value: imageUrl } = await ElMessageBox.prompt('请输入凭证图片地址', '上传凭证', {
@@ -389,6 +184,10 @@ const promptReceiptPayload = async () => {
     inputValidator: (inputValue) => {
       if (!inputValue?.trim()) {
         return '请输入凭证图片地址'
+      }
+
+      if (inputValue.trim().length > 500) {
+        return '凭证图片地址长度不能超过 500 个字符'
       }
 
       return true
@@ -402,11 +201,14 @@ const promptReceiptPayload = async () => {
     inputPlaceholder: '例如 54.00',
     inputType: 'number',
     inputValidator: (inputValue) => {
-      if (!inputValue) {
+      const normalizedValue = String(inputValue ?? '').trim()
+
+      if (!normalizedValue) {
         return '请输入实际总金额'
       }
 
-      if (Number(inputValue) <= 0) {
+      const actualAmount = Number(normalizedValue)
+      if (!Number.isFinite(actualAmount) || actualAmount <= 0) {
         return '金额必须大于 0'
       }
 
@@ -417,33 +219,28 @@ const promptReceiptPayload = async () => {
   const { value: startAt } = await ElMessageBox.prompt('请输入预计开始送达时间', '上传凭证', {
     cancelButtonText: '取消',
     confirmButtonText: '下一步',
-    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
     inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
     inputValidator: (inputValue) => {
-      if (!inputValue?.trim()) {
-        return '请输入预计开始送达时间'
-      }
-
-      return true
+      return validateApiDateTime(inputValue, '预计开始送达时间格式应为 yyyy-MM-dd HH:mm:ss') || true
     },
   })
 
   const { value: endAt } = await ElMessageBox.prompt('请输入预计最晚送达时间', '上传凭证', {
     cancelButtonText: '取消',
     confirmButtonText: '提交',
-    inputPattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
     inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
     inputValidator: (inputValue) => {
-      if (!inputValue?.trim()) {
-        return '请输入预计最晚送达时间'
+      const formatError = validateApiDateTime(inputValue, '预计最晚送达时间格式应为 yyyy-MM-dd HH:mm:ss')
+      if (formatError) {
+        return formatError
       }
 
-      return true
+      return parseApiDateTime(inputValue) > parseApiDateTime(startAt) || '预计最晚送达时间必须晚于开始送达时间'
     },
   })
 
   return {
-    actualTotalAmount: Number(amount),
+    actualTotalAmount: Number(String(amount).trim()),
     expectedDeliveryEndAt: toApiDateTime(endAt),
     expectedDeliveryStartAt: toApiDateTime(startAt),
     imageUrl: imageUrl.trim(),
@@ -466,7 +263,13 @@ const navigateToComplaint = () => {
   }
 
   if (detail.value.actionFlags.canCreateComplaint) {
-    router.push(`/complaints/create?orderId=${detail.value.basicInfo.orderId}`)
+    const orderId = Number(detail.value.basicInfo.orderId || 0)
+    if (!Number.isInteger(orderId) || orderId <= 0) {
+      ElMessage.warning('当前订单 ID 无效，请返回详情页重新加载')
+      return
+    }
+
+    router.push(`/complaints/create?orderId=${orderId}`)
     return
   }
 
@@ -476,7 +279,12 @@ const navigateToComplaint = () => {
 }
 
 const runAction = async (action) => {
-  if (!currentOrderId.value) {
+  if (orderStore.submitting && action !== 'viewReceipt') {
+    return
+  }
+
+  if (!isValidOrderId.value) {
+    ElMessage.warning('当前订单 ID 无效，请返回大厅重新进入详情页')
     return
   }
 
@@ -507,19 +315,6 @@ const runAction = async (action) => {
   }
 }
 
-const runPrimaryAction = async () => {
-  if (!primaryAction.value) {
-    return
-  }
-
-  if (primaryAction.value.key === 'complaint') {
-    navigateToComplaint()
-    return
-  }
-
-  await runAction(primaryAction.value.key)
-}
-
 watch(
   () => route.params.orderId,
   (orderId, previousOrderId) => {
@@ -530,7 +325,16 @@ watch(
 )
 
 onMounted(() => {
+  countdownTimer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
   loadDetail()
+})
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    window.clearInterval(countdownTimer)
+  }
 })
 </script>
 
@@ -546,10 +350,9 @@ onMounted(() => {
       />
     </div>
 
-    <PageSection
+    <div
       v-loading="orderStore.detailLoading"
-      title="拼单详情"
-      description="查看订单状态、成员进度、支付凭证、收货确认和异常处理信息。"
+      class="section"
     >
       <template v-if="detail">
         <div class="card-header-row">
@@ -563,28 +366,6 @@ onMounted(() => {
             :value="detail.basicInfo.status"
             :text="formatOrderStatus(detail.basicInfo.status)"
           />
-        </div>
-
-        <div class="surface-card detail-panel detail-hero-panel">
-          <h3>当前引导</h3>
-          <ul class="detail-list">
-            <li><span>下一步建议</span><strong>{{ nextStepHint }}</strong></li>
-            <li><span>投诉状态</span><strong>{{ complaintActionText }}</strong></li>
-            <li><span>凭证状态</span><strong>{{ receiptStatusText }}</strong></li>
-          </ul>
-          <div
-            v-if="primaryAction"
-            class="page-actions detail-primary-actions"
-          >
-            <el-button
-              :type="primaryAction.type"
-              :plain="primaryAction.type !== 'primary'"
-              :loading="orderStore.submitting"
-              @click="runPrimaryAction"
-            >
-              {{ primaryAction.label }}
-            </el-button>
-          </div>
         </div>
 
         <div class="detail-grid">
@@ -657,33 +438,6 @@ onMounted(() => {
         </div>
 
         <PageSection
-          title="阶段进度"
-          description="按业务阶段展示订单当前所处位置，便于快速判断还差哪一步。"
-        >
-          <div class="action-summary-grid">
-            <div
-              v-for="item in phaseItems"
-              :key="item.key"
-              class="surface-card action-summary-card"
-              :class="{ 'is-enabled': item.done || item.current }"
-            >
-              <span>{{ item.label }}</span>
-              <el-tag
-                :type="item.done ? 'success' : item.current ? 'warning' : 'info'"
-                effect="light"
-                round
-              >
-                {{ item.done ? '已完成' : item.current ? '当前阶段' : '未开始' }}
-              </el-tag>
-              <strong>{{ item.hint }}</strong>
-            </div>
-          </div>
-          <p class="muted-text">
-            {{ phaseSummaryText }}
-          </p>
-        </PageSection>
-
-        <PageSection
           title="成员列表"
           description="查看成员加入、支付、收货和最近事件，快速判断当前进展。"
         >
@@ -698,7 +452,17 @@ onMounted(() => {
               />
               <el-table-column label="角色">
                 <template #default="{ row }">
-                  {{ formatRole(row.role) }}
+                  <div class="member-role-cell">
+                    <span>{{ formatRole(row.role) }}</span>
+                    <el-tag
+                      v-if="row.isCreator"
+                      size="small"
+                      type="warning"
+                      effect="light"
+                    >
+                      团长
+                    </el-tag>
+                  </div>
                 </template>
               </el-table-column>
               <el-table-column label="加入状态">
@@ -751,7 +515,17 @@ onMounted(() => {
             >
               <div class="mobile-record-header">
                 <div class="mobile-record-title">
-                  <span>{{ formatRole(row.role) }}</span>
+                  <span>
+                    {{ formatRole(row.role) }}
+                    <el-tag
+                      v-if="row.isCreator"
+                      size="small"
+                      type="warning"
+                      effect="light"
+                    >
+                      团长
+                    </el-tag>
+                  </span>
                   <strong>{{ row.nickname || '--' }}</strong>
                 </div>
                 <StatusTag
@@ -769,126 +543,6 @@ onMounted(() => {
             </article>
           </div>
         </PageSection>
-
-        <PageSection
-          title="补充信息"
-          description="保留金额、凭证、收货和投诉的关键字段。"
-        >
-          <ul class="detail-list compact-detail-list">
-            <li>
-              <span>预计 / 实付</span>
-              <strong>
-                {{ formatCurrency(detail.paymentSummary.estimatedTotalAmount) }} /
-                {{ formatCurrency(detail.paymentSummary.actualTotalAmount) }}
-              </strong>
-            </li>
-            <li>
-              <span>支付 / 收货</span>
-              <strong>
-                {{ detail.paymentSummary.paidMemberCount }}/{{ activeMemberList.length || 0 }} /
-                {{ receivedMemberCount }}/{{ activeMemberList.length || 0 }}
-              </strong>
-            </li>
-            <li>
-              <span>退款 / 差额</span>
-              <strong>
-                {{ formatCurrency(detail.paymentSummary.refundAmountTotal) }} / {{ paymentDeltaText }}
-              </strong>
-            </li>
-            <li>
-              <span>凭证</span>
-              <strong>
-                {{ detail.receiptInfo ? formatCurrency(detail.receiptInfo.actualTotalAmount) : '--' }}
-                · {{ detail.receiptInfo ? formatDateTime(detail.receiptInfo.uploadedAt) : formatDateTime(detail.basicInfo.receiptUploadDeadlineAt) }}
-              </strong>
-            </li>
-            <li>
-              <span>送达 / 自动确认</span>
-              <strong>
-                {{ formatDateTime(detail.receiveInfo.deliveredAt) }} /
-                {{ formatDateTime(detail.receiveInfo.autoConfirmDeadlineAt) }}
-              </strong>
-            </li>
-            <li>
-              <span>投诉</span>
-              <strong>
-                {{ detail.complaintInfo.complaintOpened ? '已开放' : '未开放' }} ·
-                {{ detail.complaintInfo.complaintCount }} 条 · {{ complaintActionText }}
-              </strong>
-            </li>
-          </ul>
-        </PageSection>
-
-        <div class="detail-grid">
-          <PageSection
-            title="收货明细"
-            description="保留每个成员的收货确认结果。"
-          >
-            <div class="desktop-table">
-              <el-table
-                :data="detail.receiveInfo.receiveStatusSummary"
-                stripe
-              >
-                <el-table-column
-                  prop="nickname"
-                  label="成员"
-                />
-                <el-table-column label="收货状态">
-                  <template #default="{ row }">
-                    <StatusTag
-                      :value="row.receiveStatus"
-                      :text="formatReceiveStatus(row.receiveStatus)"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column label="收货时间">
-                  <template #default="{ row }">
-                    {{ formatDateTime(row.receivedAt) }}
-                  </template>
-                </el-table-column>
-              </el-table>
-            </div>
-
-            <div class="mobile-record-list">
-              <article
-                v-for="(row, index) in detail.receiveInfo.receiveStatusSummary"
-                :key="`${row.nickname}-${index}`"
-                class="surface-card mobile-record-card"
-              >
-                <div class="mobile-record-header">
-                  <div class="mobile-record-title">
-                    <span>收货汇总</span>
-                    <strong>{{ row.nickname || '--' }}</strong>
-                  </div>
-                  <StatusTag
-                    :value="row.receiveStatus"
-                    :text="formatReceiveStatus(row.receiveStatus)"
-                  />
-                </div>
-                <ul class="mobile-record-fields">
-                  <li><span>收货时间</span><strong>{{ formatDateTime(row.receivedAt) }}</strong></li>
-                </ul>
-              </article>
-            </div>
-          </PageSection>
-
-          <PageSection
-            title="时间线"
-            description="展示最近 5 条关键事件。"
-          >
-            <el-timeline>
-              <el-timeline-item
-                v-for="item in compactTimelineItems"
-                :key="`${item.action}-${item.at}`"
-                :timestamp="formatDateTime(item.at)"
-                :type="getTimelineType(item.action)"
-              >
-                <strong>{{ formatTimelineAction(item.action) }}</strong>
-                <div>{{ item.description }}</div>
-              </el-timeline-item>
-            </el-timeline>
-          </PageSection>
-        </div>
 
         <div class="page-actions wrap-actions detail-actions-bar">
           <el-button @click="router.push('/orders')">
@@ -1004,7 +658,7 @@ onMounted(() => {
           </el-button>
         </div>
       </EmptyState>
-    </PageSection>
+    </div>
 
     <el-dialog
       v-model="receiptDialogVisible"

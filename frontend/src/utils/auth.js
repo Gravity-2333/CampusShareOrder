@@ -10,6 +10,7 @@ export const getStoredSession = () => {
   try {
     return JSON.parse(raw)
   } catch {
+    clearSessionStorage()
     return null
   }
 }

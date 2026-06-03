@@ -1,12 +1,16 @@
 package com.campusshareorder.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.campusshareorder.backend.common.enums.ErrorCode;
+import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.CapitalRecord;
+import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
 import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.OrderReceipt;
+import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.CapitalRecordMapper;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
@@ -17,6 +21,7 @@ import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.impl.OrderServiceImpl;
+import com.campusshareorder.backend.vo.order.OrderDetailVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
@@ -103,21 +109,38 @@ class OrderServiceImplTest {
         currentMember.setReceiveStatus("WAIT_CONFIRM");
         GroupOrderMember creator = paidMember(12L, 102L, true);
         creator.setReceiveStatus("RECEIVED");
+        UserAccount memberUser = user(101L, 80);
+        UserAccount creatorUser = user(102L, 99);
 
         when(groupOrderMapper.selectById(1L)).thenReturn(order);
         when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(currentMember);
         when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(currentMember, creator));
         when(capitalRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(creditChangeRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        when(userAccountMapper.selectById(101L)).thenReturn(memberUser);
+        when(userAccountMapper.selectById(102L)).thenReturn(creatorUser);
 
         orderService.confirmReceived(1L, 101L);
 
         assertThat(currentMember.getReceiveStatus()).isEqualTo("RECEIVED");
         assertThat(order.getStatus()).isEqualTo("COMPLETED");
+        assertThat(memberUser.getCreditScore()).isEqualTo(82);
+        assertThat(creatorUser.getCreditScore()).isEqualTo(100);
 
         ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
         verify(capitalRecordMapper).insert(capitalCaptor.capture());
         assertThat(capitalCaptor.getValue().getType()).isEqualTo("SETTLE_TO_CREATOR");
         assertThat(capitalCaptor.getValue().getAmount()).isEqualByComparingTo("54.00");
+
+        ArgumentCaptor<CreditChangeRecord> creditCaptor = ArgumentCaptor.forClass(CreditChangeRecord.class);
+        verify(creditChangeRecordMapper, atLeastOnce()).insert(creditCaptor.capture());
+        assertThat(creditCaptor.getAllValues())
+                .hasSize(2)
+                .allSatisfy(record -> {
+                    assertThat(record.getReasonType()).isEqualTo("ORDER_FINISHED");
+                    assertThat(record.getChangeValue()).isEqualTo(2);
+                    assertThat(record.getRelatedOrderId()).isEqualTo(1L);
+                });
 
         ArgumentCaptor<OperationLog> logCaptor = ArgumentCaptor.forClass(OperationLog.class);
         verify(operationLogMapper, atLeastOnce()).insert(logCaptor.capture());
@@ -158,11 +181,130 @@ class OrderServiceImplTest {
         assertThat(order.getStatus()).isEqualTo("CANCELED");
         assertThat(order.getCancelReason()).isEqualTo("DEADLINE_NOT_GROUPED");
         assertThat(paidMember.getJoinStatus()).isEqualTo("CANCELED");
+        assertThat(paidMember.getPayStatus()).isEqualTo("REFUNDED");
         assertThat(paidMember.getRefundAmountTotal()).isEqualByComparingTo("30.00");
 
         ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
         verify(capitalRecordMapper).insert(capitalCaptor.capture());
         assertThat(capitalCaptor.getValue().getType()).isEqualTo("REFUND_CANCEL");
+    }
+
+    @Test
+    void paidMemberCanExitOpenOrderAndRefundsPaidAmount() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        order.setCurrentMemberCount(2);
+        GroupOrderMember paidMember = paidMember(11L, 101L, false);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(paidMember);
+        when(capitalRecordMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        orderService.exitOrder(1L, 101L);
+
+        assertThat(paidMember.getJoinStatus()).isEqualTo("REFUNDED");
+        assertThat(paidMember.getPayStatus()).isEqualTo("REFUNDED");
+        assertThat(paidMember.getRefundAmountTotal()).isEqualByComparingTo("30.00");
+        assertThat(order.getCurrentMemberCount()).isEqualTo(1);
+
+        ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
+        verify(capitalRecordMapper).insert(capitalCaptor.capture());
+        assertThat(capitalCaptor.getValue().getType()).isEqualTo("REFUND_EXIT");
+        assertThat(capitalCaptor.getValue().getAmount()).isEqualByComparingTo("30.00");
+    }
+
+    @Test
+    void exitedMemberCannotPayOpenOrder() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        GroupOrderMember exitedMember = paidMember(11L, 101L, false);
+        exitedMember.setJoinStatus("EXITED");
+        exitedMember.setPayStatus("UNPAID");
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+
+        assertThatThrownBy(() -> orderService.payOrder(1L, 101L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.ORDER_STATUS_INVALID.getCode()));
+
+        verify(groupOrderMemberMapper, never()).updateById(any(GroupOrderMember.class));
+        verify(capitalRecordMapper, never()).insert(any(CapitalRecord.class));
+    }
+
+    @Test
+    void exitedMemberCannotConfirmReceived() {
+        GroupOrder order = waitReceiveOrder();
+        GroupOrderMember exitedMember = paidMember(11L, 101L, false);
+        exitedMember.setJoinStatus("EXITED");
+        exitedMember.setReceiveStatus("WAIT_CONFIRM");
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+
+        assertThatThrownBy(() -> orderService.confirmReceived(1L, 101L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.ORDER_STATUS_INVALID.getCode()));
+
+        verify(groupOrderMemberMapper, never()).updateById(any(GroupOrderMember.class));
+    }
+
+    @Test
+    void fullOpenOrderDetailDoesNotExposeJoinAction() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        order.setCurrentMemberCount(2);
+        GroupOrderMember creator = paidMember(12L, 102L, true);
+        GroupOrderMember member = paidMember(11L, 101L, false);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(creator, member));
+        when(complaintMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(orderReceiptMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userAccountMapper.selectById(any())).thenAnswer(invocation -> user(invocation.getArgument(0), 80));
+
+        OrderDetailVO detail = orderService.getOrderDetail(1L, 999L);
+
+        assertThat(detail.getActionFlags().isCanJoin()).isFalse();
+    }
+
+    @Test
+    void inactiveMemberDetailDoesNotExposeComplaintAction() {
+        GroupOrder order = waitReceiveOrder();
+        order.setComplaintOpened(true);
+        GroupOrderMember exitedMember = paidMember(11L, 101L, false);
+        exitedMember.setJoinStatus("EXITED");
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(exitedMember));
+        when(complaintMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(orderReceiptMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userAccountMapper.selectById(any())).thenAnswer(invocation -> user(invocation.getArgument(0), 80));
+
+        OrderDetailVO detail = orderService.getOrderDetail(1L, 101L);
+
+        assertThat(detail.getActionFlags().isCanCreateComplaint()).isFalse();
+        assertThat(detail.getActionFlags().isCanConfirmReceived()).isFalse();
+    }
+
+    @Test
+    void canceledOrderTimelineDoesNotShowGroupedEvent() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("CANCELED");
+        GroupOrderMember creator = paidMember(12L, 102L, true);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of(creator));
+        when(complaintMapper.selectList(any(LambdaQueryWrapper.class))).thenReturn(List.of());
+        when(orderReceiptMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userAccountMapper.selectById(any())).thenAnswer(invocation -> user(invocation.getArgument(0), 80));
+
+        OrderDetailVO detail = orderService.getOrderDetail(1L, 102L);
+
+        assertThat(detail.getTimeline())
+                .extracting("description")
+                .contains("订单已取消")
+                .doesNotContain("订单已成团");
     }
 
     @Test
@@ -242,5 +384,12 @@ class OrderServiceImplTest {
         member.setRefundAmountTotal(BigDecimal.ZERO);
         member.setReceiveStatus("WAIT_CONFIRM");
         return member;
+    }
+
+    private UserAccount user(Long userId, int creditScore) {
+        UserAccount user = new UserAccount();
+        user.setId(userId);
+        user.setCreditScore(creditScore);
+        return user;
     }
 }

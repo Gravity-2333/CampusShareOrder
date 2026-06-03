@@ -3,8 +3,7 @@ import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import PageSection from '../../components/common/PageSection.vue'
-import StatCard from '../../components/common/StatCard.vue'
+import EmptyState from '../../components/common/EmptyState.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useComplaintStore } from '../../stores/complaint'
 import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
@@ -14,33 +13,47 @@ const router = useRouter()
 const complaintStore = useComplaintStore()
 
 const complaint = computed(() => complaintStore.complaintDetail)
+const currentComplaintId = computed(() => route.params.complaintId)
+const normalizedComplaintId = computed(() => Number(currentComplaintId.value || 0))
+const isValidComplaintId = computed(
+  () => Number.isInteger(normalizedComplaintId.value) && normalizedComplaintId.value > 0,
+)
+const detailErrorText = computed(() =>
+  isValidComplaintId.value
+    ? '当前未能加载到投诉详情，请返回列表重新选择。'
+    : '当前路由中的投诉 ID 无效，请返回我的投诉重新进入详情页。',
+)
 
-const stats = computed(() => {
-  if (!complaint.value) {
-    return []
+// 处理进度时间轴
+const timeline = computed(() => {
+  if (!complaint.value) return []
+
+  const events = []
+
+  // 投诉已提交
+  if (complaint.value.createdAt) {
+    events.push({
+      title: '投诉已提交',
+      description: '系统已记录投诉信息',
+      time: complaint.value.createdAt,
+    })
   }
 
-  return [
-    {
-      label: '投诉状态',
-      value: formatComplaintStatus(complaint.value.status),
-      hint: '展示当前处理进度',
-    },
-    {
-      label: '投诉类型',
-      value: formatComplaintType(complaint.value.type),
-      hint: '帮助管理员快速判断问题类型',
-    },
-    {
-      label: '关联订单',
-      value: complaint.value.orderNo,
-      hint: '详情页继续沿用 complaint -> order 的固定字段关系',
-    },
-  ]
+  // 管理员已受理
+  if (complaint.value.status === 'PROCESSED' && complaint.value.handledAt) {
+    events.push({
+      title: '管理员已受理',
+      description: complaint.value.handleResult || '管理员正在处理中',
+      time: complaint.value.handledAt,
+    })
+  }
+
+  return events
 })
 
 const loadDetail = async (complaintId = route.params.complaintId) => {
-  if (!complaintId) {
+  if (!isValidComplaintId.value) {
+    complaintStore.complaintDetail = null
     return
   }
 
@@ -67,86 +80,99 @@ onMounted(() => {
 
 <template>
   <div class="stack-page">
-    <div class="stats-grid">
-      <StatCard
-        v-for="item in stats"
-        :key="item.label"
-        :label="item.label"
-        :value="item.value"
-        :hint="item.hint"
-      />
-    </div>
-
-    <PageSection
+    <div
       v-loading="complaintStore.complaintDetailLoading"
-      title="投诉详情"
-      description="查看投诉内容、处理状态、关联订单和最终处理结果。"
+      class="section"
     >
       <template v-if="complaint">
-        <div class="card-header-row">
+        <div class="section-header">
           <div>
-            <p class="section-kicker">
-              {{ complaint.complaintNo }}
-            </p>
-            <h2>{{ complaint.productName }}</h2>
+            <StatusTag
+              :value="complaint.status"
+              :text="formatComplaintStatus(complaint.status)"
+            />
+            <h3>投诉单号：{{ complaint.complaintNo }}</h3>
           </div>
-          <StatusTag
-            :value="complaint.status"
-            :text="formatComplaintStatus(complaint.status)"
-          />
         </div>
 
-        <div class="detail-grid">
-          <div class="surface-card detail-panel">
-            <h3>基础信息</h3>
-            <ul class="detail-list">
-              <li><span>投诉类型</span><strong>{{ formatComplaintType(complaint.type) }}</strong></li>
-              <li><span>关联订单</span><strong>{{ complaint.orderNo }}</strong></li>
-              <li><span>订单商品</span><strong>{{ complaint.productName }}</strong></li>
-              <li><span>被投诉人</span><strong>{{ complaint.accusedNickname }}</strong></li>
-              <li><span>系统开启通道</span><strong>{{ complaint.openedBySystem ? '是' : '否' }}</strong></li>
-              <li><span>创建时间</span><strong>{{ formatDateTime(complaint.createdAt) }}</strong></li>
-            </ul>
+        <div class="detail-panel">
+          <h4>投诉信息</h4>
+          <ul class="detail-list">
+            <li>
+              <span>关联订单</span>
+              <strong>{{ complaint.orderNo }} - {{ complaint.productName || '--' }}</strong>
+            </li>
+            <li>
+              <span>投诉类型</span>
+              <strong>{{ formatComplaintType(complaint.type) }}</strong>
+            </li>
+            <li>
+              <span>投诉人</span>
+              <strong>{{ complaint.complainantNickname || '--' }}</strong>
+            </li>
+            <li>
+              <span>创建时间</span>
+              <strong>{{ formatDateTime(complaint.createdAt) }}</strong>
+            </li>
+          </ul>
+          <div class="detail-note">
+            <span>投诉描述</span>
+            <p>{{ complaint.content || '暂无投诉描述' }}</p>
           </div>
 
-          <div class="surface-card detail-panel">
-            <h3>处理信息</h3>
-            <ul class="detail-list">
-              <li><span>处理状态</span><strong>{{ formatComplaintStatus(complaint.status) }}</strong></li>
-              <li><span>处理时间</span><strong>{{ formatDateTime(complaint.handledAt) }}</strong></li>
-            </ul>
-
-            <div class="detail-note">
-              <span>投诉内容</span>
-              <p>{{ complaint.content || '暂无投诉内容' }}</p>
+          <div style="margin-top: 1.5rem">
+            <h4>处理进度</h4>
+            <div
+              v-if="timeline.length"
+              class="timeline"
+            >
+              <div
+                v-for="(event, index) in timeline"
+                :key="index"
+                class="timeline-item"
+              >
+                <strong>{{ event.title }}</strong>
+                <div>{{ event.description }}</div>
+                <div style="color: #6b7c70; font-size: 0.85rem">
+                  {{ formatDateTime(event.time) }}
+                </div>
+              </div>
             </div>
-
-            <div class="detail-note">
-              <span>处理结果</span>
-              <p>{{ complaint.handleResult || '管理员尚未处理' }}</p>
+            <div
+              v-else
+              style="color: #6b7c70; padding: 1rem 0"
+            >
+              暂无处理记录
             </div>
           </div>
-        </div>
 
-        <div class="table-toolbar">
-          <span class="table-caption">
-            当前投诉状态为 <strong>{{ formatComplaintStatus(complaint.status) }}</strong>，处理结果会在这里同步更新。
-          </span>
+          <div class="page-actions detail-actions-bar">
+            <el-button @click="router.push('/complaints')">
+              返回列表
+            </el-button>
+          </div>
         </div>
+      </template>
 
-        <div class="page-actions wrap-actions">
+      <EmptyState
+        v-else-if="!complaintStore.complaintDetailLoading"
+        title="投诉详情不可用"
+        :description="detailErrorText"
+      >
+        <div class="page-actions">
           <el-button @click="router.push('/complaints')">
             返回我的投诉
           </el-button>
           <el-button
             type="primary"
             plain
-            @click="router.push(`/orders/${complaint.orderId}`)"
+            :disabled="!isValidComplaintId"
+            @click="loadDetail()"
           >
-            查看关联订单
+            重新加载
           </el-button>
         </div>
-      </template>
-    </PageSection>
+      </EmptyState>
+    </div>
   </div>
 </template>

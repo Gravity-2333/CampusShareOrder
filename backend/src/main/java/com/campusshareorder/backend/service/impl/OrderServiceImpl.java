@@ -15,6 +15,7 @@ import com.campusshareorder.backend.dto.order.OrderQueryRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.Complaint;
+import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
 import com.campusshareorder.backend.entity.Notification;
@@ -23,6 +24,7 @@ import com.campusshareorder.backend.entity.OrderReceipt;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.CapitalRecordMapper;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
+import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
 import com.campusshareorder.backend.mapper.NotificationMapper;
@@ -66,6 +68,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final OrderReceiptMapper orderReceiptMapper;
     private final ComplaintMapper complaintMapper;
     private final CapitalRecordMapper capitalRecordMapper;
+    private final CreditChangeRecordMapper creditChangeRecordMapper;
     private final NotificationMapper notificationMapper;
     private final OperationLogMapper operationLogMapper;
 
@@ -294,6 +297,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
+        if (!"ACTIVE".equals(member.getJoinStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许支付");
+        }
         if (!"UNPAID".equals(member.getPayStatus())) {
             throw new BusinessException(ErrorCode.ORDER_ALREADY_PAID);
         }
@@ -319,11 +325,23 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (Boolean.TRUE.equals(member.getIsCreator())) {
             throw new BusinessException(ErrorCode.INITIATOR_EXIT_NOT_ALLOWED);
         }
-        if (!"ACTIVE".equals(member.getJoinStatus()) || !"UNPAID".equals(member.getPayStatus())) {
+        if (!"ACTIVE".equals(member.getJoinStatus()) || !List.of("UNPAID", "PAID").contains(member.getPayStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许退出");
         }
 
-        groupOrderMemberMapper.deleteById(member.getId());
+        if ("PAID".equals(member.getPayStatus())) {
+            BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+            BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+            BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+            member.setRefundAmountTotal(refunded.add(netRefund));
+            member.setPayStatus("REFUNDED");
+            member.setJoinStatus("REFUNDED");
+            insertCapitalRecord("RFE-M" + member.getId(), userId, orderId, member.getId(),
+                    "REFUND_EXIT", netRefund, "成员退出拼单退款");
+        } else {
+            member.setJoinStatus("EXITED");
+        }
+        groupOrderMemberMapper.updateById(member);
         order.setCurrentMemberCount(Math.max(order.getCurrentMemberCount() - 1, 1));
         groupOrderMapper.updateById(order);
         insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_EXITED", null);
@@ -419,6 +437,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
 
         GroupOrderMember member = requireMember(orderId, userId);
+        if (!"ACTIVE".equals(member.getJoinStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许确认收货");
+        }
         if (Boolean.TRUE.equals(member.getIsCreator())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "发起人无需重复确认收货");
         }
@@ -597,6 +618,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                     : order.getActualTotalAmount();
             insertCapitalRecord("SET-O" + orderId, order.getCreatorUserId(), orderId, null,
                     "SETTLE_TO_CREATOR", settleAmount, "订单完成结算给发起人");
+            applyOrderFinishedCreditRewards(activeMembers, orderId);
             insertOperationLog("SYSTEM", null, "ORDER", orderId, "ORDER_COMPLETED", null);
             notifyActiveMembers(orderId, "ORDER_COMPLETED", "订单已完成",
                     "全部成员已确认收货，订单已完成并生成结算记录。", true);
@@ -613,6 +635,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
                 BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
                 member.setRefundAmountTotal(refunded.add(netRefund));
+                member.setPayStatus("REFUNDED");
                 insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
                         member.getId(), "REFUND_CANCEL", netRefund, "订单取消净退款");
             }
@@ -681,6 +704,43 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         record.setRemark(remark);
         record.setCreatedAt(LocalDateTime.now());
         capitalRecordMapper.insert(record);
+    }
+
+    private void applyOrderFinishedCreditRewards(List<GroupOrderMember> activeMembers, Long orderId) {
+        for (GroupOrderMember member : activeMembers) {
+            if (member.getUserId() == null) {
+                continue;
+            }
+
+            Long existingCount = creditChangeRecordMapper.selectCount(
+                    new LambdaQueryWrapper<CreditChangeRecord>()
+                            .eq(CreditChangeRecord::getUserId, member.getUserId())
+                            .eq(CreditChangeRecord::getRelatedOrderId, orderId)
+                            .eq(CreditChangeRecord::getReasonType, "ORDER_FINISHED")
+            );
+            if (existingCount != null && existingCount > 0) {
+                continue;
+            }
+
+            UserAccount user = userAccountMapper.selectById(member.getUserId());
+            if (user == null) {
+                continue;
+            }
+
+            int delta = 2;
+            int currentScore = user.getCreditScore() == null ? 0 : user.getCreditScore();
+            user.setCreditScore(Math.min(100, currentScore + delta));
+            userAccountMapper.updateById(user);
+
+            CreditChangeRecord record = new CreditChangeRecord();
+            record.setUserId(user.getId());
+            record.setChangeValue(delta);
+            record.setReasonType("ORDER_FINISHED");
+            record.setRelatedOrderId(orderId);
+            record.setRemark("完成有效拼单奖励信用分");
+            record.setCreatedAt(LocalDateTime.now());
+            creditChangeRecordMapper.insert(record);
+        }
     }
 
     private void insertOperationLog(String operatorType, Long operatorId, String bizType, Long bizId,
@@ -868,7 +928,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private ActionFlagsVO buildActionFlags(GroupOrder order, GroupOrderMember currentMember, OrderReceipt receipt, List<Complaint> complaints, Long userId) {
         ActionFlagsVO actionFlags = new ActionFlagsVO();
         boolean hasMyComplaint = complaints.stream().anyMatch(item -> Objects.equals(item.getComplainantUserId(), userId));
-        actionFlags.setCanJoin("OPEN".equals(order.getStatus()) && currentMember == null);
+        actionFlags.setCanJoin("OPEN".equals(order.getStatus())
+                && currentMember == null
+                && order.getCurrentMemberCount() < order.getTotalMemberCount());
         actionFlags.setCanPay(currentMember != null
                 && "OPEN".equals(order.getStatus())
                 && "ACTIVE".equals(currentMember.getJoinStatus())
@@ -877,15 +939,17 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 && "OPEN".equals(order.getStatus())
                 && "ACTIVE".equals(currentMember.getJoinStatus())
                 && !Boolean.TRUE.equals(currentMember.getIsCreator())
-                && "UNPAID".equals(currentMember.getPayStatus()));
+                && List.of("UNPAID", "PAID").contains(currentMember.getPayStatus()));
         actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
         actionFlags.setCanMarkDelivered("WAIT_DELIVERY".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
         actionFlags.setCanConfirmReceived(currentMember != null
                 && "WAIT_RECEIVE".equals(order.getStatus())
+                && "ACTIVE".equals(currentMember.getJoinStatus())
                 && !Boolean.TRUE.equals(currentMember.getIsCreator())
                 && "WAIT_CONFIRM".equals(currentMember.getReceiveStatus()));
         actionFlags.setCanCreateComplaint(Boolean.TRUE.equals(order.getComplaintOpened())
                 && currentMember != null
+                && "ACTIVE".equals(currentMember.getJoinStatus())
                 && !Objects.equals(order.getCreatorUserId(), userId)
                 && !hasMyComplaint);
         actionFlags.setCanViewReceipt(receipt != null);
@@ -896,7 +960,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         List<TimelineItemVO> timeline = new ArrayList<>();
         timeline.add(buildTimelineItem("ORDER_CREATED", "创建拼单", order.getCreatedAt(), creator == null ? "系统" : creator.getNickname()));
 
-        if (!"OPEN".equals(order.getStatus())) {
+        if (List.of("GROUPED", "WAIT_DELIVERY", "WAIT_RECEIVE", "COMPLETED").contains(order.getStatus())) {
             timeline.add(buildTimelineItem("ORDER_STATUS", "订单已成团", order.getUpdatedAt(), "系统"));
         }
         if (receipt != null) {

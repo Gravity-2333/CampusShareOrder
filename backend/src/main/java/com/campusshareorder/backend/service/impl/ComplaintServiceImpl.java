@@ -66,16 +66,18 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
 
         LambdaQueryWrapper<GroupOrderMember> complainantWrapper = new LambdaQueryWrapper<>();
         complainantWrapper.eq(GroupOrderMember::getGroupOrderId, request.getOrderId())
-                .eq(GroupOrderMember::getUserId, userId);
+                .eq(GroupOrderMember::getUserId, userId)
+                .eq(GroupOrderMember::getJoinStatus, "ACTIVE");
         if (groupOrderMemberMapper.selectCount(complainantWrapper) == 0) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "投诉人不在该订单中");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "投诉人不是该订单有效成员");
         }
 
         LambdaQueryWrapper<GroupOrderMember> accusedWrapper = new LambdaQueryWrapper<>();
         accusedWrapper.eq(GroupOrderMember::getGroupOrderId, request.getOrderId())
-                .eq(GroupOrderMember::getUserId, accusedUserId);
+                .eq(GroupOrderMember::getUserId, accusedUserId)
+                .eq(GroupOrderMember::getJoinStatus, "ACTIVE");
         if (groupOrderMemberMapper.selectCount(accusedWrapper) == 0) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "被投诉人不在该订单中");
+            throw new BusinessException(ErrorCode.FORBIDDEN, "被投诉人不是该订单有效成员");
         }
 
         LambdaQueryWrapper<Complaint> duplicateWrapper = new LambdaQueryWrapper<>();

@@ -48,18 +48,25 @@ export const complaintStatusTextMap = {
 export const complaintTypeTextMap = {
   FAKE_RECEIPT: '伪造凭证',
   NOT_PURCHASED: '未购买',
+  NO_SHIP: '未发货',
+  NO_DELIVERY: '未送达',
+  QUALITY: '商品质量',
+  OTHER: '其他',
 }
 
 export const capitalRecordTypeTextMap = {
   PAY: '支付',
   REFUND_CANCEL: '取消退款',
   REFUND_DIFF: '差额退款',
+  REFUND_EXIT: '退出退款',
   SETTLE_TO_CREATOR: '发起人结算',
 }
 
 export const creditReasonTypeTextMap = {
+  COMPLAINT_CONFIRMED: '投诉扣分',
   COMPLAINT_PENALTY: '投诉扣分',
   INITIAL: '初始信用分',
+  ORDER_FINISHED: '完成订单奖励',
 }
 
 export const statusToneMap = {

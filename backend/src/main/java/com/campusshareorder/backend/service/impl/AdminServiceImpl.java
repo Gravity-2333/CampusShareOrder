@@ -74,6 +74,15 @@ public class AdminServiceImpl implements AdminService {
         metrics.setUsers(userAccountMapper.selectCount(null));
         metrics.setOrders(groupOrderMapper.selectCount(null));
         metrics.setComplaints(complaintMapper.selectCount(null));
+        metrics.setCompletedOrders(groupOrderMapper.selectCount(
+                new LambdaQueryWrapper<GroupOrder>().eq(GroupOrder::getStatus, "COMPLETED")
+        ));
+        metrics.setPendingComplaints(complaintMapper.selectCount(
+                new LambdaQueryWrapper<Complaint>().eq(Complaint::getStatus, "PENDING")
+        ));
+        metrics.setTodayNewUsers(userAccountMapper.selectCount(
+                new LambdaQueryWrapper<UserAccount>().ge(UserAccount::getCreatedAt, LocalDateTime.now().toLocalDate().atStartOfDay())
+        ));
 
         AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
         overview.setMetrics(metrics);

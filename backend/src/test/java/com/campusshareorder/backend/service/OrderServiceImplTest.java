@@ -136,7 +136,7 @@ class OrderServiceImplTest {
         ArgumentCaptor<CapitalRecord> capitalCaptor = ArgumentCaptor.forClass(CapitalRecord.class);
         verify(capitalRecordMapper).insert(capitalCaptor.capture());
         assertThat(capitalCaptor.getValue().getType()).isEqualTo("SETTLE_TO_CREATOR");
-        assertThat(capitalCaptor.getValue().getAmount()).isEqualByComparingTo("30.00");
+        assertThat(capitalCaptor.getValue().getAmount()).isEqualByComparingTo("54.00");
         assertThat(capitalCaptor.getValue().getOperatorType()).isEqualTo("SYSTEM");
 
         ArgumentCaptor<CreditChangeRecord> creditCaptor = ArgumentCaptor.forClass(CreditChangeRecord.class);
@@ -171,6 +171,26 @@ class OrderServiceImplTest {
 
         assertThat(order.getStatus()).isEqualTo("COMPLETED");
         verify(capitalRecordMapper, never()).insert(any(CapitalRecord.class));
+    }
+
+    @Test
+    void uploadReceiptRejectsActualAmountGreaterThanEstimatedAmount() {
+        GroupOrder order = groupedOrder();
+        order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(20));
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+
+        UploadReceiptRequest request = new UploadReceiptRequest();
+        request.setActualTotalAmount(new BigDecimal("61.00"));
+        request.setExpectedDeliveryStartAt(LocalDateTime.now().plusMinutes(10));
+        request.setExpectedDeliveryEndAt(LocalDateTime.now().plusMinutes(40));
+
+        assertThatThrownBy(() -> orderService.uploadReceipt(1L, request, null, 102L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()))
+                .hasMessageContaining("实际总金额");
+
+        verify(orderReceiptMapper, never()).insert(any(OrderReceipt.class));
+        verify(receiptStorageService, never()).store(any());
     }
 
     @Test

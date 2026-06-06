@@ -423,6 +423,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (!request.getExpectedDeliveryEndAt().isAfter(request.getExpectedDeliveryStartAt())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "预计最晚送达时间必须晚于开始送达时间");
         }
+        if (request.getActualTotalAmount().compareTo(order.getEstimatedTotalAmount()) > 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "实际总金额不能高于预计总金额");
+        }
         Long receiptCount = orderReceiptMapper.selectCount(
                 new LambdaQueryWrapper<OrderReceipt>().eq(OrderReceipt::getGroupOrderId, orderId)
         );
@@ -677,13 +680,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (allReceived) {
             order.setStatus("COMPLETED");
             groupOrderMapper.updateById(order);
-            BigDecimal settleAmount = activeMembers.stream()
-                    .filter(member -> !Boolean.TRUE.equals(member.getIsCreator()))
+            BigDecimal settleAmount = order.getActualTotalAmount() == null
+                    ? activeMembers.stream()
                     .filter(member -> "PAID".equals(member.getPayStatus()))
                     .map(member -> member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount())
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : order.getActualTotalAmount();
             insertCapitalRecord("SET-O" + orderId, order.getCreatorUserId(), orderId, null,
-                    "SETTLE_TO_CREATOR", settleAmount, "其他参与者初始支付金额打款给发起人",
+                    "SETTLE_TO_CREATOR", settleAmount, "订单完成后按实际总金额结算给发起人",
                     "SYSTEM", null);
             applyOrderFinishedCreditRewards(activeMembers, orderId);
             insertOperationLog("SYSTEM", null, "ORDER", orderId, "ORDER_COMPLETED", null);

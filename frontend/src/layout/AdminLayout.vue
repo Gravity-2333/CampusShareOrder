@@ -18,6 +18,7 @@ const navItems = [
   { label: '用户管理', path: '/admin/users' },
   { label: '数据报表', path: '/admin/reports' },
   { label: '系统流水', path: '/admin/records/capital' },
+  { label: '操作日志', path: '/admin/records/logs' },
 ]
 
 const activePath = computed(() => {

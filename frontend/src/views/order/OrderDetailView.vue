@@ -222,11 +222,22 @@ const submitReceipt = async () => {
     ElMessage.warning('实际总金额必须大于0')
     return
   }
+  const estimatedTotalAmount = Number(detail.value?.basicInfo?.estimatedTotalAmount || 0)
+  if (estimatedTotalAmount > 0 && amount > estimatedTotalAmount) {
+    ElMessage.warning('实际总金额不能高于预计总金额')
+    return
+  }
   if (!receiptForm.expectedDeliveryStartAt || !receiptForm.expectedDeliveryEndAt) {
     ElMessage.warning('请填写预计送达时间区间')
     return
   }
-  if (parseApiDateTime(receiptForm.expectedDeliveryEndAt) <= parseApiDateTime(receiptForm.expectedDeliveryStartAt)) {
+  const startAt = parseApiDateTime(receiptForm.expectedDeliveryStartAt)
+  const endAt = parseApiDateTime(receiptForm.expectedDeliveryEndAt)
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) {
+    ElMessage.warning('预计送达时间格式不正确')
+    return
+  }
+  if (endAt <= startAt) {
     ElMessage.warning('预计最晚送达时间必须晚于开始送达时间')
     return
   }
@@ -709,9 +720,13 @@ onBeforeUnmount(() => {
           label="实际总金额"
           required
         >
+          <p class="muted-text field-tip">
+            不得高于预计总金额 {{ formatCurrency(detail?.basicInfo?.estimatedTotalAmount) }}，低于预计金额时系统会自动生成差额退款。
+          </p>
           <el-input-number
             v-model="receiptForm.actualTotalAmount"
             :min="0.01"
+            :max="Number(detail?.basicInfo?.estimatedTotalAmount || 999999)"
             :precision="2"
             :step="1"
             controls-position="right"

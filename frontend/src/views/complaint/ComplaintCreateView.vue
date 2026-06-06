@@ -36,16 +36,18 @@ const complaintTypes = [
 
 // 是否有可投诉订单
 const hasComplaintableOrders = computed(() => complaintableOrders.value.length > 0)
-const canSubmitComplaint = computed(
-  () => hasComplaintableOrders.value && selectedOrderDetail.value?.actionFlags?.canCreateComplaint === true,
-)
 const accusedOptions = computed(() => {
   const detail = selectedOrderDetail.value
   if (!detail) return []
 
   const options = []
+  const currentUserId = Number(detail.currentUserMember?.userId || 0)
   const pushUnique = (member) => {
-    if (!member?.userId || options.some((option) => option.userId === member.userId)) return
+    if (
+      !member?.userId ||
+      Number(member.userId) === currentUserId ||
+      options.some((option) => option.userId === member.userId)
+    ) return
     options.push({
       userId: member.userId,
       nickname: member.nickname || `用户 #${member.userId}`,
@@ -63,6 +65,12 @@ const accusedOptions = computed(() => {
 
   return options
 })
+const canSubmitComplaint = computed(
+  () =>
+    hasComplaintableOrders.value &&
+    selectedOrderDetail.value?.actionFlags?.canCreateComplaint === true &&
+    accusedOptions.value.length > 0,
+)
 const selectedOrderTip = computed(() => {
   if (!form.orderId) return '请选择订单后，系统会校验当前订单是否已开放投诉。'
   if (loadingOrderDetail.value) return '正在校验订单投诉权限...'

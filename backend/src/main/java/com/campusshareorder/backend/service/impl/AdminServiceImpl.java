@@ -47,7 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -119,16 +121,38 @@ public class AdminServiceImpl implements AdminService {
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, userId).orderByDesc(CreditChangeRecord::getCreatedAt);
+        Map<Long, Integer> scoreAfterRecordMap = buildScoreAfterRecordMap(user);
         List<AdminCreditRecordVO> records = creditChangeRecordMapper.selectList(wrapper).stream().map(record -> {
             AdminCreditRecordVO vo = new AdminCreditRecordVO();
             vo.setCreatedAt(record.getCreatedAt());
             vo.setChangeReason(record.getRemark() == null || record.getRemark().isBlank() ? record.getReasonType() : record.getRemark());
             vo.setDelta(record.getChangeValue());
+            vo.setCurrentScore(scoreAfterRecordMap.getOrDefault(record.getId(), user.getCreditScore()));
+            vo.setReasonType(record.getReasonType());
+            vo.setRelatedOrderId(record.getRelatedOrderId());
+            vo.setRelatedComplaintId(record.getRelatedComplaintId());
             return vo;
         }).collect(Collectors.toList());
         detail.setCreditRecords(records);
 
         return detail;
+    }
+
+    private Map<Long, Integer> buildScoreAfterRecordMap(UserAccount user) {
+        LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CreditChangeRecord::getUserId, user.getId())
+                .orderByDesc(CreditChangeRecord::getCreatedAt);
+        List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
+
+        Map<Long, Integer> scoreAfterRecordMap = new HashMap<>();
+        int runningScore = user.getCreditScore() == null ? 0 : user.getCreditScore();
+        for (CreditChangeRecord record : records) {
+            if (record.getId() != null) {
+                scoreAfterRecordMap.put(record.getId(), runningScore);
+            }
+            runningScore -= record.getChangeValue() == null ? 0 : record.getChangeValue();
+        }
+        return scoreAfterRecordMap;
     }
 
     @Override

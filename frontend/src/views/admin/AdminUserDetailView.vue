@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
+import { creditReasonTypeTextMap } from '../../utils/enum'
 import { formatDateTime, formatSignedNumber, formatUserStatus } from '../../utils/format'
 
 const route = useRoute()
@@ -45,6 +46,14 @@ const stats = computed(() => {
     },
   ]
 })
+
+const formatReasonType = (value) => creditReasonTypeTextMap[value] || value || '--'
+
+const formatRelatedBiz = (row) => {
+  if (row.relatedComplaintId) return `投诉 #${row.relatedComplaintId}`
+  if (row.relatedOrderId) return `订单 #${row.relatedOrderId}`
+  return '--'
+}
 
 const loadDetail = async (userId = route.params.userId) => {
   if (!isValidUserId.value) {
@@ -190,6 +199,21 @@ onMounted(() => {
                     {{ formatSignedNumber(row.delta) }}
                   </template>
                 </el-table-column>
+                <el-table-column label="变更后分数">
+                  <template #default="{ row }">
+                    {{ row.currentScore ?? '--' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="原因类型">
+                  <template #default="{ row }">
+                    {{ formatReasonType(row.reasonType) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="关联业务">
+                  <template #default="{ row }">
+                    {{ formatRelatedBiz(row) }}
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
 
@@ -205,6 +229,9 @@ onMounted(() => {
                 </div>
                 <ul class="mobile-record-fields">
                   <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+                  <li><span>变更后分数</span><strong>{{ row.currentScore ?? '--' }}</strong></li>
+                  <li><span>原因类型</span><strong>{{ formatReasonType(row.reasonType) }}</strong></li>
+                  <li><span>关联业务</span><strong>{{ formatRelatedBiz(row) }}</strong></li>
                 </ul>
               </article>
             </div>

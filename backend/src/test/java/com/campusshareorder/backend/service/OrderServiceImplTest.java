@@ -308,6 +308,30 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void unpaidExitedMemberCanRejoinOpenOrder() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        order.setCurrentMemberCount(1);
+        GroupOrderMember exitedMember = paidMember(11L, 101L, false);
+        exitedMember.setJoinStatus("EXITED");
+        exitedMember.setPayStatus("UNPAID");
+        exitedMember.setPaidAt(null);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+
+        orderService.joinOrder(1L, null, 101L);
+
+        assertThat(exitedMember.getJoinStatus()).isEqualTo("ACTIVE");
+        assertThat(exitedMember.getPayStatus()).isEqualTo("UNPAID");
+        assertThat(exitedMember.getPaidAt()).isNull();
+        assertThat(exitedMember.getRefundAmountTotal()).isEqualByComparingTo("0.00");
+        assertThat(order.getCurrentMemberCount()).isEqualTo(2);
+        verify(groupOrderMemberMapper).updateById(exitedMember);
+        verify(groupOrderMapper).updateById(order);
+    }
+
+    @Test
     void creatorCanCancelOpenOrderWithoutParticipantsAndRefundPaidAmount() {
         GroupOrder order = groupedOrder();
         order.setStatus("OPEN");

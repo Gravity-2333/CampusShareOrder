@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 import {
+  cancelOrder,
   confirmReceived,
   createOrder,
   exitOrder,
@@ -163,6 +164,10 @@ export const useOrderStore = defineStore('order', {
 
         if (action === 'exit') {
           await exitOrder(orderId)
+        }
+
+        if (action === 'cancel') {
+          await cancelOrder(orderId)
         }
 
         if (action === 'pay') {

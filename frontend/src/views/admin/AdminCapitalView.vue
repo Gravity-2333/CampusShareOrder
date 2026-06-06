@@ -108,8 +108,8 @@ onMounted(loadRecords)
     </div>
 
     <PageSection
-      title="资金记录"
-      description="核对订单支付、退款和发起人结算等资金流向。"
+      title="系统流水记录"
+      description="展示所有用户的支付、退款和发起人结算流水。"
     >
       <p class="muted-text">
         {{ summaryText }}
@@ -206,7 +206,12 @@ onMounted(loadRecords)
             />
             <el-table-column
               prop="orderNo"
-              label="关联订单"
+              label="关联拼单"
+            />
+            <el-table-column prop="orderId" label="拼单 ID" />
+            <el-table-column
+              prop="operatorName"
+              label="操作人"
             />
             <el-table-column
               prop="status"
@@ -217,11 +222,16 @@ onMounted(loadRecords)
                 {{ formatCurrency(row.amount) }}
               </template>
             </el-table-column>
+            <el-table-column label="收款人">
+              <template #default="{ row }">
+                {{ row.receiverName || '--' }}
+              </template>
+            </el-table-column>
             <el-table-column
               prop="remark"
               label="备注"
             />
-            <el-table-column label="时间">
+            <el-table-column label="支付/退款/打款时间">
               <template #default="{ row }">
                 {{ formatDateTime(row.createdAt) }}
               </template>
@@ -242,10 +252,13 @@ onMounted(loadRecords)
             <ul class="mobile-record-fields">
               <li><span>用户</span><strong>{{ row.userNickname || '--' }}</strong></li>
               <li><span>关联订单</span><strong>{{ row.orderNo || '--' }}</strong></li>
+              <li><span>拼单 ID</span><strong>{{ row.orderId || '--' }}</strong></li>
+              <li><span>操作人</span><strong>{{ row.operatorName || '--' }}</strong></li>
               <li><span>状态</span><strong>{{ row.status || '--' }}</strong></li>
               <li><span>金额</span><strong>{{ formatCurrency(row.amount) }}</strong></li>
+              <li><span>收款人</span><strong>{{ row.receiverName || '--' }}</strong></li>
               <li><span>备注</span><strong>{{ row.remark || '--' }}</strong></li>
-              <li><span>时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
+              <li><span>支付/退款/打款时间</span><strong>{{ formatDateTime(row.createdAt) }}</strong></li>
             </ul>
           </article>
         </div>

@@ -7,6 +7,7 @@ import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.dto.order.MyOrderQueryRequest;
 import com.campusshareorder.backend.dto.order.OrderQueryRequest;
+import org.springframework.web.multipart.MultipartFile;
 import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.*;
 
@@ -19,7 +20,8 @@ public interface OrderService extends IService<GroupOrder> {
 
     void payOrder(Long orderId, Long userId);
     void exitOrder(Long orderId, Long userId);
-    void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId);
+    void cancelOrder(Long orderId, Long userId);
+    void uploadReceipt(Long orderId, UploadReceiptRequest request, MultipartFile image, Long userId);
     void markDelivered(Long orderId, Long userId);
     void confirmReceived(Long orderId, Long userId);
     void processAutoGroup();

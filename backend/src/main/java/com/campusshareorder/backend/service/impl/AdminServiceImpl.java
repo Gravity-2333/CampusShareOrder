@@ -233,7 +233,7 @@ public class AdminServiceImpl implements AdminService {
         order.setStatus("CANCELED");
         order.setCancelReason(reason);
         groupOrderMapper.updateById(order);
-        refundActiveMembers(orderId, "管理员取消订单退款");
+        refundActiveMembers(orderId, "管理员取消订单全额退款", "ADMIN", adminId);
         insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN", reason);
         notifyOrderMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
                 "管理员已取消该订单，系统会按规则处理退款。");
@@ -299,7 +299,7 @@ public class AdminServiceImpl implements AdminService {
             order.setStatus("CANCELED");
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
-            refundActiveMembers(order.getId(), "投诉处理取消订单退款");
+            refundActiveMembers(order.getId(), "投诉处理取消订单全额退款", "ADMIN", adminId);
         }
 
         applyComplaintCreditPenalty(complaint);
@@ -361,12 +361,90 @@ public class AdminServiceImpl implements AdminService {
             vo.setCreatedAt(record.getCreatedAt());
             UserAccount user = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
             vo.setUserNickname(user == null ? "" : user.getNickname());
+            vo.setReceiverName("SETTLE_TO_CREATOR".equals(record.getType()) && user != null
+                    ? user.getNickname()
+                    : "");
+            vo.setOperatorName(resolveCapitalOperator(record));
             GroupOrder order = record.getGroupOrderId() == null ? null : groupOrderMapper.selectById(record.getGroupOrderId());
             vo.setOrderNo(order == null ? "" : order.getOrderNo());
             return vo;
         }).collect(Collectors.toList());
 
         return new PageVO<>(list, capitalPage.getTotal(), capitalPage.getCurrent(), capitalPage.getSize(), capitalPage.getPages());
+    }
+
+    private String resolveCapitalOperator(CapitalRecord record) {
+        if ("USER".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            UserAccount operator = userAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "用户" : operator.getNickname();
+        }
+        if ("ADMIN".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            AdminAccount operator = adminAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "管理员" : operator.getUsername();
+        }
+        if (record.getOperatorType() == null) {
+            UserAccount legacyUser = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
+            if ("PAY".equals(record.getType()) || "REFUND_EXIT".equals(record.getType())) {
+                return legacyUser == null ? "用户" : legacyUser.getNickname();
+            }
+        }
+        return "系统";
+    }
+
+    private String normalizeOperatorType(String operatorType) {
+        if ("USER".equals(operatorType) || "ADMIN".equals(operatorType)) {
+            return operatorType;
+        }
+        return "SYSTEM";
+    }
+
+    private void refundActiveMembers(Long orderId, String remark, String operatorType, Long operatorId) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
+        );
+        for (GroupOrderMember member : members) {
+            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
+                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+                member.setRefundAmountTotal(refunded.add(netRefund));
+                member.setPayStatus("REFUNDED");
+                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
+                        member.getId(), "REFUND_CANCEL", netRefund, remark, operatorType, operatorId);
+            }
+            if ("ACTIVE".equals(member.getJoinStatus())) {
+                member.setJoinStatus("CANCELED");
+            }
+            groupOrderMemberMapper.updateById(member);
+        }
+    }
+
+    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
+                                     String type, BigDecimal amount, String remark,
+                                     String operatorType, Long operatorId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        Long existingCount = capitalRecordMapper.selectCount(
+                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
+        );
+        if (existingCount != null && existingCount > 0) {
+            return;
+        }
+
+        CapitalRecord record = new CapitalRecord();
+        record.setBizNo(bizNo);
+        record.setUserId(userId);
+        record.setGroupOrderId(orderId);
+        record.setMemberId(memberId);
+        record.setType(type);
+        record.setAmount(amount);
+        record.setStatus("SUCCESS");
+        record.setRemark(remark);
+        record.setOperatorType(normalizeOperatorType(operatorType));
+        record.setOperatorId(operatorId);
+        record.setCreatedAt(LocalDateTime.now());
+        capitalRecordMapper.insert(record);
     }
 
     @Override
@@ -481,52 +559,6 @@ public class AdminServiceImpl implements AdminService {
         }
 
         return vo;
-    }
-
-    private void refundActiveMembers(Long orderId, String remark) {
-        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
-                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
-        );
-        for (GroupOrderMember member : members) {
-            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
-                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
-                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
-                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
-                member.setRefundAmountTotal(refunded.add(netRefund));
-                member.setPayStatus("REFUNDED");
-                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
-                        member.getId(), "REFUND_CANCEL", netRefund, remark);
-            }
-            if ("ACTIVE".equals(member.getJoinStatus())) {
-                member.setJoinStatus("CANCELED");
-            }
-            groupOrderMemberMapper.updateById(member);
-        }
-    }
-
-    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
-                                     String type, BigDecimal amount, String remark) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
-        }
-        Long existingCount = capitalRecordMapper.selectCount(
-                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
-        );
-        if (existingCount != null && existingCount > 0) {
-            return;
-        }
-
-        CapitalRecord record = new CapitalRecord();
-        record.setBizNo(bizNo);
-        record.setUserId(userId);
-        record.setGroupOrderId(orderId);
-        record.setMemberId(memberId);
-        record.setType(type);
-        record.setAmount(amount);
-        record.setStatus("SUCCESS");
-        record.setRemark(remark);
-        record.setCreatedAt(LocalDateTime.now());
-        capitalRecordMapper.insert(record);
     }
 
     private void applyComplaintCreditPenalty(Complaint complaint) {

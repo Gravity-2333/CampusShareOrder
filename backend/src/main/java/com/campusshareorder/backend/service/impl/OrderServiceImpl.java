@@ -32,6 +32,7 @@ import com.campusshareorder.backend.mapper.OperationLogMapper;
 import com.campusshareorder.backend.mapper.OrderReceiptMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
+import com.campusshareorder.backend.service.ReceiptStorageService;
 import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.ActionFlagsVO;
 import com.campusshareorder.backend.vo.order.ComplaintInfoVO;
@@ -49,6 +50,7 @@ import com.campusshareorder.backend.vo.order.TimelineItemVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -71,6 +73,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private final CreditChangeRecordMapper creditChangeRecordMapper;
     private final NotificationMapper notificationMapper;
     private final OperationLogMapper operationLogMapper;
+    private final ReceiptStorageService receiptStorageService;
 
     @Override
     @Transactional
@@ -133,7 +136,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Override
     public PageVO<OrderListItemVO> getOrderList(OrderQueryRequest request) {
         Page<GroupOrder> page = new Page<>(request.getPage(), request.getPageSize());
-        LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<GroupOrder> wrapper = new LambdaQueryWrapper<GroupOrder>()
+                .ne(GroupOrder::getStatus, "CANCELED");
 
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
             wrapper.and(item -> item.like(GroupOrder::getProductName, request.getKeyword())
@@ -193,7 +197,10 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         UserAccount creator = userAccountMapper.selectById(order.getCreatorUserId());
         detailVO.setInitiatorInfo(buildInitiatorInfo(creator));
 
-        List<OrderMemberVO> memberVOList = members.stream().map(this::buildMemberVO).collect(Collectors.toList());
+        List<OrderMemberVO> memberVOList = members.stream()
+                .filter(member -> "ACTIVE".equals(member.getJoinStatus()))
+                .map(this::buildMemberVO)
+                .collect(Collectors.toList());
         detailVO.setMemberList(memberVOList);
 
         GroupOrderMember currentMember = members.stream()
@@ -267,7 +274,28 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                         .eq(GroupOrderMember::getUserId, userId)
         );
         if (existingMember != null) {
-            throw new BusinessException(ErrorCode.ORDER_ALREADY_JOINED);
+            if ("ACTIVE".equals(existingMember.getJoinStatus())) {
+                throw new BusinessException(ErrorCode.ORDER_ALREADY_JOINED);
+            }
+            if (!List.of("EXITED", "REFUNDED").contains(existingMember.getJoinStatus())) {
+                throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "当前成员状态不允许重新加入");
+            }
+
+            existingMember.setRemark(request == null ? null : request.getRemark());
+            existingMember.setJoinStatus("ACTIVE");
+            existingMember.setPayStatus("UNPAID");
+            existingMember.setPayAmount(order.getEstimatedPerAmount());
+            existingMember.setPaidAt(null);
+            existingMember.setRefundAmountTotal(BigDecimal.ZERO);
+            existingMember.setReceiveStatus("NOT_READY");
+            existingMember.setReceivedAt(null);
+            groupOrderMemberMapper.updateById(existingMember);
+
+            order.setCurrentMemberCount(order.getCurrentMemberCount() + 1);
+            groupOrderMapper.updateById(order);
+            insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_REJOINED",
+                    request == null ? null : request.getRemark());
+            return;
         }
 
         GroupOrderMember member = new GroupOrderMember();
@@ -307,8 +335,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setPayStatus("PAID");
         member.setPaidAt(LocalDateTime.now());
         groupOrderMemberMapper.updateById(member);
-        insertCapitalRecord("PAY-M" + member.getId(), userId, orderId, member.getId(),
-                "PAY", member.getPayAmount(), "成员支付拼单预估金额");
+        insertCapitalRecord(generateCapitalBizNo("PAY"), userId, orderId, member.getId(),
+                "PAY", member.getPayAmount(), "成员支付拼单预估金额", "USER", userId);
         insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_PAID", null);
         tryGroupOrder(order);
     }
@@ -336,8 +364,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             member.setRefundAmountTotal(refunded.add(netRefund));
             member.setPayStatus("REFUNDED");
             member.setJoinStatus("REFUNDED");
-            insertCapitalRecord("RFE-M" + member.getId(), userId, orderId, member.getId(),
-                    "REFUND_EXIT", netRefund, "成员退出拼单退款");
+            insertCapitalRecord(generateCapitalBizNo("RFE"), userId, orderId, member.getId(),
+                    "REFUND_EXIT", netRefund, "成员退出拼单全额退款", "USER", userId);
         } else {
             member.setJoinStatus("EXITED");
         }
@@ -349,13 +377,48 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
 
     @Override
     @Transactional
-    public void uploadReceipt(Long orderId, UploadReceiptRequest request, Long userId) {
+    public void cancelOrder(Long orderId, Long userId) {
+        GroupOrder order = requireOrder(orderId);
+        if (!"OPEN".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有拼单中的订单才能取消");
+        }
+        if (!Objects.equals(order.getCreatorUserId(), userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以取消拼单");
+        }
+
+        List<GroupOrderMember> activeMembers = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>()
+                        .eq(GroupOrderMember::getGroupOrderId, orderId)
+                        .eq(GroupOrderMember::getJoinStatus, "ACTIVE")
+        );
+        boolean hasParticipant = activeMembers.stream()
+                .anyMatch(member -> !Boolean.TRUE.equals(member.getIsCreator()));
+        if (hasParticipant) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "已有参与者加入，不能取消拼单");
+        }
+
+        cancelActiveMembers(orderId, "USER", userId, "发起人取消拼单全额退款");
+        order.setStatus("CANCELED");
+        order.setCancelReason("CREATOR_CANCELED");
+        groupOrderMapper.updateById(order);
+        insertOperationLog("USER", userId, "ORDER", orderId, "ORDER_CANCELED_BY_CREATOR", null);
+        notifyOrderMembers(orderId, "ORDER_CANCELED", "拼单已取消",
+                "发起人已取消拼单，已支付金额已原路退款。", true);
+    }
+
+    @Override
+    @Transactional
+    public void uploadReceipt(Long orderId, UploadReceiptRequest request, MultipartFile image, Long userId) {
         GroupOrder order = requireOrder(orderId);
         if (!"GROUPED".equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "只有已成团订单才能上传凭证");
         }
         if (!Objects.equals(order.getCreatorUserId(), userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "只有发起人可以上传凭证");
+        }
+        if (order.getReceiptUploadDeadlineAt() == null
+                || LocalDateTime.now().isAfter(order.getReceiptUploadDeadlineAt())) {
+            throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID, "成团超过30分钟，不能上传凭证");
         }
         if (!request.getExpectedDeliveryEndAt().isAfter(request.getExpectedDeliveryStartAt())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "预计最晚送达时间必须晚于开始送达时间");
@@ -366,11 +429,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (receiptCount != null && receiptCount > 0) {
             throw new BusinessException(ErrorCode.RECEIPT_ALREADY_UPLOADED);
         }
+        String imageUrl = receiptStorageService.store(image);
 
         OrderReceipt receipt = new OrderReceipt();
         receipt.setGroupOrderId(orderId);
         receipt.setUploaderUserId(userId);
-        receipt.setImageUrl(request.getImageUrl());
+        receipt.setImageUrl(imageUrl);
         receipt.setActualTotalAmount(request.getActualTotalAmount());
         receipt.setExpectedDeliveryStartAt(request.getExpectedDeliveryStartAt());
         receipt.setExpectedDeliveryEndAt(request.getExpectedDeliveryEndAt());
@@ -389,7 +453,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         order.setStatus("WAIT_DELIVERY");
         groupOrderMapper.updateById(order);
         refundActualAmountDifference(order, request.getActualTotalAmount());
-        insertOperationLog("USER", userId, "ORDER", orderId, "RECEIPT_UPLOADED", request.getImageUrl());
+        insertOperationLog("USER", userId, "ORDER", orderId, "RECEIPT_UPLOADED", imageUrl);
     }
 
     @Override
@@ -479,7 +543,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             order.setStatus("CANCELED");
             order.setCancelReason("DEADLINE_NOT_GROUPED");
             groupOrderMapper.updateById(order);
-            cancelActiveMembers(order.getId());
+            cancelActiveMembers(order.getId(), "SYSTEM", null, "订单超时取消全额退款");
             insertOperationLog("SYSTEM", null, "ORDER", order.getId(), "ORDER_AUTO_CANCELED", "DEADLINE_NOT_GROUPED");
             notifyOrderMembers(order.getId(), "ORDER_CANCELED", "拼单已自动取消",
                     "订单超时未成团，系统已取消订单并处理退款。", true);
@@ -613,11 +677,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (allReceived) {
             order.setStatus("COMPLETED");
             groupOrderMapper.updateById(order);
-            BigDecimal settleAmount = order.getActualTotalAmount() == null
-                    ? order.getEstimatedTotalAmount()
-                    : order.getActualTotalAmount();
+            BigDecimal settleAmount = activeMembers.stream()
+                    .filter(member -> !Boolean.TRUE.equals(member.getIsCreator()))
+                    .filter(member -> "PAID".equals(member.getPayStatus()))
+                    .map(member -> member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount())
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             insertCapitalRecord("SET-O" + orderId, order.getCreatorUserId(), orderId, null,
-                    "SETTLE_TO_CREATOR", settleAmount, "订单完成结算给发起人");
+                    "SETTLE_TO_CREATOR", settleAmount, "其他参与者初始支付金额打款给发起人",
+                    "SYSTEM", null);
             applyOrderFinishedCreditRewards(activeMembers, orderId);
             insertOperationLog("SYSTEM", null, "ORDER", orderId, "ORDER_COMPLETED", null);
             notifyActiveMembers(orderId, "ORDER_COMPLETED", "订单已完成",
@@ -625,7 +692,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
     }
 
-    private void cancelActiveMembers(Long orderId) {
+    private void cancelActiveMembers(Long orderId, String operatorType, Long operatorId, String remark) {
         List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
                 new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
         );
@@ -637,7 +704,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 member.setRefundAmountTotal(refunded.add(netRefund));
                 member.setPayStatus("REFUNDED");
                 insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
-                        member.getId(), "REFUND_CANCEL", netRefund, "订单取消净退款");
+                        member.getId(), "REFUND_CANCEL", netRefund, remark, operatorType, operatorId);
             }
             if ("ACTIVE".equals(member.getJoinStatus())) {
                 member.setJoinStatus("CANCELED");
@@ -677,12 +744,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             member.setRefundAmountTotal(refunded.add(payableDiff));
             groupOrderMemberMapper.updateById(member);
             insertCapitalRecord("RFD-M" + member.getId(), member.getUserId(),
-                    order.getId(), member.getId(), "REFUND_DIFF", payableDiff, "实际金额低于预估金额差额退款");
+                    order.getId(), member.getId(), "REFUND_DIFF", payableDiff,
+                    "实际金额低于预估金额差额退款", "SYSTEM", null);
         }
     }
 
     private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
-                                     String type, BigDecimal amount, String remark) {
+                                     String type, BigDecimal amount, String remark,
+                                     String operatorType, Long operatorId) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             return;
         }
@@ -702,8 +771,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         record.setAmount(amount);
         record.setStatus("SUCCESS");
         record.setRemark(remark);
+        record.setOperatorType(operatorType);
+        record.setOperatorId(operatorId);
         record.setCreatedAt(LocalDateTime.now());
         capitalRecordMapper.insert(record);
+    }
+
+    private String generateCapitalBizNo(String prefix) {
+        return prefix + "-" + IdUtil.getSnowflakeNextIdStr();
     }
 
     private void applyOrderFinishedCreditRewards(List<GroupOrderMember> activeMembers, Long orderId) {
@@ -929,7 +1004,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         ActionFlagsVO actionFlags = new ActionFlagsVO();
         boolean hasMyComplaint = complaints.stream().anyMatch(item -> Objects.equals(item.getComplainantUserId(), userId));
         actionFlags.setCanJoin("OPEN".equals(order.getStatus())
-                && currentMember == null
+                && (currentMember == null || List.of("EXITED", "REFUNDED").contains(currentMember.getJoinStatus()))
                 && order.getCurrentMemberCount() < order.getTotalMemberCount());
         actionFlags.setCanPay(currentMember != null
                 && "OPEN".equals(order.getStatus())
@@ -940,7 +1015,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 && "ACTIVE".equals(currentMember.getJoinStatus())
                 && !Boolean.TRUE.equals(currentMember.getIsCreator())
                 && List.of("UNPAID", "PAID").contains(currentMember.getPayStatus()));
-        actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
+        actionFlags.setCanCancel("OPEN".equals(order.getStatus())
+                && Objects.equals(order.getCreatorUserId(), userId)
+                && order.getCurrentMemberCount() != null
+                && order.getCurrentMemberCount() == 1);
+        actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus())
+                && Objects.equals(order.getCreatorUserId(), userId)
+                && order.getReceiptUploadDeadlineAt() != null
+                && !LocalDateTime.now().isAfter(order.getReceiptUploadDeadlineAt()));
         actionFlags.setCanMarkDelivered("WAIT_DELIVERY".equals(order.getStatus()) && Objects.equals(order.getCreatorUserId(), userId));
         actionFlags.setCanConfirmReceived(currentMember != null
                 && "WAIT_RECEIVE".equals(order.getStatus())

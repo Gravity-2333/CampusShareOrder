@@ -59,7 +59,7 @@ export const capitalRecordTypeTextMap = {
   REFUND_CANCEL: '取消退款',
   REFUND_DIFF: '差额退款',
   REFUND_EXIT: '退出退款',
-  SETTLE_TO_CREATOR: '发起人结算',
+  SETTLE_TO_CREATOR: '发起人打款',
 }
 
 export const creditReasonTypeTextMap = {

@@ -20,5 +20,7 @@ public class CapitalRecord {
     private BigDecimal amount;
     private String status;
     private String remark;
+    private String operatorType;
+    private Long operatorId;
     private LocalDateTime createdAt;
 }

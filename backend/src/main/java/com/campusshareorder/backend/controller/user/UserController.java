@@ -10,8 +10,14 @@ import com.campusshareorder.backend.dto.user.UpdateProfileRequest;
 import com.campusshareorder.backend.dto.user.UserCreditQueryRequest;
 import com.campusshareorder.backend.dto.user.VerifyStudentRequest;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
+import com.campusshareorder.backend.entity.CapitalRecord;
+import com.campusshareorder.backend.entity.AdminAccount;
+import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.UserAccount;
+import com.campusshareorder.backend.mapper.CapitalRecordMapper;
+import com.campusshareorder.backend.mapper.AdminAccountMapper;
 import com.campusshareorder.backend.mapper.CreditChangeRecordMapper;
+import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.UserAccountMapper;
 import com.campusshareorder.backend.service.OrderService;
 import com.campusshareorder.backend.utils.SecurityUtils;
@@ -19,6 +25,7 @@ import com.campusshareorder.backend.vo.common.PageVO;
 import com.campusshareorder.backend.vo.order.MyOrderListItemVO;
 import com.campusshareorder.backend.vo.user.UserCreditItemVO;
 import com.campusshareorder.backend.vo.user.UserCreditVO;
+import com.campusshareorder.backend.vo.user.UserCapitalRecordVO;
 import com.campusshareorder.backend.vo.user.UserProfileVO;
 import com.campusshareorder.backend.vo.user.VerifyStudentVO;
 import jakarta.validation.Valid;
@@ -40,6 +47,9 @@ public class UserController {
     private final OrderService orderService;
     private final UserAccountMapper userAccountMapper;
     private final CreditChangeRecordMapper creditChangeRecordMapper;
+    private final CapitalRecordMapper capitalRecordMapper;
+    private final GroupOrderMapper groupOrderMapper;
+    private final AdminAccountMapper adminAccountMapper;
 
     @GetMapping("/my-orders")
     public ApiResponse<PageVO<MyOrderListItemVO>> getMyOrders(MyOrderQueryRequest request) {
@@ -142,11 +152,76 @@ public class UserController {
         return ApiResponse.success(creditVO);
     }
 
+    @GetMapping("/capital-records")
+    public ApiResponse<PageVO<UserCapitalRecordVO>> getCapitalRecords(
+            Integer page,
+            Integer pageSize,
+            String type
+    ) {
+        Long userId = SecurityUtils.getRequiredUserId();
+        int normalizedPage = page == null || page < 1 ? 1 : page;
+        int normalizedPageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+
+        LambdaQueryWrapper<CapitalRecord> wrapper = new LambdaQueryWrapper<CapitalRecord>()
+                .eq(CapitalRecord::getUserId, userId);
+        if (type != null && !type.trim().isEmpty()) {
+            wrapper.eq(CapitalRecord::getType, type.trim());
+        }
+        wrapper.orderByDesc(CapitalRecord::getCreatedAt);
+
+        Page<CapitalRecord> recordPage = capitalRecordMapper.selectPage(
+                new Page<>(normalizedPage, normalizedPageSize),
+                wrapper
+        );
+        UserAccount user = requireUser(userId);
+        var records = recordPage.getRecords().stream().map(record -> {
+            UserCapitalRecordVO vo = new UserCapitalRecordVO();
+            vo.setBizNo(record.getBizNo());
+            vo.setOrderId(record.getGroupOrderId());
+            vo.setType(record.getType());
+            vo.setAmount(record.getAmount());
+            vo.setStatus(record.getStatus());
+            vo.setRemark(record.getRemark());
+            vo.setCreatedAt(record.getCreatedAt());
+            vo.setOperatorName(resolveCapitalOperator(record, user));
+            vo.setReceiverName("SETTLE_TO_CREATOR".equals(record.getType()) ? user.getNickname() : "");
+            GroupOrder order = record.getGroupOrderId() == null
+                    ? null
+                    : groupOrderMapper.selectById(record.getGroupOrderId());
+            vo.setOrderNo(order == null ? "" : order.getOrderNo());
+            return vo;
+        }).collect(Collectors.toList());
+
+        return ApiResponse.success(new PageVO<>(
+                records,
+                recordPage.getTotal(),
+                recordPage.getCurrent(),
+                recordPage.getSize(),
+                recordPage.getPages()
+        ));
+    }
+
     private UserAccount requireUser(Long userId) {
         UserAccount user = userAccountMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
         }
         return user;
+    }
+
+    private String resolveCapitalOperator(CapitalRecord record, UserAccount user) {
+        if ("USER".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            UserAccount operator = userAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "用户" : operator.getNickname();
+        }
+        if ("ADMIN".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            AdminAccount operator = adminAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "管理员" : operator.getUsername();
+        }
+        if (record.getOperatorType() == null
+                && ("PAY".equals(record.getType()) || "REFUND_EXIT".equals(record.getType()))) {
+            return user.getNickname();
+        }
+        return "系统";
     }
 }

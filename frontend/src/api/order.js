@@ -13,6 +13,8 @@ export const payOrder = (orderId) => provider.order.payOrder(orderId)
 
 export const exitOrder = (orderId) => provider.order.exitOrder(orderId)
 
+export const cancelOrder = (orderId) => provider.order.cancelOrder(orderId)
+
 export const uploadReceipt = (orderId, payload) => provider.order.uploadReceipt(orderId, payload)
 
 export const markDelivered = (orderId) => provider.order.markDelivered(orderId)

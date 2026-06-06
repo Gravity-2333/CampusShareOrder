@@ -217,6 +217,29 @@ class OrderServiceImplTest {
     }
 
     @Test
+    void createOrderTrimsTextFieldsBeforePersisting() {
+        UserAccount user = user(101L, 80);
+        user.setIsVerified(true);
+        when(userAccountMapper.selectById(101L)).thenReturn(user);
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setProductName("  测试拼单  ");
+        request.setProductDesc("  测试描述  ");
+        request.setTotalMemberCount(2);
+        request.setEstimatedTotalAmount(new BigDecimal("20.00"));
+        request.setPickupPoint("  图书馆门口  ");
+        request.setDeadlineAt(LocalDateTime.now().plusHours(2).withNano(0).toString().replace('T', ' '));
+
+        orderService.createOrder(request, 101L);
+
+        ArgumentCaptor<GroupOrder> orderCaptor = ArgumentCaptor.forClass(GroupOrder.class);
+        verify(groupOrderMapper).insert(orderCaptor.capture());
+        assertThat(orderCaptor.getValue().getProductName()).isEqualTo("测试拼单");
+        assertThat(orderCaptor.getValue().getProductDesc()).isEqualTo("测试描述");
+        assertThat(orderCaptor.getValue().getPickupPoint()).isEqualTo("图书馆门口");
+    }
+
+    @Test
     void uploadReceiptRejectsPastExpectedDeliveryStartTime() {
         GroupOrder order = groupedOrder();
         order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(20));

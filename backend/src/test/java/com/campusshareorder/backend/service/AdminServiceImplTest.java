@@ -119,6 +119,34 @@ class AdminServiceImplTest {
     }
 
     @Test
+    void getComplaintDetailIncludesComplainantAndAccusedUserInfo() {
+        Complaint complaint = complaint("PENDING");
+        GroupOrder order = new GroupOrder();
+        order.setId(10L);
+        order.setOrderNo("ORD001");
+        order.setProductName("测试商品");
+        UserAccount complainant = new UserAccount();
+        complainant.setId(101L);
+        complainant.setNickname("投诉用户");
+        UserAccount accused = new UserAccount();
+        accused.setId(100L);
+        accused.setNickname("被投诉用户");
+
+        when(complaintMapper.selectById(1L)).thenReturn(complaint);
+        when(groupOrderMapper.selectById(10L)).thenReturn(order);
+        when(userAccountMapper.selectById(101L)).thenReturn(complainant);
+        when(userAccountMapper.selectById(100L)).thenReturn(accused);
+
+        var detail = adminService.getComplaintDetail(1L);
+
+        assertThat(detail.getComplainantUserId()).isEqualTo(101L);
+        assertThat(detail.getComplainantNickname()).isEqualTo("投诉用户");
+        assertThat(detail.getAccusedUserId()).isEqualTo(100L);
+        assertThat(detail.getAccusedNickname()).isEqualTo("被投诉用户");
+        assertThat(detail.getOrderNo()).isEqualTo("ORD001");
+    }
+
+    @Test
     void handleComplaintCancelsOrderRefundsAndAppliesCreditPenalty() {
         Complaint complaint = complaint("PENDING");
         GroupOrder order = new GroupOrder();

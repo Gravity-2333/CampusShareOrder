@@ -129,7 +129,9 @@ public class AdminServiceImpl implements AdminService {
         detail.setCreatedAt(user.getCreatedAt());
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CreditChangeRecord::getUserId, userId).orderByDesc(CreditChangeRecord::getCreatedAt);
+        wrapper.eq(CreditChangeRecord::getUserId, userId)
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
         Map<Long, Integer> scoreAfterRecordMap = buildScoreAfterRecordMap(user);
         List<AdminCreditRecordVO> records = creditChangeRecordMapper.selectList(wrapper).stream().map(record -> {
             AdminCreditRecordVO vo = new AdminCreditRecordVO();
@@ -150,7 +152,8 @@ public class AdminServiceImpl implements AdminService {
     private Map<Long, Integer> buildScoreAfterRecordMap(UserAccount user) {
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, user.getId())
-                .orderByDesc(CreditChangeRecord::getCreatedAt);
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
         List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
 
         Map<Long, Integer> scoreAfterRecordMap = new HashMap<>();
@@ -330,6 +333,7 @@ public class AdminServiceImpl implements AdminService {
                 ? null
                 : userAccountMapper.selectById(complaint.getComplainantUserId());
         detail.setComplainantNickname(complainant == null ? "" : complainant.getNickname());
+        detail.setAccusedUserId(complaint.getAccusedUserId());
         detail.setAccusedNickname(accused == null ? "" : accused.getNickname());
         detail.setType(complaint.getType());
         detail.setContent(complaint.getContent());

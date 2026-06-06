@@ -103,16 +103,20 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 RoundingMode.HALF_UP
         );
 
+        String productName = request.getProductName().trim();
+        String productDesc = request.getProductDesc() == null ? null : request.getProductDesc().trim();
+        String pickupPoint = request.getPickupPoint().trim();
+
         GroupOrder order = new GroupOrder();
         order.setOrderNo(generateOrderNo());
         order.setCreatorUserId(userId);
-        order.setProductName(request.getProductName());
-        order.setProductDesc(request.getProductDesc());
+        order.setProductName(productName);
+        order.setProductDesc(productDesc);
         order.setTotalMemberCount(request.getTotalMemberCount());
         order.setCurrentMemberCount(1);
         order.setEstimatedTotalAmount(request.getEstimatedTotalAmount());
         order.setEstimatedPerAmount(estimatedPerAmount);
-        order.setPickupPoint(request.getPickupPoint());
+        order.setPickupPoint(pickupPoint);
         order.setDeadlineAt(deadlineAt);
         order.setStatus("OPEN");
         order.setComplaintOpened(false);
@@ -129,7 +133,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         creatorMember.setRefundAmountTotal(BigDecimal.ZERO);
         creatorMember.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(creatorMember);
-        insertOperationLog("USER", userId, "ORDER", order.getId(), "ORDER_CREATED", request.getProductName());
+        insertOperationLog("USER", userId, "ORDER", order.getId(), "ORDER_CREATED", productName);
 
         CreateOrderVO vo = new CreateOrderVO();
         vo.setOrderId(order.getId());
@@ -146,12 +150,13 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 .ne(GroupOrder::getStatus, "CANCELED");
 
         if (request.getKeyword() != null && !request.getKeyword().trim().isEmpty()) {
-            wrapper.and(item -> item.like(GroupOrder::getProductName, request.getKeyword())
+            String keyword = request.getKeyword().trim();
+            wrapper.and(item -> item.like(GroupOrder::getProductName, keyword)
                     .or()
-                    .like(GroupOrder::getOrderNo, request.getKeyword()));
+                    .like(GroupOrder::getOrderNo, keyword));
         }
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
-            wrapper.eq(GroupOrder::getStatus, request.getStatus());
+            wrapper.eq(GroupOrder::getStatus, request.getStatus().trim());
         }
         wrapper.orderByDesc(GroupOrder::getCreatedAt);
 

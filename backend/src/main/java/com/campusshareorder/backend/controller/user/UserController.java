@@ -125,7 +125,8 @@ public class UserController {
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, user.getId())
-                .orderByDesc(CreditChangeRecord::getCreatedAt);
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
         Page<CreditChangeRecord> page = creditChangeRecordMapper.selectPage(
                 new Page<>(request.getPage(), request.getPageSize()),
                 wrapper
@@ -159,7 +160,8 @@ public class UserController {
     private Map<Long, Integer> buildScoreAfterRecordMap(UserAccount user) {
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CreditChangeRecord::getUserId, user.getId())
-                .orderByDesc(CreditChangeRecord::getCreatedAt);
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
         List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
 
         Map<Long, Integer> scoreAfterRecordMap = new HashMap<>();

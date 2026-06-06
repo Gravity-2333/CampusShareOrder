@@ -151,6 +151,11 @@ onMounted(loadCredit)
                   </strong>
                 </template>
               </el-table-column>
+              <el-table-column label="变更后分数">
+                <template #default="{ row }">
+                  {{ row.currentScore ?? '--' }}
+                </template>
+              </el-table-column>
               <el-table-column
                 prop="changeReason"
                 label="描述"
@@ -182,6 +187,7 @@ onMounted(loadCredit)
               <ul class="mobile-record-fields">
                 <li><span>类型</span><strong>{{ Number(row.delta) >= 0 ? '加分' : '扣分' }}</strong></li>
                 <li><span>变更</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+                <li><span>变更后分数</span><strong>{{ row.currentScore ?? '--' }}</strong></li>
                 <li><span>原因</span><strong>{{ formatReasonType(row.reasonType) }}</strong></li>
                 <li><span>关联业务</span><strong>{{ formatRelatedBiz(row) }}</strong></li>
               </ul>

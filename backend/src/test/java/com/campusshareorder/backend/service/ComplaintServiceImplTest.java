@@ -18,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -119,5 +120,32 @@ class ComplaintServiceImplTest {
 
         assertThat(detail.getComplainantNickname()).isEqualTo("投诉用户");
         assertThat(detail.getAccusedNickname()).isEqualTo("被投诉用户");
+    }
+
+    @Test
+    void createComplaintUsesExplicitAccusedUser() {
+        GroupOrder order = new GroupOrder();
+        order.setId(1L);
+        order.setCreatorUserId(100L);
+        order.setComplaintOpened(true);
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectCount(any(LambdaQueryWrapper.class)))
+                .thenReturn(1L)
+                .thenReturn(1L);
+        when(complaintMapper.selectCount(any(LambdaQueryWrapper.class))).thenReturn(0L);
+
+        CreateComplaintRequest request = new CreateComplaintRequest();
+        request.setOrderId(1L);
+        request.setAccusedUserId(102L);
+        request.setType("QUALITY");
+        request.setContent("商品质量与约定不一致");
+
+        complaintService.createComplaint(request, 101L);
+
+        ArgumentCaptor<Complaint> captor = ArgumentCaptor.forClass(Complaint.class);
+        verify(complaintMapper).insert(captor.capture());
+        assertThat(captor.getValue().getComplainantUserId()).isEqualTo(101L);
+        assertThat(captor.getValue().getAccusedUserId()).isEqualTo(102L);
+        assertThat(captor.getValue().getStatus()).isEqualTo("PENDING");
     }
 }

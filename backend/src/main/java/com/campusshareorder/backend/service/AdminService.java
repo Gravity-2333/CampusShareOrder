@@ -31,7 +31,7 @@ public interface AdminService {
 
     void cancelOrder(Long orderId, CancelOrderRequest request, Long adminId);
 
-    PageVO<ComplaintListItemVO> getComplaints(String status, Integer page, Integer pageSize);
+    PageVO<ComplaintListItemVO> getComplaints(String keyword, String status, Integer page, Integer pageSize);
 
     AdminComplaintDetailVO getComplaintDetail(Long complaintId);
 

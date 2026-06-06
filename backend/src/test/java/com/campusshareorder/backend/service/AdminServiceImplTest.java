@@ -11,6 +11,7 @@ import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
 import com.campusshareorder.backend.entity.GroupOrder;
 import com.campusshareorder.backend.entity.GroupOrderMember;
+import com.campusshareorder.backend.entity.OperationLog;
 import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.AdminAccountMapper;
 import com.campusshareorder.backend.mapper.CapitalRecordMapper;
@@ -142,6 +143,7 @@ class AdminServiceImplTest {
         when(userAccountMapper.selectById(100L)).thenReturn(accused);
 
         HandleComplaintRequest request = new HandleComplaintRequest();
+        request.setResult("CONFIRMED");
         request.setHandleResult("投诉成立，订单取消");
         adminService.handleComplaint(1L, request, 900L);
 
@@ -160,6 +162,35 @@ class AdminServiceImplTest {
         verify(creditChangeRecordMapper).insert(creditCaptor.capture());
         assertThat(creditCaptor.getValue().getReasonType()).isEqualTo("COMPLAINT_CONFIRMED");
         assertThat(creditCaptor.getValue().getChangeValue()).isEqualTo(-10);
+    }
+
+    @Test
+    void handleComplaintRejectedDoesNotCancelOrderRefundOrApplyCreditPenalty() {
+        Complaint complaint = complaint("PENDING");
+        GroupOrder order = new GroupOrder();
+        order.setId(10L);
+        order.setStatus("WAIT_DELIVERY");
+
+        when(complaintMapper.selectById(1L)).thenReturn(complaint);
+        when(groupOrderMapper.selectById(10L)).thenReturn(order);
+
+        HandleComplaintRequest request = new HandleComplaintRequest();
+        request.setResult("REJECTED");
+        request.setHandleResult("证据不足，投诉驳回");
+        adminService.handleComplaint(1L, request, 900L);
+
+        assertThat(complaint.getStatus()).isEqualTo("PROCESSED");
+        assertThat(complaint.getHandleResult()).isEqualTo("证据不足，投诉驳回");
+        assertThat(order.getStatus()).isEqualTo("WAIT_DELIVERY");
+
+        verify(groupOrderMapper, never()).updateById(any(GroupOrder.class));
+        verify(groupOrderMemberMapper, never()).selectList(any(LambdaQueryWrapper.class));
+        verify(capitalRecordMapper, never()).insert(any(CapitalRecord.class));
+        verify(creditChangeRecordMapper, never()).insert(any(CreditChangeRecord.class));
+
+        ArgumentCaptor<OperationLog> logCaptor = ArgumentCaptor.forClass(OperationLog.class);
+        verify(operationLogMapper).insert(logCaptor.capture());
+        assertThat(logCaptor.getValue().getAction()).isEqualTo("COMPLAINT_REJECTED");
     }
 
     private Complaint complaint(String status) {

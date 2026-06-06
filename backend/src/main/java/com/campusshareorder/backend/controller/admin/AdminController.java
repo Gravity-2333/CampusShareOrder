@@ -98,12 +98,13 @@ public class AdminController {
 
     @GetMapping("/complaints")
     public ApiResponse<PageVO<ComplaintListItemVO>> getComplaints(
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "") String status,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize,
             HttpServletRequest request) {
         requireAdmin(request);
-        return ApiResponse.success(adminService.getComplaints(status, page, pageSize));
+        return ApiResponse.success(adminService.getComplaints(keyword, status, page, pageSize));
     }
 
     @GetMapping("/complaints/{complaintId}")

@@ -208,7 +208,10 @@ onMounted(loadRecords)
               prop="orderNo"
               label="关联拼单"
             />
-            <el-table-column prop="orderId" label="拼单 ID" />
+            <el-table-column
+              prop="orderId"
+              label="拼单 ID"
+            />
             <el-table-column
               prop="operatorName"
               label="操作人"

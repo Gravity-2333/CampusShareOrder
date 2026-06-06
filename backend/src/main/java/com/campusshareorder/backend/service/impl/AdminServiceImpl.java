@@ -76,7 +76,7 @@ public class AdminServiceImpl implements AdminService {
         AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
         overview.setMetrics(metrics);
         overview.setRecentOrders(getOrders("", "", 1, 5).getList());
-        overview.setRecentComplaints(getComplaints("", 1, 5).getList());
+        overview.setRecentComplaints(getComplaints("", "", 1, 5).getList());
         overview.setRecentLogs(getOperationLogs("", "", "", "", 1, 5).getList());
         return overview;
     }
@@ -240,9 +240,34 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public PageVO<ComplaintListItemVO> getComplaints(String status, Integer page, Integer pageSize) {
+    public PageVO<ComplaintListItemVO> getComplaints(String keyword, String status, Integer page, Integer pageSize) {
         Page<Complaint> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<Complaint> wrapper = new LambdaQueryWrapper<>();
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String trimmedKeyword = keyword.trim();
+            List<Long> orderIds = groupOrderMapper.selectList(new LambdaQueryWrapper<GroupOrder>()
+                    .like(GroupOrder::getOrderNo, trimmedKeyword)
+                    .or().like(GroupOrder::getProductName, trimmedKeyword))
+                    .stream().map(GroupOrder::getId).collect(Collectors.toList());
+            List<Long> userIds = userAccountMapper.selectList(new LambdaQueryWrapper<UserAccount>()
+                    .like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword))
+                    .stream().map(UserAccount::getId).collect(Collectors.toList());
+
+            wrapper.and(w -> {
+                w.like(Complaint::getComplaintNo, trimmedKeyword)
+                        .or().like(Complaint::getContent, trimmedKeyword)
+                        .or().like(Complaint::getType, trimmedKeyword);
+                if (!orderIds.isEmpty()) {
+                    w.or().in(Complaint::getGroupOrderId, orderIds);
+                }
+                if (!userIds.isEmpty()) {
+                    w.or().in(Complaint::getComplainantUserId, userIds)
+                            .or().in(Complaint::getAccusedUserId, userIds);
+                }
+            });
+        }
 
         if (status != null && !status.trim().isEmpty()) {
             wrapper.eq(Complaint::getStatus, status.trim());
@@ -291,6 +316,8 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ErrorCode.COMPLAINT_ALREADY_PROCESSED);
         }
         String handleResult = requireText(request == null ? null : request.getHandleResult(), "处理结果不能为空");
+        String result = request == null ? "CONFIRMED" : request.getResult();
+        boolean confirmed = "CONFIRMED".equals(result);
 
         complaint.setStatus("PROCESSED");
         complaint.setHandleResult(handleResult);
@@ -299,19 +326,27 @@ public class AdminServiceImpl implements AdminService {
         complaintMapper.updateById(complaint);
 
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
-        if (order != null && !"COMPLETED".equals(order.getStatus()) && !"CANCELED".equals(order.getStatus())) {
+        if (confirmed && order != null && !"COMPLETED".equals(order.getStatus()) && !"CANCELED".equals(order.getStatus())) {
             order.setStatus("CANCELED");
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
             refundActiveMembers(order.getId(), "投诉处理取消订单全额退款", "ADMIN", adminId);
         }
 
-        applyComplaintCreditPenalty(complaint);
-        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED", handleResult);
-        insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED", "投诉已处理",
-                "你的投诉已由管理员处理，请查看处理结果。", complaint.getGroupOrderId(), complaintId);
-        insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED", "投诉处理完成",
-                "与你相关的投诉已处理，请关注订单和信用分变化。", complaint.getGroupOrderId(), complaintId);
+        if (confirmed) {
+            applyComplaintCreditPenalty(complaint);
+        }
+
+        String action = confirmed ? "COMPLAINT_CONFIRMED" : "COMPLAINT_REJECTED";
+        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, action, handleResult);
+        insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED",
+                confirmed ? "投诉已成立" : "投诉已驳回",
+                confirmed ? "你的投诉已由管理员判定成立，请查看处理结果。" : "你的投诉已由管理员驳回，请查看处理结果。",
+                complaint.getGroupOrderId(), complaintId);
+        insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED",
+                confirmed ? "投诉成立" : "投诉已驳回",
+                confirmed ? "与你相关的投诉已判定成立，请关注订单和信用分变化。" : "与你相关的投诉已被驳回，本次不会影响信用分。",
+                complaint.getGroupOrderId(), complaintId);
     }
 
     @Override

@@ -111,6 +111,10 @@ onMounted(() => {
               <strong>{{ complaint.complainantNickname || '--' }}</strong>
             </li>
             <li>
+              <span>被投诉人</span>
+              <strong>{{ complaint.accusedNickname || '--' }}</strong>
+            </li>
+            <li>
               <span>创建时间</span>
               <strong>{{ formatDateTime(complaint.createdAt) }}</strong>
             </li>

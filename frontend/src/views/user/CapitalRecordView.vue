@@ -84,11 +84,26 @@ onMounted(loadRecords)
           clearable
           @change="submitFilter"
         >
-          <el-option label="支付" value="PAY" />
-          <el-option label="取消退款" value="REFUND_CANCEL" />
-          <el-option label="退出退款" value="REFUND_EXIT" />
-          <el-option label="差额退款" value="REFUND_DIFF" />
-          <el-option label="发起人打款" value="SETTLE_TO_CREATOR" />
+          <el-option
+            label="支付"
+            value="PAY"
+          />
+          <el-option
+            label="取消退款"
+            value="REFUND_CANCEL"
+          />
+          <el-option
+            label="退出退款"
+            value="REFUND_EXIT"
+          />
+          <el-option
+            label="差额退款"
+            value="REFUND_DIFF"
+          />
+          <el-option
+            label="发起人打款"
+            value="SETTLE_TO_CREATOR"
+          />
         </el-select>
       </div>
 
@@ -102,26 +117,41 @@ onMounted(loadRecords)
             :data="recordsPage.list"
             stripe
           >
-            <el-table-column prop="bizNo" label="流水号" />
+            <el-table-column
+              prop="bizNo"
+              label="流水号"
+            />
             <el-table-column label="类型">
               <template #default="{ row }">
                 {{ formatCapitalRecordType(row.type) }}
               </template>
             </el-table-column>
-            <el-table-column prop="orderNo" label="关联拼单" />
-            <el-table-column prop="orderId" label="拼单 ID" />
+            <el-table-column
+              prop="orderNo"
+              label="关联拼单"
+            />
+            <el-table-column
+              prop="orderId"
+              label="拼单 ID"
+            />
             <el-table-column label="金额">
               <template #default="{ row }">
                 {{ formatCurrency(row.amount) }}
               </template>
             </el-table-column>
-            <el-table-column prop="operatorName" label="操作人" />
+            <el-table-column
+              prop="operatorName"
+              label="操作人"
+            />
             <el-table-column label="收款人">
               <template #default="{ row }">
                 {{ row.receiverName || '--' }}
               </template>
             </el-table-column>
-            <el-table-column prop="remark" label="原因/备注" />
+            <el-table-column
+              prop="remark"
+              label="原因/备注"
+            />
             <el-table-column label="支付/退款时间">
               <template #default="{ row }">
                 {{ formatDateTime(row.createdAt) }}

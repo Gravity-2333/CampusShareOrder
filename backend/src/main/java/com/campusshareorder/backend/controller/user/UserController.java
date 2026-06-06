@@ -37,6 +37,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -128,11 +131,12 @@ public class UserController {
                 wrapper
         );
 
+        Map<Long, Integer> scoreAfterRecordMap = buildScoreAfterRecordMap(user);
         var items = page.getRecords().stream().map(record -> {
             UserCreditItemVO vo = new UserCreditItemVO();
             vo.setRecordId(record.getId());
             vo.setDelta(record.getChangeValue());
-            vo.setCurrentScore(user.getCreditScore());
+            vo.setCurrentScore(scoreAfterRecordMap.getOrDefault(record.getId(), user.getCreditScore()));
             vo.setChangeReason(record.getRemark());
             vo.setReasonType(record.getReasonType());
             vo.setRemark(record.getRemark());
@@ -150,6 +154,23 @@ public class UserController {
         creditVO.setTotal(page.getTotal());
         creditVO.setPages(page.getPages());
         return ApiResponse.success(creditVO);
+    }
+
+    private Map<Long, Integer> buildScoreAfterRecordMap(UserAccount user) {
+        LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CreditChangeRecord::getUserId, user.getId())
+                .orderByDesc(CreditChangeRecord::getCreatedAt);
+        List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
+
+        Map<Long, Integer> scoreAfterRecordMap = new HashMap<>();
+        int runningScore = user.getCreditScore() == null ? 0 : user.getCreditScore();
+        for (CreditChangeRecord record : records) {
+            if (record.getId() != null) {
+                scoreAfterRecordMap.put(record.getId(), runningScore);
+            }
+            runningScore -= record.getChangeValue() == null ? 0 : record.getChangeValue();
+        }
+        return scoreAfterRecordMap;
     }
 
     @GetMapping("/capital-records")

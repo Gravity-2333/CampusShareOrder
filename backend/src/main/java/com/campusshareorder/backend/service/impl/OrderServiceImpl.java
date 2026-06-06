@@ -170,7 +170,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             vo.setProductDesc(order.getProductDesc());
             vo.setTotalMemberCount(order.getTotalMemberCount());
             vo.setCurrentMemberCount(order.getCurrentMemberCount());
-            vo.setRemainingCount(Math.max(order.getTotalMemberCount() - order.getCurrentMemberCount(), 0));
+            vo.setRemainingCount(resolveRemainingCount(order));
             vo.setEstimatedTotalAmount(order.getEstimatedTotalAmount());
             vo.setEstimatedPerAmount(order.getEstimatedPerAmount());
             vo.setPickupPoint(order.getPickupPoint());
@@ -306,7 +306,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             existingMember.setReceivedAt(null);
             groupOrderMemberMapper.updateById(existingMember);
 
-            order.setCurrentMemberCount(order.getCurrentMemberCount() + 1);
+            order.setCurrentMemberCount(safeMemberCount(order.getCurrentMemberCount()) + 1);
             groupOrderMapper.updateById(order);
             insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_REJOINED",
                     request == null ? null : request.getRemark());
@@ -326,7 +326,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         member.setReceiveStatus("NOT_READY");
         groupOrderMemberMapper.insert(member);
 
-        order.setCurrentMemberCount(order.getCurrentMemberCount() + 1);
+        order.setCurrentMemberCount(safeMemberCount(order.getCurrentMemberCount()) + 1);
         groupOrderMapper.updateById(order);
         insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_JOINED", request == null ? null : request.getRemark());
     }
@@ -385,7 +385,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             member.setJoinStatus("EXITED");
         }
         groupOrderMemberMapper.updateById(member);
-        order.setCurrentMemberCount(Math.max(order.getCurrentMemberCount() - 1, 1));
+        order.setCurrentMemberCount(Math.max(safeMemberCount(order.getCurrentMemberCount()) - 1, 1));
         groupOrderMapper.updateById(order);
         insertOperationLog("USER", userId, "ORDER", orderId, "MEMBER_EXITED", null);
     }
@@ -1027,7 +1027,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         boolean hasMyComplaint = complaints.stream().anyMatch(item -> Objects.equals(item.getComplainantUserId(), userId));
         actionFlags.setCanJoin("OPEN".equals(order.getStatus())
                 && (currentMember == null || List.of("EXITED", "REFUNDED").contains(currentMember.getJoinStatus()))
-                && order.getCurrentMemberCount() < order.getTotalMemberCount());
+                && safeMemberCount(order.getCurrentMemberCount()) < safeMemberCount(order.getTotalMemberCount()));
         actionFlags.setCanPay(currentMember != null
                 && "OPEN".equals(order.getStatus())
                 && "ACTIVE".equals(currentMember.getJoinStatus())
@@ -1040,7 +1040,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         actionFlags.setCanCancel("OPEN".equals(order.getStatus())
                 && Objects.equals(order.getCreatorUserId(), userId)
                 && order.getCurrentMemberCount() != null
-                && order.getCurrentMemberCount() == 1);
+                && safeMemberCount(order.getCurrentMemberCount()) == 1);
         actionFlags.setCanUploadReceipt("GROUPED".equals(order.getStatus())
                 && Objects.equals(order.getCreatorUserId(), userId)
                 && order.getReceiptUploadDeadlineAt() != null
@@ -1058,6 +1058,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 && !hasMyComplaint);
         actionFlags.setCanViewReceipt(receipt != null);
         return actionFlags;
+    }
+
+    private int resolveRemainingCount(GroupOrder order) {
+        return Math.max(safeMemberCount(order.getTotalMemberCount()) - safeMemberCount(order.getCurrentMemberCount()), 0);
+    }
+
+    private int safeMemberCount(Integer count) {
+        return count == null ? 0 : Math.max(count, 0);
     }
 
     private List<TimelineItemVO> buildTimeline(GroupOrder order, UserAccount creator, OrderReceipt receipt, List<Complaint> complaints, Long userId) {

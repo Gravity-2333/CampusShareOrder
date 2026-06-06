@@ -1,9 +1,11 @@
 package com.campusshareorder.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.order.CreateOrderRequest;
+import com.campusshareorder.backend.dto.order.OrderQueryRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
@@ -214,6 +216,22 @@ class OrderServiceImplTest {
                 .hasMessageContaining("截止时间格式");
 
         verify(groupOrderMapper, never()).insert(any(GroupOrder.class));
+    }
+
+    @Test
+    void getOrdersClampsNegativeRemainingCountToZero() {
+        GroupOrder order = groupedOrder();
+        order.setTotalMemberCount(2);
+        order.setCurrentMemberCount(5);
+        Page<GroupOrder> orderPage = new Page<>(1, 10);
+        orderPage.setRecords(List.of(order));
+        orderPage.setTotal(1);
+        when(groupOrderMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(orderPage);
+
+        var result = orderService.getOrderList(new OrderQueryRequest());
+
+        assertThat(result.getList()).hasSize(1);
+        assertThat(result.getList().get(0).getRemainingCount()).isZero();
     }
 
     @Test

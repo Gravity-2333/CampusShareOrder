@@ -227,7 +227,7 @@ public class AdminServiceImpl implements AdminService {
             vo.setProductDesc(order.getProductDesc());
             vo.setTotalMemberCount(order.getTotalMemberCount());
             vo.setCurrentMemberCount(order.getCurrentMemberCount());
-            vo.setRemainingCount(order.getTotalMemberCount() - order.getCurrentMemberCount());
+            vo.setRemainingCount(resolveRemainingCount(order));
             vo.setEstimatedTotalAmount(order.getEstimatedTotalAmount());
             vo.setEstimatedPerAmount(order.getEstimatedPerAmount());
             vo.setPickupPoint(order.getPickupPoint());
@@ -811,6 +811,14 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
         }
         return value.trim();
+    }
+
+    private int resolveRemainingCount(GroupOrder order) {
+        return Math.max(safeMemberCount(order.getTotalMemberCount()) - safeMemberCount(order.getCurrentMemberCount()), 0);
+    }
+
+    private int safeMemberCount(Integer count) {
+        return count == null ? 0 : Math.max(count, 0);
     }
 
     private String normalizeOrderStatus(String status) {

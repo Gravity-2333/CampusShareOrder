@@ -77,7 +77,7 @@ const routes = [
       {
         path: '/complaints',
         component: () => import('../views/complaint/MyComplaintView.vue'),
-        meta: { requiresAuth: true, role: 'USER', title: '我的投诉' },
+        meta: { requiresAuth: true, role: 'USER', title: '相关投诉' },
       },
       {
         path: '/complaints/create',

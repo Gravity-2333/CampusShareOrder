@@ -16,7 +16,7 @@ const navItems = computed(() => {
     { label: '拼单大厅', path: '/orders' },
     { label: '发起拼单', path: '/orders/create' },
     { label: '我的拼单', path: '/my-orders' },
-    { label: '我的投诉', path: '/complaints' },
+    { label: '相关投诉', path: '/complaints' },
     { label: '个人资料', path: '/profile' },
     { label: '支付与退款', path: '/capital-records' },
     { label: '信用分', path: '/credit' },

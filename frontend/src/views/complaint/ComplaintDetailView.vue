@@ -23,6 +23,11 @@ const detailErrorText = computed(() =>
     ? '当前未能加载到投诉详情，请返回列表重新选择。'
     : '当前路由中的投诉 ID 无效，请返回我的投诉重新进入详情页。',
 )
+const viewerRoleText = computed(() => {
+  if (complaint.value?.viewerRoleInComplaint === 'COMPLAINANT') return '我发起的投诉'
+  if (complaint.value?.viewerRoleInComplaint === 'ACCUSED') return '与我相关的被投诉记录'
+  return '投诉记录'
+})
 
 // 处理进度时间轴
 const timeline = computed(() => {
@@ -34,7 +39,9 @@ const timeline = computed(() => {
   if (complaint.value.createdAt) {
     events.push({
       title: '投诉已提交',
-      description: '系统已记录投诉信息',
+      description: complaint.value.viewerRoleInComplaint === 'ACCUSED'
+        ? '系统已记录与你相关的投诉信息'
+        : '系统已记录投诉信息',
       time: complaint.value.createdAt,
     })
   }
@@ -92,6 +99,9 @@ onMounted(() => {
               :text="formatComplaintStatus(complaint.status)"
             />
             <h3>投诉单号：{{ complaint.complaintNo }}</h3>
+            <p class="muted-text">
+              {{ viewerRoleText }}
+            </p>
           </div>
         </div>
 
@@ -113,6 +123,10 @@ onMounted(() => {
             <li>
               <span>被投诉人</span>
               <strong>{{ complaint.accusedNickname || '--' }}</strong>
+            </li>
+            <li>
+              <span>当前视角</span>
+              <strong>{{ viewerRoleText }}</strong>
             </li>
             <li>
               <span>创建时间</span>

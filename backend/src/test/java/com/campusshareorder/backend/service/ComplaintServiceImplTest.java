@@ -120,6 +120,39 @@ class ComplaintServiceImplTest {
 
         assertThat(detail.getComplainantNickname()).isEqualTo("投诉用户");
         assertThat(detail.getAccusedNickname()).isEqualTo("被投诉用户");
+        assertThat(detail.getViewerRoleInComplaint()).isEqualTo("COMPLAINANT");
+    }
+
+    @Test
+    void accusedUserCanViewRelatedComplaintDetail() {
+        Complaint complaint = new Complaint();
+        complaint.setId(10L);
+        complaint.setComplaintNo("CMP001");
+        complaint.setGroupOrderId(1L);
+        complaint.setComplainantUserId(101L);
+        complaint.setAccusedUserId(100L);
+        complaint.setType("QUALITY");
+        complaint.setStatus("PENDING");
+
+        when(complaintMapper.selectById(10L)).thenReturn(complaint);
+        when(groupOrderMapper.selectById(1L)).thenReturn(new GroupOrder());
+
+        var detail = complaintService.getComplaintDetail(10L, 100L);
+
+        assertThat(detail.getViewerRoleInComplaint()).isEqualTo("ACCUSED");
+    }
+
+    @Test
+    void unrelatedUserCannotViewComplaintDetail() {
+        Complaint complaint = new Complaint();
+        complaint.setId(10L);
+        complaint.setComplainantUserId(101L);
+        complaint.setAccusedUserId(100L);
+        when(complaintMapper.selectById(10L)).thenReturn(complaint);
+
+        assertThatThrownBy(() -> complaintService.getComplaintDetail(10L, 999L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.FORBIDDEN.getCode()));
     }
 
     @Test

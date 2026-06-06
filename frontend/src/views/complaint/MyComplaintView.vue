@@ -7,7 +7,7 @@ import AppPagination from '../../components/common/AppPagination.vue'
 import EmptyState from '../../components/common/EmptyState.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useComplaintStore } from '../../stores/complaint'
-import { formatComplaintStatus, formatDateTime } from '../../utils/format'
+import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
 
 const router = useRouter()
 const complaintStore = useComplaintStore()
@@ -28,6 +28,12 @@ const handlePageChange = async ({ page, pageSize }) => {
   }
 }
 
+const formatViewerRole = (value) => {
+  if (value === 'COMPLAINANT') return '我发起'
+  if (value === 'ACCUSED') return '投诉我'
+  return '--'
+}
+
 onMounted(loadComplaints)
 </script>
 
@@ -35,7 +41,7 @@ onMounted(loadComplaints)
   <div class="stack-page complaint-list-page">
     <div class="section">
       <div class="section-header">
-        <h3>我的投诉</h3>
+        <h3>相关投诉</h3>
         <div class="page-actions">
           <el-button
             type="primary"
@@ -70,6 +76,27 @@ onMounted(loadComplaints)
             label="商品"
             min-width="120"
           />
+          <el-table-column
+            label="视角"
+            width="100"
+          >
+            <template #default="{ row }">
+              <el-tag
+                size="small"
+                :type="row.viewerRoleInComplaint === 'ACCUSED' ? 'warning' : 'success'"
+              >
+                {{ formatViewerRole(row.viewerRoleInComplaint) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column
+            label="类型"
+            min-width="110"
+          >
+            <template #default="{ row }">
+              {{ formatComplaintType(row.type) }}
+            </template>
+          </el-table-column>
           <el-table-column
             label="状态"
             width="120"
@@ -116,8 +143,8 @@ onMounted(loadComplaints)
 
       <EmptyState
         v-else-if="!complaintStore.myComplaintsLoading"
-        title="暂无投诉"
-        description="订单出现异常时，你可以从订单详情页发起投诉。"
+        title="暂无相关投诉"
+        description="订单出现异常时，你可以从订单详情页发起投诉；与你相关的处理结果也会出现在这里。"
       />
     </div>
   </div>

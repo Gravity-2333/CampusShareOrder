@@ -10,4 +10,8 @@ public class AdminLoginRequest {
 
     @NotBlank(message = "管理员密码不能为空")
     private String password;
+
+    public void setUsername(String username) {
+        this.username = username == null ? null : username.trim();
+    }
 }

@@ -115,6 +115,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
                                 .or()
                                 .eq(Complaint::getAccusedUserId, userId))
                         .orderByDesc(Complaint::getCreatedAt)
+                        .orderByDesc(Complaint::getId)
         );
 
         List<ComplaintListItemVO> list = page.getRecords().stream().map(complaint -> {

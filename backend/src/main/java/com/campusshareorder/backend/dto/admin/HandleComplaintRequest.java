@@ -17,4 +17,12 @@ public class HandleComplaintRequest {
     public String getResult() {
         return result == null || result.isBlank() ? "CONFIRMED" : result.trim();
     }
+
+    public void setResult(String result) {
+        this.result = result == null || result.isBlank() ? "CONFIRMED" : result.trim();
+    }
+
+    public void setHandleResult(String handleResult) {
+        this.handleResult = handleResult == null ? null : handleResult.trim();
+    }
 }

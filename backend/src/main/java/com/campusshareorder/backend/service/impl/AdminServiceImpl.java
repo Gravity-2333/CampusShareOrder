@@ -98,15 +98,17 @@ public class AdminServiceImpl implements AdminService {
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            wrapper.and(w -> w.like(UserAccount::getNickname, keyword)
-                    .or().like(UserAccount::getPhone, keyword));
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword));
         }
 
         if (status != null && !status.trim().isEmpty()) {
-            wrapper.eq(UserAccount::getStatus, status);
+            wrapper.eq(UserAccount::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(UserAccount::getCreatedAt);
+        wrapper.orderByDesc(UserAccount::getCreatedAt)
+                .orderByDesc(UserAccount::getId);
         Page<UserAccount> userPage = userAccountMapper.selectPage(pageRequest, wrapper);
 
         List<AdminUserListItemVO> list = userPage.getRecords().stream().map(this::toAdminUserListItem).collect(Collectors.toList());
@@ -213,7 +215,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(GroupOrder::getStatus, denormalizeOrderStatus(status));
         }
 
-        wrapper.orderByDesc(GroupOrder::getCreatedAt);
+        wrapper.orderByDesc(GroupOrder::getCreatedAt)
+                .orderByDesc(GroupOrder::getId);
         Page<GroupOrder> orderPage = groupOrderMapper.selectPage(pageRequest, wrapper);
 
         List<OrderListItemVO> list = orderPage.getRecords().stream().map(order -> {
@@ -309,7 +312,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(Complaint::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(Complaint::getCreatedAt);
+        wrapper.orderByDesc(Complaint::getCreatedAt)
+                .orderByDesc(Complaint::getId);
         Page<Complaint> complaintPage = complaintMapper.selectPage(pageRequest, wrapper);
 
         List<ComplaintListItemVO> list = complaintPage.getRecords().stream().map(this::toComplaintListItem).collect(Collectors.toList());
@@ -423,7 +427,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(CapitalRecord::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(CapitalRecord::getCreatedAt);
+        wrapper.orderByDesc(CapitalRecord::getCreatedAt)
+                .orderByDesc(CapitalRecord::getId);
         Page<CapitalRecord> capitalPage = capitalRecordMapper.selectPage(pageRequest, wrapper);
 
         List<AdminCapitalRecordVO> list = capitalPage.getRecords().stream().map(record -> {
@@ -590,7 +595,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(OperationLog::getBizType, bizType.trim());
         }
 
-        wrapper.orderByDesc(OperationLog::getCreatedAt);
+        wrapper.orderByDesc(OperationLog::getCreatedAt)
+                .orderByDesc(OperationLog::getId);
         Page<OperationLog> logPage = operationLogMapper.selectPage(pageRequest, wrapper);
 
         List<AdminOperationLogVO> list = logPage.getRecords().stream().map(log -> {

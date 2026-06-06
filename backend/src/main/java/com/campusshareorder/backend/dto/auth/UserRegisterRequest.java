@@ -11,4 +11,12 @@ public class UserRegisterRequest {
     private String password;
     @NotBlank(message = "昵称不能为空")
     private String nickname;
+
+    public void setPhone(String phone) {
+        this.phone = phone == null ? null : phone.trim();
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname == null ? null : nickname.trim();
+    }
 }

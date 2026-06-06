@@ -158,7 +158,8 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         if (request.getStatus() != null && !request.getStatus().trim().isEmpty()) {
             wrapper.eq(GroupOrder::getStatus, request.getStatus().trim());
         }
-        wrapper.orderByDesc(GroupOrder::getCreatedAt);
+        wrapper.orderByDesc(GroupOrder::getCreatedAt)
+                .orderByDesc(GroupOrder::getId);
 
         Page<GroupOrder> orderPage = groupOrderMapper.selectPage(page, wrapper);
         List<OrderListItemVO> list = orderPage.getRecords().stream().map(order -> {
@@ -197,6 +198,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
                 new LambdaQueryWrapper<Complaint>()
                         .eq(Complaint::getGroupOrderId, orderId)
                         .orderByDesc(Complaint::getCreatedAt)
+                        .orderByDesc(Complaint::getId)
         );
         OrderReceipt receipt = orderReceiptMapper.selectOne(
                 new LambdaQueryWrapper<OrderReceipt>().eq(OrderReceipt::getGroupOrderId, orderId)
@@ -241,7 +243,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     public PageVO<MyOrderListItemVO> getMyOrders(MyOrderQueryRequest request, Long userId) {
         Page<GroupOrderMember> page = new Page<>(request.getPage(), request.getPageSize());
         LambdaQueryWrapper<GroupOrderMember> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(GroupOrderMember::getUserId, userId).orderByDesc(GroupOrderMember::getCreatedAt);
+        wrapper.eq(GroupOrderMember::getUserId, userId)
+                .orderByDesc(GroupOrderMember::getCreatedAt)
+                .orderByDesc(GroupOrderMember::getId);
         Page<GroupOrderMember> memberPage = groupOrderMemberMapper.selectPage(page, wrapper);
 
         List<MyOrderListItemVO> list = memberPage.getRecords().stream().map(member -> {

@@ -190,7 +190,8 @@ public class UserController {
         if (type != null && !type.trim().isEmpty()) {
             wrapper.eq(CapitalRecord::getType, type.trim());
         }
-        wrapper.orderByDesc(CapitalRecord::getCreatedAt);
+        wrapper.orderByDesc(CapitalRecord::getCreatedAt)
+                .orderByDesc(CapitalRecord::getId);
 
         Page<CapitalRecord> recordPage = capitalRecordMapper.selectPage(
                 new Page<>(normalizedPage, normalizedPageSize),

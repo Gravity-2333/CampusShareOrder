@@ -9,4 +9,8 @@ public class CancelOrderRequest {
     @NotBlank(message = "取消原因不能为空")
     @Size(max = 255, message = "取消原因长度不能超过255")
     private String reason;
+
+    public void setReason(String reason) {
+        this.reason = reason == null ? null : reason.trim();
+    }
 }

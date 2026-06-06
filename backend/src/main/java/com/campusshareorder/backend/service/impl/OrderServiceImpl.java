@@ -55,6 +55,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -86,7 +87,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
             throw new BusinessException(ErrorCode.USER_NOT_VERIFIED);
         }
 
-        LocalDateTime deadlineAt = LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss");
+        LocalDateTime deadlineAt;
+        try {
+            deadlineAt = LocalDateTimeUtil.parse(request.getDeadlineAt(), "yyyy-MM-dd HH:mm:ss");
+        } catch (DateTimeParseException | IllegalArgumentException e) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "截止时间格式不正确");
+        }
         if (!deadlineAt.isAfter(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "截止时间必须晚于当前时间");
         }
@@ -422,6 +428,9 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
         }
         if (!request.getExpectedDeliveryEndAt().isAfter(request.getExpectedDeliveryStartAt())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "预计最晚送达时间必须晚于开始送达时间");
+        }
+        if (!request.getExpectedDeliveryStartAt().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "预计开始送达时间必须晚于当前时间");
         }
         if (request.getActualTotalAmount().compareTo(order.getEstimatedTotalAmount()) > 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "实际总金额不能高于预计总金额");

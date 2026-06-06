@@ -3,6 +3,7 @@ package com.campusshareorder.backend.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.exception.BusinessException;
+import com.campusshareorder.backend.dto.order.CreateOrderRequest;
 import com.campusshareorder.backend.dto.order.UploadReceiptRequest;
 import com.campusshareorder.backend.entity.CapitalRecord;
 import com.campusshareorder.backend.entity.CreditChangeRecord;
@@ -188,6 +189,48 @@ class OrderServiceImplTest {
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
                         assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()))
                 .hasMessageContaining("实际总金额");
+
+        verify(orderReceiptMapper, never()).insert(any(OrderReceipt.class));
+        verify(receiptStorageService, never()).store(any());
+    }
+
+    @Test
+    void createOrderRejectsInvalidDeadlineValueAsValidationError() {
+        UserAccount user = user(101L, 80);
+        user.setIsVerified(true);
+        when(userAccountMapper.selectById(101L)).thenReturn(user);
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setProductName("测试拼单");
+        request.setProductDesc("测试描述");
+        request.setTotalMemberCount(2);
+        request.setEstimatedTotalAmount(new BigDecimal("20.00"));
+        request.setPickupPoint("图书馆门口");
+        request.setDeadlineAt("2026-99-99 10:00:00");
+
+        assertThatThrownBy(() -> orderService.createOrder(request, 101L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()))
+                .hasMessageContaining("截止时间格式");
+
+        verify(groupOrderMapper, never()).insert(any(GroupOrder.class));
+    }
+
+    @Test
+    void uploadReceiptRejectsPastExpectedDeliveryStartTime() {
+        GroupOrder order = groupedOrder();
+        order.setReceiptUploadDeadlineAt(LocalDateTime.now().plusMinutes(20));
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+
+        UploadReceiptRequest request = new UploadReceiptRequest();
+        request.setActualTotalAmount(new BigDecimal("54.00"));
+        request.setExpectedDeliveryStartAt(LocalDateTime.now().minusMinutes(1));
+        request.setExpectedDeliveryEndAt(LocalDateTime.now().plusMinutes(40));
+
+        assertThatThrownBy(() -> orderService.uploadReceipt(1L, request, null, 102L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.VALIDATION_ERROR.getCode()))
+                .hasMessageContaining("开始送达时间");
 
         verify(orderReceiptMapper, never()).insert(any(OrderReceipt.class));
         verify(receiptStorageService, never()).store(any());

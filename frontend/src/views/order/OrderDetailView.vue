@@ -237,6 +237,10 @@ const submitReceipt = async () => {
     ElMessage.warning('预计送达时间格式不正确')
     return
   }
+  if (startAt <= Date.now()) {
+    ElMessage.warning('预计开始送达时间必须晚于当前时间')
+    return
+  }
   if (endAt <= startAt) {
     ElMessage.warning('预计最晚送达时间必须晚于开始送达时间')
     return

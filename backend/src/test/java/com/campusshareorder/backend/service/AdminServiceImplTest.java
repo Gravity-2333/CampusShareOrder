@@ -1,6 +1,7 @@
 package com.campusshareorder.backend.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campusshareorder.backend.common.enums.ErrorCode;
 import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.admin.BanUserRequest;
@@ -144,6 +145,28 @@ class AdminServiceImplTest {
         assertThat(detail.getAccusedUserId()).isEqualTo(100L);
         assertThat(detail.getAccusedNickname()).isEqualTo("被投诉用户");
         assertThat(detail.getOrderNo()).isEqualTo("ORD001");
+    }
+
+    @Test
+    void getOperationLogsShowsSystemOperatorWithoutUserLookup() {
+        OperationLog log = new OperationLog();
+        log.setOperatorType("SYSTEM");
+        log.setOperatorId(null);
+        log.setBizType("ORDER");
+        log.setBizId(null);
+        log.setAction("ORDER_AUTO_CANCELED");
+        log.setCreatedAt(LocalDateTime.now());
+        Page<OperationLog> logPage = new Page<>(1, 10);
+        logPage.setRecords(List.of(log));
+        logPage.setTotal(1);
+
+        when(operationLogMapper.selectPage(any(Page.class), any(LambdaQueryWrapper.class))).thenReturn(logPage);
+
+        var page = adminService.getOperationLogs("", "", "", "", 1, 10);
+
+        assertThat(page.getList()).hasSize(1);
+        assertThat(page.getList().get(0).getOperatorName()).isEqualTo("系统");
+        verify(userAccountMapper, never()).selectById(any());
     }
 
     @Test

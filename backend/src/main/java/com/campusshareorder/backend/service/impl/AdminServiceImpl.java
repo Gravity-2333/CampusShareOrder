@@ -768,6 +768,9 @@ public class AdminServiceImpl implements AdminService {
             AdminAccount admin = adminAccountMapper.selectById(log.getOperatorId());
             return admin == null ? "管理员" : admin.getUsername();
         }
+        if ("SYSTEM".equals(log.getOperatorType()) || log.getOperatorId() == null) {
+            return "系统";
+        }
 
         UserAccount user = userAccountMapper.selectById(log.getOperatorId());
         return user == null ? "系统" : user.getNickname();

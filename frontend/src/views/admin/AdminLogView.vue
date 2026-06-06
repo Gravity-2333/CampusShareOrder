@@ -143,6 +143,10 @@ onMounted(loadLogs)
             label="USER"
             value="USER"
           />
+          <el-option
+            label="SYSTEM"
+            value="SYSTEM"
+          />
         </el-select>
         <el-select
           v-model="filters.bizType"

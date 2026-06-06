@@ -32,6 +32,16 @@ const loadDashboard = async () => {
   }
 }
 
+const goComplaintDetail = (row) => {
+  if (!row?.complaintId) {
+    ElMessage.warning('当前投诉缺少有效 ID，请前往投诉列表重新选择')
+    router.push('/admin/complaints')
+    return
+  }
+
+  router.push(`/admin/complaints/${row.complaintId}`)
+}
+
 onMounted(loadDashboard)
 </script>
 
@@ -90,8 +100,8 @@ onMounted(loadDashboard)
             </td>
             <td>
               <a
-                :href="`/admin/complaints/${row.complaintId}`"
-                @click.prevent="router.push(`/admin/complaints/${row.complaintId}`)"
+                :href="row.complaintId ? `/admin/complaints/${row.complaintId}` : '/admin/complaints'"
+                @click.prevent="goComplaintDetail(row)"
               >处理</a>
             </td>
           </tr>

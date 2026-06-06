@@ -112,7 +112,7 @@ public class UserController {
             user.setNickname(request.getNickname().trim());
         }
         if (request.getContactInfo() != null) {
-            user.setContactInfo(request.getContactInfo());
+            user.setContactInfo(request.getContactInfo().trim());
         }
         userAccountMapper.updateById(user);
 

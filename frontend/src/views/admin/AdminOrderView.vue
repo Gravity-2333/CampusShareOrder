@@ -129,7 +129,7 @@ onMounted(loadOrders)
             <td>{{ row.productName }}</td>
             <td>{{ row.creatorNickname || '--' }}</td>
             <td>{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</td>
-            <td>{{ row.estimatedTotalAmount || '--' }}</td>
+            <td>{{ row.estimatedTotalAmount ?? '--' }}</td>
             <td>
               <span
                 class="tag"

@@ -6,6 +6,7 @@ import com.campusshareorder.backend.common.exception.BusinessException;
 import com.campusshareorder.backend.dto.complaint.CreateComplaintRequest;
 import com.campusshareorder.backend.entity.Complaint;
 import com.campusshareorder.backend.entity.GroupOrder;
+import com.campusshareorder.backend.entity.UserAccount;
 import com.campusshareorder.backend.mapper.ComplaintMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMapper;
 import com.campusshareorder.backend.mapper.GroupOrderMemberMapper;
@@ -85,5 +86,38 @@ class ComplaintServiceImplTest {
                         assertThat(exception.getCode()).isEqualTo(ErrorCode.FORBIDDEN.getCode()));
 
         verify(complaintMapper, never()).insert(any(Complaint.class));
+    }
+
+    @Test
+    void getComplaintDetailIncludesComplainantNickname() {
+        Complaint complaint = new Complaint();
+        complaint.setId(10L);
+        complaint.setComplaintNo("CMP001");
+        complaint.setGroupOrderId(1L);
+        complaint.setComplainantUserId(101L);
+        complaint.setAccusedUserId(100L);
+        complaint.setType("NOT_PURCHASED");
+        complaint.setStatus("PENDING");
+
+        GroupOrder order = new GroupOrder();
+        order.setId(1L);
+        order.setOrderNo("ORDER001");
+
+        UserAccount complainant = new UserAccount();
+        complainant.setId(101L);
+        complainant.setNickname("投诉用户");
+        UserAccount accused = new UserAccount();
+        accused.setId(100L);
+        accused.setNickname("被投诉用户");
+
+        when(complaintMapper.selectById(10L)).thenReturn(complaint);
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(userAccountMapper.selectById(101L)).thenReturn(complainant);
+        when(userAccountMapper.selectById(100L)).thenReturn(accused);
+
+        var detail = complaintService.getComplaintDetail(10L, 101L);
+
+        assertThat(detail.getComplainantNickname()).isEqualTo("投诉用户");
+        assertThat(detail.getAccusedNickname()).isEqualTo("被投诉用户");
     }
 }

@@ -184,11 +184,11 @@ public class UserController {
             vo.setRemark(record.getRemark());
             vo.setCreatedAt(record.getCreatedAt());
             vo.setOperatorName(resolveCapitalOperator(record, user));
-            vo.setReceiverName("SETTLE_TO_CREATOR".equals(record.getType()) ? user.getNickname() : "");
             GroupOrder order = record.getGroupOrderId() == null
                     ? null
                     : groupOrderMapper.selectById(record.getGroupOrderId());
             vo.setOrderNo(order == null ? "" : order.getOrderNo());
+            vo.setReceiverName(resolveCapitalReceiver(record, user, order));
             return vo;
         }).collect(Collectors.toList());
 
@@ -223,5 +223,19 @@ public class UserController {
             return user.getNickname();
         }
         return "系统";
+    }
+
+    private String resolveCapitalReceiver(CapitalRecord record, UserAccount user, GroupOrder order) {
+        if ("PAY".equals(record.getType())) {
+            return "平台资金账户";
+        }
+        if (record.getType() != null && record.getType().startsWith("REFUND")) {
+            return user.getNickname();
+        }
+        if ("SETTLE_TO_CREATOR".equals(record.getType()) && order != null) {
+            UserAccount creator = userAccountMapper.selectById(order.getCreatorUserId());
+            return creator == null ? "订单发起人" : creator.getNickname();
+        }
+        return user.getNickname();
     }
 }

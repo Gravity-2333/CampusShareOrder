@@ -268,6 +268,10 @@ public class AdminServiceImpl implements AdminService {
         detail.setOrderNo(order == null ? "" : order.getOrderNo());
         detail.setProductName(order == null ? "" : order.getProductName());
         detail.setComplainantUserId(complaint.getComplainantUserId());
+        UserAccount complainant = complaint.getComplainantUserId() == null
+                ? null
+                : userAccountMapper.selectById(complaint.getComplainantUserId());
+        detail.setComplainantNickname(complainant == null ? "" : complainant.getNickname());
         detail.setAccusedNickname(accused == null ? "" : accused.getNickname());
         detail.setType(complaint.getType());
         detail.setContent(complaint.getContent());
@@ -361,12 +365,10 @@ public class AdminServiceImpl implements AdminService {
             vo.setCreatedAt(record.getCreatedAt());
             UserAccount user = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
             vo.setUserNickname(user == null ? "" : user.getNickname());
-            vo.setReceiverName("SETTLE_TO_CREATOR".equals(record.getType()) && user != null
-                    ? user.getNickname()
-                    : "");
             vo.setOperatorName(resolveCapitalOperator(record));
             GroupOrder order = record.getGroupOrderId() == null ? null : groupOrderMapper.selectById(record.getGroupOrderId());
             vo.setOrderNo(order == null ? "" : order.getOrderNo());
+            vo.setReceiverName(resolveCapitalReceiver(record, user, order));
             return vo;
         }).collect(Collectors.toList());
 
@@ -389,6 +391,20 @@ public class AdminServiceImpl implements AdminService {
             }
         }
         return "系统";
+    }
+
+    private String resolveCapitalReceiver(CapitalRecord record, UserAccount user, GroupOrder order) {
+        if ("PAY".equals(record.getType())) {
+            return "平台资金账户";
+        }
+        if (record.getType() != null && record.getType().startsWith("REFUND")) {
+            return user == null ? "退款用户" : user.getNickname();
+        }
+        if ("SETTLE_TO_CREATOR".equals(record.getType()) && order != null) {
+            UserAccount creator = userAccountMapper.selectById(order.getCreatorUserId());
+            return creator == null ? "订单发起人" : creator.getNickname();
+        }
+        return user == null ? "平台资金账户" : user.getNickname();
     }
 
     private String normalizeOperatorType(String operatorType) {
@@ -526,6 +542,7 @@ public class AdminServiceImpl implements AdminService {
         vo.setUserId(user.getId());
         vo.setPhone(user.getPhone());
         vo.setNickname(user.getNickname());
+        vo.setStudentNo(user.getStudentNo());
         vo.setIsVerified(user.getIsVerified());
         vo.setCreditScore(user.getCreditScore());
         vo.setStatus(user.getStatus());
@@ -538,6 +555,7 @@ public class AdminServiceImpl implements AdminService {
         vo.setComplaintId(complaint.getId());
         vo.setComplaintNo(complaint.getComplaintNo());
         vo.setOrderId(complaint.getGroupOrderId());
+        vo.setComplainantUserId(complaint.getComplainantUserId());
         vo.setAccusedUserId(complaint.getAccusedUserId());
         vo.setType(complaint.getType());
         vo.setContent(complaint.getContent());
@@ -556,6 +574,13 @@ public class AdminServiceImpl implements AdminService {
         UserAccount accused = complaint.getAccusedUserId() == null ? null : userAccountMapper.selectById(complaint.getAccusedUserId());
         if (accused != null) {
             vo.setAccusedNickname(accused.getNickname());
+        }
+
+        UserAccount complainant = complaint.getComplainantUserId() == null
+                ? null
+                : userAccountMapper.selectById(complaint.getComplainantUserId());
+        if (complainant != null) {
+            vo.setComplainantNickname(complainant.getNickname());
         }
 
         return vo;

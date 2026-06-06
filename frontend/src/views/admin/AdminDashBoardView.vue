@@ -14,7 +14,7 @@ const cards = computed(() => [
   { label: '总订单数', value: adminStore.metrics.orders },
   { label: '待处理投诉', value: adminStore.metrics.complaints },
   { label: '注册用户', value: adminStore.metrics.users },
-  { label: '今日新增', value: adminStore.metrics.todayNew || '--' },
+  { label: '今日新增', value: adminStore.metrics.todayNew ?? '--' },
 ])
 
 // 过滤只显示待处理的投诉

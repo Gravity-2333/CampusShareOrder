@@ -126,6 +126,12 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
             vo.setHandleResult(complaint.getHandleResult());
             vo.setOpenedBySystem(false);
 
+            UserAccount complainantUser = userAccountMapper.selectById(complaint.getComplainantUserId());
+            if (complainantUser != null) {
+                vo.setComplainantUserId(complainantUser.getId());
+                vo.setComplainantNickname(complainantUser.getNickname());
+            }
+
             UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
             if (accusedUser != null) {
                 vo.setAccusedUserId(accusedUser.getId());
@@ -166,6 +172,11 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
             vo.setOrderNo(order.getOrderNo());
             vo.setProductName(order.getProductName());
             vo.setOpenedBySystem(Boolean.TRUE.equals(order.getComplaintOpened()));
+        }
+
+        UserAccount complainantUser = userAccountMapper.selectById(complaint.getComplainantUserId());
+        if (complainantUser != null) {
+            vo.setComplainantNickname(complainantUser.getNickname());
         }
 
         UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());

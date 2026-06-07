@@ -12,6 +12,8 @@ public class AdminComplaintDetailVO {
     private String orderNo;
     private String productName;
     private Long complainantUserId;
+    private String complainantNickname;
+    private Long accusedUserId;
     private String accusedNickname;
     private String type;
     private String content;

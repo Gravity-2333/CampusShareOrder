@@ -54,6 +54,7 @@ export const normalizeOrderDetail = (detail = {}) => {
 
   return {
     actionFlags: {
+      canCancel: Boolean(detail.actionFlags?.canCancel),
       canConfirmReceived: Boolean(detail.actionFlags?.canConfirmReceived),
       canCreateComplaint: Boolean(detail.actionFlags?.canCreateComplaint),
       canExit: Boolean(detail.actionFlags?.canExit),
@@ -123,6 +124,8 @@ export const normalizeOrderDetail = (detail = {}) => {
             detail.receiptInfo.actualTotalAmount === null || detail.receiptInfo.actualTotalAmount === undefined
               ? null
               : Number(detail.receiptInfo.actualTotalAmount),
+          expectedDeliveryEndAt: detail.receiptInfo.expectedDeliveryEndAt || '',
+          expectedDeliveryStartAt: detail.receiptInfo.expectedDeliveryStartAt || '',
           receiptImageUrl: detail.receiptInfo.receiptImageUrl || detail.receiptInfo.imageUrl || '',
           uploadedAt: detail.receiptInfo.uploadedAt || '',
         }

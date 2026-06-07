@@ -12,9 +12,9 @@ const adminStore = useAdminStore()
 
 const cards = computed(() => [
   { label: '总订单数', value: adminStore.metrics.orders },
-  { label: '待处理投诉', value: adminStore.metrics.complaints },
+  { label: '待处理投诉', value: adminStore.metrics.pendingComplaints ?? 0 },
   { label: '注册用户', value: adminStore.metrics.users },
-  { label: '今日新增', value: adminStore.metrics.todayNew || '--' },
+  { label: '今日新增用户', value: adminStore.metrics.todayNewUsers ?? 0 },
 ])
 
 // 过滤只显示待处理的投诉
@@ -30,6 +30,16 @@ const loadDashboard = async () => {
   } catch (error) {
     ElMessage.error(error.message)
   }
+}
+
+const goComplaintDetail = (row) => {
+  if (!row?.complaintId) {
+    ElMessage.warning('当前投诉缺少有效 ID，请前往投诉列表重新选择')
+    router.push('/admin/complaints')
+    return
+  }
+
+  router.push(`/admin/complaints/${row.complaintId}`)
 }
 
 onMounted(loadDashboard)
@@ -90,8 +100,8 @@ onMounted(loadDashboard)
             </td>
             <td>
               <a
-                :href="`/admin/complaints/${row.complaintId}`"
-                @click.prevent="router.push(`/admin/complaints/${row.complaintId}`)"
+                :href="row.complaintId ? `/admin/complaints/${row.complaintId}` : '/admin/complaints'"
+                @click.prevent="goComplaintDetail(row)"
               >处理</a>
             </td>
           </tr>

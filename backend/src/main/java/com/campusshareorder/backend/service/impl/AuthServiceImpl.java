@@ -32,16 +32,19 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterResultVO register(UserRegisterRequest request) {
+        String phone = request.getPhone().trim();
+        String nickname = request.getNickname().trim();
+
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserAccount::getPhone, request.getPhone());
+        wrapper.eq(UserAccount::getPhone, phone);
         if (userAccountMapper.selectCount(wrapper) > 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该手机号已注册");
         }
 
         UserAccount user = new UserAccount();
-        user.setPhone(request.getPhone());
+        user.setPhone(phone);
         user.setPasswordHash(BCrypt.hashpw(request.getPassword()));
-        user.setNickname(request.getNickname());
+        user.setNickname(nickname);
         user.setCreditScore(80);
         user.setIsVerified(false);
         user.setStatus("NORMAL");
@@ -60,8 +63,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public UserLoginVO login(UserLoginRequest request) {
+        String phone = request.getPhone().trim();
+
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserAccount::getPhone, request.getPhone());
+        wrapper.eq(UserAccount::getPhone, phone);
         UserAccount user = userAccountMapper.selectOne(wrapper);
 
         if (user == null) {
@@ -97,8 +102,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public AdminLoginVO adminLogin(AdminLoginRequest request) {
+        String username = request.getUsername().trim();
+
         LambdaQueryWrapper<AdminAccount> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(AdminAccount::getUsername, request.getUsername());
+        wrapper.eq(AdminAccount::getUsername, username);
         AdminAccount admin = adminAccountMapper.selectOne(wrapper);
 
         if (admin == null || !BCrypt.checkpw(request.getPassword(), admin.getPasswordHash())) {

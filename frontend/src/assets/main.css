@@ -575,6 +575,22 @@
   width: 100%;
 }
 
+.upload-copy {
+  display: grid;
+  gap: 8px;
+  color: var(--text-color);
+}
+
+.upload-copy span {
+  color: var(--muted-color);
+  font-size: 13px;
+}
+
+.el-upload,
+.el-upload-dragger {
+  width: 100%;
+}
+
 .create-order-form {
   align-items: stretch;
   background:

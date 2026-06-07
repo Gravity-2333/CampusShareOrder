@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onBeforeUnmount, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onBeforeUnmount, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 
 import { useAdminStore } from '../../stores/admin'
@@ -7,7 +7,6 @@ import { formatComplaintType } from '../../utils/format'
 
 const adminStore = useAdminStore()
 
-const period = reactive({ value: 'month' })
 const loading = ref(false)
 const trendCanvas = ref(null)
 const distributionCanvas = ref(null)
@@ -22,10 +21,10 @@ const stats = computed(() => [
 ])
 
 function computeCompletionRate() {
-  const orders = adminStore.dashboardOverview.recentOrders || []
-  if (!orders.length) return '--'
-  const completed = orders.filter(o => o.status === 'COMPLETED').length
-  return Math.round((completed / orders.length) * 100) + '%'
+  const total = Number(adminStore.metrics.orders || 0)
+  if (!total) return '--'
+  const completed = Number(adminStore.metrics.completedOrders || 0)
+  return Math.round((completed / total) * 100) + '%'
 }
 
 const complaintStats = computed(() => {
@@ -270,17 +269,6 @@ onBeforeUnmount(() => {
 <template>
   <div class="stack-page">
     <div class="toolbar">
-      <select v-model="period.value">
-        <option value="week">
-          本周
-        </option>
-        <option value="month">
-          本月
-        </option>
-        <option value="quarter">
-          本季度
-        </option>
-      </select>
       <button
         class="btn btn-primary"
         :disabled="loading"

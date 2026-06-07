@@ -36,4 +36,20 @@ public class CreateOrderRequest {
     @NotBlank(message = "截止时间不能为空")
     @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}$", message = "截止时间格式应为 yyyy-MM-dd HH:mm:ss")
     private String deadlineAt;
+
+    public void setProductName(String productName) {
+        this.productName = productName == null ? null : productName.trim();
+    }
+
+    public void setProductDesc(String productDesc) {
+        this.productDesc = productDesc == null ? null : productDesc.trim();
+    }
+
+    public void setPickupPoint(String pickupPoint) {
+        this.pickupPoint = pickupPoint == null ? null : pickupPoint.trim();
+    }
+
+    public void setDeadlineAt(String deadlineAt) {
+        this.deadlineAt = deadlineAt == null ? null : deadlineAt.trim();
+    }
 }

@@ -9,10 +9,12 @@ public class ComplaintDetailVO {
     private String complaintNo;
     private Long orderId;
     private Long complainantUserId;
+    private String complainantNickname;
     private Long accusedUserId;
     private String productName;
     private String orderNo;
     private String accusedNickname;
+    private String viewerRoleInComplaint;
     private String type;
     private String content;
     private String status;

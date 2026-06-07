@@ -11,4 +11,8 @@ public class VerifyStudentRequest {
     @Size(max = 10, message = "学号长度不能超过10位")
     @Pattern(regexp = "^[A-Za-z0-9]+$", message = "学号只能包含字母和数字")
     private String studentNo;
+
+    public void setStudentNo(String studentNo) {
+        this.studentNo = studentNo == null ? null : studentNo.trim();
+    }
 }

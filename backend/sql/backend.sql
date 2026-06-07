@@ -151,6 +151,8 @@ CREATE TABLE IF NOT EXISTS capital_record (
     amount DECIMAL(10,2) NOT NULL,
     status VARCHAR(32) NOT NULL DEFAULT 'SUCCESS',
     remark VARCHAR(255),
+    operator_type VARCHAR(32) NOT NULL DEFAULT 'SYSTEM',
+    operator_id BIGINT UNSIGNED,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES user_account(id),
     FOREIGN KEY (group_order_id) REFERENCES group_order(id),

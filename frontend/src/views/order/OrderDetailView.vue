@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElImage, ElMessage, ElMessageBox } from 'element-plus'
 
@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
+import { useUserStore } from '../../stores/user'
 import {
   formatCurrency,
   formatDateTime,
@@ -17,14 +18,22 @@ import {
   formatReceiveStatus,
   formatRole,
 } from '../../utils/format'
-import { validateApiDateTime } from '../../utils/validate'
 
 const route = useRoute()
 const router = useRouter()
 const orderStore = useOrderStore()
+const userStore = useUserStore()
 
 const receiptDialogVisible = ref(false)
+const uploadDialogVisible = ref(false)
 const activeReceiptUrl = ref('')
+const receiptFileList = ref([])
+const receiptForm = reactive({
+  actualTotalAmount: '',
+  expectedDeliveryEndAt: '',
+  expectedDeliveryStartAt: '',
+  image: null,
+})
 const now = ref(Date.now())
 let countdownTimer = null
 
@@ -150,6 +159,7 @@ const loadDetail = async (orderId = currentOrderId.value) => {
 
 const confirmAction = async (action) => {
   const confirmMap = {
+    cancel: '仅在没有其他参与者时可取消。确认后订单将关闭，已支付金额会全额退款，是否继续？',
     delivered: '确认已送达后，订单会进入待收货阶段，是否继续？',
     exit: '退出拼单后将失去当前成员资格，是否继续？',
     join: '确认加入该拼单吗？',
@@ -173,77 +183,83 @@ const confirmAction = async (action) => {
   }
 }
 
-const toApiDateTime = (value) => String(value || '').trim()
 const parseApiDateTime = (value) => new Date(String(value || '').trim().replace(' ', 'T')).getTime()
 
-const promptReceiptPayload = async () => {
-  const { value: imageUrl } = await ElMessageBox.prompt('请输入凭证图片地址', '上传凭证', {
-    cancelButtonText: '取消',
-    confirmButtonText: '下一步',
-    inputPlaceholder: '例如 https://example.com/receipt.jpg',
-    inputValidator: (inputValue) => {
-      if (!inputValue?.trim()) {
-        return '请输入凭证图片地址'
-      }
+const resetReceiptForm = () => {
+  receiptForm.actualTotalAmount = ''
+  receiptForm.expectedDeliveryEndAt = ''
+  receiptForm.expectedDeliveryStartAt = ''
+  receiptForm.image = null
+  receiptFileList.value = []
+}
 
-      if (inputValue.trim().length > 500) {
-        return '凭证图片地址长度不能超过 500 个字符'
-      }
+const handleReceiptFileChange = (uploadFile) => {
+  const file = uploadFile?.raw
+  if (!file) return
 
-      return true
-    },
-  })
+  const isAllowedType = ['image/jpeg', 'image/png'].includes(file.type)
+  const hasAllowedExtension = /\.(jpe?g|png)$/i.test(file.name)
+  if (!isAllowedType || !hasAllowedExtension) {
+    receiptFileList.value = []
+    receiptForm.image = null
+    ElMessage.warning('仅支持 JPG/PNG')
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    receiptFileList.value = []
+    receiptForm.image = null
+    ElMessage.warning('文件大小不能超过10MB')
+    return
+  }
+  receiptForm.image = file
+}
 
-  const { value: amount } = await ElMessageBox.prompt('请输入本次拼单的实际总金额', '上传凭证', {
-    cancelButtonText: '取消',
-    confirmButtonText: '下一步',
-    inputPattern: /^(0|[1-9]\d*)(\.\d{1,2})?$/,
-    inputPlaceholder: '例如 54.00',
-    inputType: 'number',
-    inputValidator: (inputValue) => {
-      const normalizedValue = String(inputValue ?? '').trim()
+const submitReceipt = async () => {
+  if (!receiptForm.image) {
+    ElMessage.warning('请选择订单截图')
+    return
+  }
+  const amount = Number(receiptForm.actualTotalAmount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    ElMessage.warning('实际总金额必须大于0')
+    return
+  }
+  const estimatedTotalAmount = Number(detail.value?.basicInfo?.estimatedTotalAmount || 0)
+  if (estimatedTotalAmount > 0 && amount > estimatedTotalAmount) {
+    ElMessage.warning('实际总金额不能高于预计总金额')
+    return
+  }
+  if (!receiptForm.expectedDeliveryStartAt || !receiptForm.expectedDeliveryEndAt) {
+    ElMessage.warning('请填写预计送达时间区间')
+    return
+  }
+  const startAt = parseApiDateTime(receiptForm.expectedDeliveryStartAt)
+  const endAt = parseApiDateTime(receiptForm.expectedDeliveryEndAt)
+  if (!Number.isFinite(startAt) || !Number.isFinite(endAt)) {
+    ElMessage.warning('预计送达时间格式不正确')
+    return
+  }
+  if (startAt <= Date.now()) {
+    ElMessage.warning('预计开始送达时间必须晚于当前时间')
+    return
+  }
+  if (endAt <= startAt) {
+    ElMessage.warning('预计最晚送达时间必须晚于开始送达时间')
+    return
+  }
 
-      if (!normalizedValue) {
-        return '请输入实际总金额'
-      }
-
-      const actualAmount = Number(normalizedValue)
-      if (!Number.isFinite(actualAmount) || actualAmount <= 0) {
-        return '金额必须大于 0'
-      }
-
-      return true
-    },
-  })
-
-  const { value: startAt } = await ElMessageBox.prompt('请输入预计开始送达时间', '上传凭证', {
-    cancelButtonText: '取消',
-    confirmButtonText: '下一步',
-    inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
-    inputValidator: (inputValue) => {
-      return validateApiDateTime(inputValue, '预计开始送达时间格式应为 yyyy-MM-dd HH:mm:ss') || true
-    },
-  })
-
-  const { value: endAt } = await ElMessageBox.prompt('请输入预计最晚送达时间', '上传凭证', {
-    cancelButtonText: '取消',
-    confirmButtonText: '提交',
-    inputPlaceholder: 'yyyy-MM-dd HH:mm:ss',
-    inputValidator: (inputValue) => {
-      const formatError = validateApiDateTime(inputValue, '预计最晚送达时间格式应为 yyyy-MM-dd HH:mm:ss')
-      if (formatError) {
-        return formatError
-      }
-
-      return parseApiDateTime(inputValue) > parseApiDateTime(startAt) || '预计最晚送达时间必须晚于开始送达时间'
-    },
-  })
-
-  return {
-    actualTotalAmount: Number(String(amount).trim()),
-    expectedDeliveryEndAt: toApiDateTime(endAt),
-    expectedDeliveryStartAt: toApiDateTime(startAt),
-    imageUrl: imageUrl.trim(),
+  try {
+    await orderStore.runDetailAction(currentOrderId.value, 'upload', {
+      actualTotalAmount: amount,
+      expectedDeliveryEndAt: receiptForm.expectedDeliveryEndAt,
+      expectedDeliveryStartAt: receiptForm.expectedDeliveryStartAt,
+      image: receiptForm.image,
+    })
+    uploadDialogVisible.value = false
+    resetReceiptForm()
+    ElMessage.success('凭证上传成功')
+  } catch (error) {
+    ElMessage.error(error.message || '凭证上传失败，请稍后重试')
   }
 }
 
@@ -296,16 +312,31 @@ const runAction = async (action) => {
       return
     }
 
+    if (['join', 'pay'].includes(action) && !userStore.session.isVerified) {
+      ElMessage.warning('请先完成实名认证，再继续拼单操作')
+      router.push('/verify-student')
+      return
+    }
+
     if (!(await confirmAction(action))) {
       return
     }
 
     if (action === 'upload') {
-      payload = await promptReceiptPayload()
+      uploadDialogVisible.value = true
+      return
     }
 
     await orderStore.runDetailAction(currentOrderId.value, action, payload)
-    ElMessage.success('操作成功')
+    const successMessageMap = {
+      cancel: '取消拼单成功，已支付金额已全额退款',
+      exit: '退出拼单成功，已支付金额已全额退款',
+      join: '加入拼单成功',
+      pay: '支付成功',
+      delivered: '已确认送达',
+      received: '已确认收货',
+    }
+    ElMessage.success(successMessageMap[action] || '操作成功')
   } catch (error) {
     if (error === 'cancel' || error?.message === 'cancel') {
       return
@@ -570,6 +601,15 @@ onBeforeUnmount(() => {
             加入拼单
           </el-button>
           <el-button
+            v-if="detail.actionFlags.canCancel"
+            type="danger"
+            plain
+            :loading="orderStore.submitting"
+            @click="runAction('cancel')"
+          >
+            取消拼单
+          </el-button>
+          <el-button
             v-if="detail.actionFlags.canExit"
             type="warning"
             plain
@@ -661,6 +701,89 @@ onBeforeUnmount(() => {
     </div>
 
     <el-dialog
+      v-model="uploadDialogVisible"
+      title="上传订单凭证"
+      width="620px"
+      @closed="resetReceiptForm"
+    >
+      <el-form
+        label-position="top"
+        :model="receiptForm"
+      >
+        <el-form-item
+          label="订单截图"
+          required
+        >
+          <el-upload
+            v-model:file-list="receiptFileList"
+            :auto-upload="false"
+            :limit="1"
+            accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+            drag
+            @change="handleReceiptFileChange"
+          >
+            <div class="upload-copy">
+              <strong>点击或拖拽选择本地图片</strong>
+              <span>仅支持 JPG / PNG，文件大小不超过 10MB</span>
+            </div>
+          </el-upload>
+        </el-form-item>
+        <el-form-item
+          label="实际总金额"
+          required
+        >
+          <p class="muted-text field-tip">
+            不得高于预计总金额 {{ formatCurrency(detail?.basicInfo?.estimatedTotalAmount) }}，低于预计金额时系统会自动生成差额退款。
+          </p>
+          <el-input-number
+            v-model="receiptForm.actualTotalAmount"
+            :min="0.01"
+            :max="Number(detail?.basicInfo?.estimatedTotalAmount || 999999)"
+            :precision="2"
+            :step="1"
+            controls-position="right"
+          />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item
+            label="预计开始送达"
+            required
+          >
+            <el-date-picker
+              v-model="receiptForm.expectedDeliveryStartAt"
+              type="datetime"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="选择开始时间"
+            />
+          </el-form-item>
+          <el-form-item
+            label="预计最晚送达"
+            required
+          >
+            <el-date-picker
+              v-model="receiptForm.expectedDeliveryEndAt"
+              type="datetime"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="选择结束时间"
+            />
+          </el-form-item>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">
+          取消
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="orderStore.submitting"
+          @click="submitReceipt"
+        >
+          提交凭证
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-model="receiptDialogVisible"
       title="订单凭证"
       width="680px"
@@ -672,6 +795,15 @@ onBeforeUnmount(() => {
           :src="activeReceiptUrl"
           fit="contain"
         />
+        <ul
+          v-if="detail?.receiptInfo"
+          class="detail-list"
+        >
+          <li><span>实际总金额</span><strong>{{ formatCurrency(detail.receiptInfo.actualTotalAmount) }}</strong></li>
+          <li><span>预计开始送达</span><strong>{{ formatDateTime(detail.receiptInfo.expectedDeliveryStartAt) }}</strong></li>
+          <li><span>预计最晚送达</span><strong>{{ formatDateTime(detail.receiptInfo.expectedDeliveryEndAt) }}</strong></li>
+          <li><span>上传时间</span><strong>{{ formatDateTime(detail.receiptInfo.uploadedAt) }}</strong></li>
+        </ul>
       </div>
     </el-dialog>
   </div>

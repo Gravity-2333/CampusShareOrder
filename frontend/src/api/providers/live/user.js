@@ -10,6 +10,8 @@ export const updateUserProfile = (payload) => request.put('/api/users/profile', 
 
 export const getUserCredit = (params) => request.get('/api/users/credit', { params })
 
+export const getUserCapitalRecords = (params) => request.get('/api/users/capital-records', { params })
+
 export const getMyOrders = async (params) => {
   const page = await request.get('/api/users/my-orders', { params })
 

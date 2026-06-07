@@ -8,4 +8,6 @@ export const updateUserProfile = (payload) => provider.user.updateUserProfile(pa
 
 export const getUserCredit = (params) => provider.user.getUserCredit(params)
 
+export const getUserCapitalRecords = (params) => provider.user.getUserCapitalRecords(params)
+
 export const getMyOrders = (params) => provider.user.getMyOrders(params)

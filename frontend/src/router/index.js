@@ -70,9 +70,14 @@ const routes = [
         meta: { requiresAuth: true, role: 'USER', title: '信用分' },
       },
       {
+        path: '/capital-records',
+        component: () => import('../views/user/CapitalRecordView.vue'),
+        meta: { requiresAuth: true, role: 'USER', title: '支付与退款记录' },
+      },
+      {
         path: '/complaints',
         component: () => import('../views/complaint/MyComplaintView.vue'),
-        meta: { requiresAuth: true, role: 'USER', title: '我的投诉' },
+        meta: { requiresAuth: true, role: 'USER', title: '相关投诉' },
       },
       {
         path: '/complaints/create',
@@ -133,7 +138,7 @@ const routes = [
       {
         path: '/admin/records/capital',
         component: () => import('../views/admin/AdminCapitalView.vue'),
-        meta: { requiresAuth: true, role: 'ADMIN', title: '资金记录' },
+        meta: { requiresAuth: true, role: 'ADMIN', title: '系统流水' },
       },
       {
         path: '/admin/records/logs',

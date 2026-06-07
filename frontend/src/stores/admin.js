@@ -45,7 +45,10 @@ export const useAdminStore = defineStore('admin', {
     logsPage: defaultPageData(),
     metrics: {
       complaints: 0,
+      completedOrders: 0,
       orders: 0,
+      pendingComplaints: 0,
+      todayNewUsers: 0,
       users: 0,
     },
     orderDetail: null,

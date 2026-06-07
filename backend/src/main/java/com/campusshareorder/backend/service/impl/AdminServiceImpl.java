@@ -47,7 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -72,11 +74,20 @@ public class AdminServiceImpl implements AdminService {
         metrics.setUsers(userAccountMapper.selectCount(null));
         metrics.setOrders(groupOrderMapper.selectCount(null));
         metrics.setComplaints(complaintMapper.selectCount(null));
+        metrics.setCompletedOrders(groupOrderMapper.selectCount(
+                new LambdaQueryWrapper<GroupOrder>().eq(GroupOrder::getStatus, "COMPLETED")
+        ));
+        metrics.setPendingComplaints(complaintMapper.selectCount(
+                new LambdaQueryWrapper<Complaint>().eq(Complaint::getStatus, "PENDING")
+        ));
+        metrics.setTodayNewUsers(userAccountMapper.selectCount(
+                new LambdaQueryWrapper<UserAccount>().ge(UserAccount::getCreatedAt, LocalDateTime.now().toLocalDate().atStartOfDay())
+        ));
 
         AdminDashboardOverviewVO overview = new AdminDashboardOverviewVO();
         overview.setMetrics(metrics);
         overview.setRecentOrders(getOrders("", "", 1, 5).getList());
-        overview.setRecentComplaints(getComplaints("", 1, 5).getList());
+        overview.setRecentComplaints(getComplaints("", "", 1, 5).getList());
         overview.setRecentLogs(getOperationLogs("", "", "", "", 1, 5).getList());
         return overview;
     }
@@ -87,15 +98,17 @@ public class AdminServiceImpl implements AdminService {
         LambdaQueryWrapper<UserAccount> wrapper = new LambdaQueryWrapper<>();
 
         if (keyword != null && !keyword.trim().isEmpty()) {
-            wrapper.and(w -> w.like(UserAccount::getNickname, keyword)
-                    .or().like(UserAccount::getPhone, keyword));
+            String trimmedKeyword = keyword.trim();
+            wrapper.and(w -> w.like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword));
         }
 
         if (status != null && !status.trim().isEmpty()) {
-            wrapper.eq(UserAccount::getStatus, status);
+            wrapper.eq(UserAccount::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(UserAccount::getCreatedAt);
+        wrapper.orderByDesc(UserAccount::getCreatedAt)
+                .orderByDesc(UserAccount::getId);
         Page<UserAccount> userPage = userAccountMapper.selectPage(pageRequest, wrapper);
 
         List<AdminUserListItemVO> list = userPage.getRecords().stream().map(this::toAdminUserListItem).collect(Collectors.toList());
@@ -118,17 +131,42 @@ public class AdminServiceImpl implements AdminService {
         detail.setCreatedAt(user.getCreatedAt());
 
         LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CreditChangeRecord::getUserId, userId).orderByDesc(CreditChangeRecord::getCreatedAt);
+        wrapper.eq(CreditChangeRecord::getUserId, userId)
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
+        Map<Long, Integer> scoreAfterRecordMap = buildScoreAfterRecordMap(user);
         List<AdminCreditRecordVO> records = creditChangeRecordMapper.selectList(wrapper).stream().map(record -> {
             AdminCreditRecordVO vo = new AdminCreditRecordVO();
             vo.setCreatedAt(record.getCreatedAt());
             vo.setChangeReason(record.getRemark() == null || record.getRemark().isBlank() ? record.getReasonType() : record.getRemark());
             vo.setDelta(record.getChangeValue());
+            vo.setCurrentScore(scoreAfterRecordMap.getOrDefault(record.getId(), user.getCreditScore()));
+            vo.setReasonType(record.getReasonType());
+            vo.setRelatedOrderId(record.getRelatedOrderId());
+            vo.setRelatedComplaintId(record.getRelatedComplaintId());
             return vo;
         }).collect(Collectors.toList());
         detail.setCreditRecords(records);
 
         return detail;
+    }
+
+    private Map<Long, Integer> buildScoreAfterRecordMap(UserAccount user) {
+        LambdaQueryWrapper<CreditChangeRecord> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(CreditChangeRecord::getUserId, user.getId())
+                .orderByDesc(CreditChangeRecord::getCreatedAt)
+                .orderByDesc(CreditChangeRecord::getId);
+        List<CreditChangeRecord> records = creditChangeRecordMapper.selectList(wrapper);
+
+        Map<Long, Integer> scoreAfterRecordMap = new HashMap<>();
+        int runningScore = user.getCreditScore() == null ? 0 : user.getCreditScore();
+        for (CreditChangeRecord record : records) {
+            if (record.getId() != null) {
+                scoreAfterRecordMap.put(record.getId(), runningScore);
+            }
+            runningScore -= record.getChangeValue() == null ? 0 : record.getChangeValue();
+        }
+        return scoreAfterRecordMap;
     }
 
     @Override
@@ -177,7 +215,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(GroupOrder::getStatus, denormalizeOrderStatus(status));
         }
 
-        wrapper.orderByDesc(GroupOrder::getCreatedAt);
+        wrapper.orderByDesc(GroupOrder::getCreatedAt)
+                .orderByDesc(GroupOrder::getId);
         Page<GroupOrder> orderPage = groupOrderMapper.selectPage(pageRequest, wrapper);
 
         List<OrderListItemVO> list = orderPage.getRecords().stream().map(order -> {
@@ -188,7 +227,7 @@ public class AdminServiceImpl implements AdminService {
             vo.setProductDesc(order.getProductDesc());
             vo.setTotalMemberCount(order.getTotalMemberCount());
             vo.setCurrentMemberCount(order.getCurrentMemberCount());
-            vo.setRemainingCount(order.getTotalMemberCount() - order.getCurrentMemberCount());
+            vo.setRemainingCount(resolveRemainingCount(order));
             vo.setEstimatedTotalAmount(order.getEstimatedTotalAmount());
             vo.setEstimatedPerAmount(order.getEstimatedPerAmount());
             vo.setPickupPoint(order.getPickupPoint());
@@ -233,22 +272,48 @@ public class AdminServiceImpl implements AdminService {
         order.setStatus("CANCELED");
         order.setCancelReason(reason);
         groupOrderMapper.updateById(order);
-        refundActiveMembers(orderId, "管理员取消订单退款");
+        refundActiveMembers(orderId, "管理员取消订单全额退款", "ADMIN", adminId);
         insertOperationLog("ADMIN", adminId, "ORDER", orderId, "ORDER_CANCELED_BY_ADMIN", reason);
         notifyOrderMembers(orderId, "ORDER_CANCELED", "订单已被管理员取消",
                 "管理员已取消该订单，系统会按规则处理退款。");
     }
 
     @Override
-    public PageVO<ComplaintListItemVO> getComplaints(String status, Integer page, Integer pageSize) {
+    public PageVO<ComplaintListItemVO> getComplaints(String keyword, String status, Integer page, Integer pageSize) {
         Page<Complaint> pageRequest = new Page<>(normalizePage(page), normalizePageSize(pageSize));
         LambdaQueryWrapper<Complaint> wrapper = new LambdaQueryWrapper<>();
+
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String trimmedKeyword = keyword.trim();
+            List<Long> orderIds = groupOrderMapper.selectList(new LambdaQueryWrapper<GroupOrder>()
+                    .like(GroupOrder::getOrderNo, trimmedKeyword)
+                    .or().like(GroupOrder::getProductName, trimmedKeyword))
+                    .stream().map(GroupOrder::getId).collect(Collectors.toList());
+            List<Long> userIds = userAccountMapper.selectList(new LambdaQueryWrapper<UserAccount>()
+                    .like(UserAccount::getNickname, trimmedKeyword)
+                    .or().like(UserAccount::getPhone, trimmedKeyword))
+                    .stream().map(UserAccount::getId).collect(Collectors.toList());
+
+            wrapper.and(w -> {
+                w.like(Complaint::getComplaintNo, trimmedKeyword)
+                        .or().like(Complaint::getContent, trimmedKeyword)
+                        .or().like(Complaint::getType, trimmedKeyword);
+                if (!orderIds.isEmpty()) {
+                    w.or().in(Complaint::getGroupOrderId, orderIds);
+                }
+                if (!userIds.isEmpty()) {
+                    w.or().in(Complaint::getComplainantUserId, userIds)
+                            .or().in(Complaint::getAccusedUserId, userIds);
+                }
+            });
+        }
 
         if (status != null && !status.trim().isEmpty()) {
             wrapper.eq(Complaint::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(Complaint::getCreatedAt);
+        wrapper.orderByDesc(Complaint::getCreatedAt)
+                .orderByDesc(Complaint::getId);
         Page<Complaint> complaintPage = complaintMapper.selectPage(pageRequest, wrapper);
 
         List<ComplaintListItemVO> list = complaintPage.getRecords().stream().map(this::toComplaintListItem).collect(Collectors.toList());
@@ -268,6 +333,11 @@ public class AdminServiceImpl implements AdminService {
         detail.setOrderNo(order == null ? "" : order.getOrderNo());
         detail.setProductName(order == null ? "" : order.getProductName());
         detail.setComplainantUserId(complaint.getComplainantUserId());
+        UserAccount complainant = complaint.getComplainantUserId() == null
+                ? null
+                : userAccountMapper.selectById(complaint.getComplainantUserId());
+        detail.setComplainantNickname(complainant == null ? "" : complainant.getNickname());
+        detail.setAccusedUserId(complaint.getAccusedUserId());
         detail.setAccusedNickname(accused == null ? "" : accused.getNickname());
         detail.setType(complaint.getType());
         detail.setContent(complaint.getContent());
@@ -287,6 +357,8 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ErrorCode.COMPLAINT_ALREADY_PROCESSED);
         }
         String handleResult = requireText(request == null ? null : request.getHandleResult(), "处理结果不能为空");
+        String result = request == null ? "CONFIRMED" : request.getResult();
+        boolean confirmed = "CONFIRMED".equals(result);
 
         complaint.setStatus("PROCESSED");
         complaint.setHandleResult(handleResult);
@@ -295,19 +367,27 @@ public class AdminServiceImpl implements AdminService {
         complaintMapper.updateById(complaint);
 
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
-        if (order != null && !"COMPLETED".equals(order.getStatus()) && !"CANCELED".equals(order.getStatus())) {
+        if (confirmed && order != null && !"COMPLETED".equals(order.getStatus()) && !"CANCELED".equals(order.getStatus())) {
             order.setStatus("CANCELED");
             order.setComplaintOpened(true);
             groupOrderMapper.updateById(order);
-            refundActiveMembers(order.getId(), "投诉处理取消订单退款");
+            refundActiveMembers(order.getId(), "投诉处理取消订单全额退款", "ADMIN", adminId);
         }
 
-        applyComplaintCreditPenalty(complaint);
-        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, "COMPLAINT_HANDLED", handleResult);
-        insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED", "投诉已处理",
-                "你的投诉已由管理员处理，请查看处理结果。", complaint.getGroupOrderId(), complaintId);
-        insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED", "投诉处理完成",
-                "与你相关的投诉已处理，请关注订单和信用分变化。", complaint.getGroupOrderId(), complaintId);
+        if (confirmed) {
+            applyComplaintCreditPenalty(complaint);
+        }
+
+        String action = confirmed ? "COMPLAINT_CONFIRMED" : "COMPLAINT_REJECTED";
+        insertOperationLog("ADMIN", adminId, "COMPLAINT", complaintId, action, handleResult);
+        insertNotification(complaint.getComplainantUserId(), "COMPLAINT_HANDLED",
+                confirmed ? "投诉已成立" : "投诉已驳回",
+                confirmed ? "你的投诉已由管理员判定成立，请查看处理结果。" : "你的投诉已由管理员驳回，请查看处理结果。",
+                complaint.getGroupOrderId(), complaintId);
+        insertNotification(complaint.getAccusedUserId(), "COMPLAINT_HANDLED",
+                confirmed ? "投诉成立" : "投诉已驳回",
+                confirmed ? "与你相关的投诉已判定成立，请关注订单和信用分变化。" : "与你相关的投诉已被驳回，本次不会影响信用分。",
+                complaint.getGroupOrderId(), complaintId);
     }
 
     @Override
@@ -347,7 +427,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(CapitalRecord::getStatus, status.trim());
         }
 
-        wrapper.orderByDesc(CapitalRecord::getCreatedAt);
+        wrapper.orderByDesc(CapitalRecord::getCreatedAt)
+                .orderByDesc(CapitalRecord::getId);
         Page<CapitalRecord> capitalPage = capitalRecordMapper.selectPage(pageRequest, wrapper);
 
         List<AdminCapitalRecordVO> list = capitalPage.getRecords().stream().map(record -> {
@@ -361,12 +442,102 @@ public class AdminServiceImpl implements AdminService {
             vo.setCreatedAt(record.getCreatedAt());
             UserAccount user = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
             vo.setUserNickname(user == null ? "" : user.getNickname());
+            vo.setOperatorName(resolveCapitalOperator(record));
             GroupOrder order = record.getGroupOrderId() == null ? null : groupOrderMapper.selectById(record.getGroupOrderId());
             vo.setOrderNo(order == null ? "" : order.getOrderNo());
+            vo.setReceiverName(resolveCapitalReceiver(record, user, order));
             return vo;
         }).collect(Collectors.toList());
 
         return new PageVO<>(list, capitalPage.getTotal(), capitalPage.getCurrent(), capitalPage.getSize(), capitalPage.getPages());
+    }
+
+    private String resolveCapitalOperator(CapitalRecord record) {
+        if ("USER".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            UserAccount operator = userAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "用户" : operator.getNickname();
+        }
+        if ("ADMIN".equals(record.getOperatorType()) && record.getOperatorId() != null) {
+            AdminAccount operator = adminAccountMapper.selectById(record.getOperatorId());
+            return operator == null ? "管理员" : operator.getUsername();
+        }
+        if (record.getOperatorType() == null) {
+            UserAccount legacyUser = record.getUserId() == null ? null : userAccountMapper.selectById(record.getUserId());
+            if ("PAY".equals(record.getType()) || "REFUND_EXIT".equals(record.getType())) {
+                return legacyUser == null ? "用户" : legacyUser.getNickname();
+            }
+        }
+        return "系统";
+    }
+
+    private String resolveCapitalReceiver(CapitalRecord record, UserAccount user, GroupOrder order) {
+        if ("PAY".equals(record.getType())) {
+            return "平台资金账户";
+        }
+        if (record.getType() != null && record.getType().startsWith("REFUND")) {
+            return user == null ? "退款用户" : user.getNickname();
+        }
+        if ("SETTLE_TO_CREATOR".equals(record.getType()) && order != null) {
+            UserAccount creator = userAccountMapper.selectById(order.getCreatorUserId());
+            return creator == null ? "订单发起人" : creator.getNickname();
+        }
+        return user == null ? "平台资金账户" : user.getNickname();
+    }
+
+    private String normalizeOperatorType(String operatorType) {
+        if ("USER".equals(operatorType) || "ADMIN".equals(operatorType)) {
+            return operatorType;
+        }
+        return "SYSTEM";
+    }
+
+    private void refundActiveMembers(Long orderId, String remark, String operatorType, Long operatorId) {
+        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
+        );
+        for (GroupOrderMember member : members) {
+            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
+                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
+                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
+                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
+                member.setRefundAmountTotal(refunded.add(netRefund));
+                member.setPayStatus("REFUNDED");
+                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
+                        member.getId(), "REFUND_CANCEL", netRefund, remark, operatorType, operatorId);
+            }
+            if ("ACTIVE".equals(member.getJoinStatus())) {
+                member.setJoinStatus("CANCELED");
+            }
+            groupOrderMemberMapper.updateById(member);
+        }
+    }
+
+    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
+                                     String type, BigDecimal amount, String remark,
+                                     String operatorType, Long operatorId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        Long existingCount = capitalRecordMapper.selectCount(
+                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
+        );
+        if (existingCount != null && existingCount > 0) {
+            return;
+        }
+
+        CapitalRecord record = new CapitalRecord();
+        record.setBizNo(bizNo);
+        record.setUserId(userId);
+        record.setGroupOrderId(orderId);
+        record.setMemberId(memberId);
+        record.setType(type);
+        record.setAmount(amount);
+        record.setStatus("SUCCESS");
+        record.setRemark(remark);
+        record.setOperatorType(normalizeOperatorType(operatorType));
+        record.setOperatorId(operatorId);
+        record.setCreatedAt(LocalDateTime.now());
+        capitalRecordMapper.insert(record);
     }
 
     @Override
@@ -424,7 +595,8 @@ public class AdminServiceImpl implements AdminService {
             wrapper.eq(OperationLog::getBizType, bizType.trim());
         }
 
-        wrapper.orderByDesc(OperationLog::getCreatedAt);
+        wrapper.orderByDesc(OperationLog::getCreatedAt)
+                .orderByDesc(OperationLog::getId);
         Page<OperationLog> logPage = operationLogMapper.selectPage(pageRequest, wrapper);
 
         List<AdminOperationLogVO> list = logPage.getRecords().stream().map(log -> {
@@ -448,6 +620,7 @@ public class AdminServiceImpl implements AdminService {
         vo.setUserId(user.getId());
         vo.setPhone(user.getPhone());
         vo.setNickname(user.getNickname());
+        vo.setStudentNo(user.getStudentNo());
         vo.setIsVerified(user.getIsVerified());
         vo.setCreditScore(user.getCreditScore());
         vo.setStatus(user.getStatus());
@@ -460,6 +633,7 @@ public class AdminServiceImpl implements AdminService {
         vo.setComplaintId(complaint.getId());
         vo.setComplaintNo(complaint.getComplaintNo());
         vo.setOrderId(complaint.getGroupOrderId());
+        vo.setComplainantUserId(complaint.getComplainantUserId());
         vo.setAccusedUserId(complaint.getAccusedUserId());
         vo.setType(complaint.getType());
         vo.setContent(complaint.getContent());
@@ -480,53 +654,14 @@ public class AdminServiceImpl implements AdminService {
             vo.setAccusedNickname(accused.getNickname());
         }
 
+        UserAccount complainant = complaint.getComplainantUserId() == null
+                ? null
+                : userAccountMapper.selectById(complaint.getComplainantUserId());
+        if (complainant != null) {
+            vo.setComplainantNickname(complainant.getNickname());
+        }
+
         return vo;
-    }
-
-    private void refundActiveMembers(Long orderId, String remark) {
-        List<GroupOrderMember> members = groupOrderMemberMapper.selectList(
-                new LambdaQueryWrapper<GroupOrderMember>().eq(GroupOrderMember::getGroupOrderId, orderId)
-        );
-        for (GroupOrderMember member : members) {
-            if ("ACTIVE".equals(member.getJoinStatus()) && "PAID".equals(member.getPayStatus())) {
-                BigDecimal paidAmount = member.getPayAmount() == null ? BigDecimal.ZERO : member.getPayAmount();
-                BigDecimal refunded = member.getRefundAmountTotal() == null ? BigDecimal.ZERO : member.getRefundAmountTotal();
-                BigDecimal netRefund = paidAmount.subtract(refunded).max(BigDecimal.ZERO);
-                member.setRefundAmountTotal(refunded.add(netRefund));
-                member.setPayStatus("REFUNDED");
-                insertCapitalRecord("RFC-M" + member.getId(), member.getUserId(), orderId,
-                        member.getId(), "REFUND_CANCEL", netRefund, remark);
-            }
-            if ("ACTIVE".equals(member.getJoinStatus())) {
-                member.setJoinStatus("CANCELED");
-            }
-            groupOrderMemberMapper.updateById(member);
-        }
-    }
-
-    private void insertCapitalRecord(String bizNo, Long userId, Long orderId, Long memberId,
-                                     String type, BigDecimal amount, String remark) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return;
-        }
-        Long existingCount = capitalRecordMapper.selectCount(
-                new LambdaQueryWrapper<CapitalRecord>().eq(CapitalRecord::getBizNo, bizNo)
-        );
-        if (existingCount != null && existingCount > 0) {
-            return;
-        }
-
-        CapitalRecord record = new CapitalRecord();
-        record.setBizNo(bizNo);
-        record.setUserId(userId);
-        record.setGroupOrderId(orderId);
-        record.setMemberId(memberId);
-        record.setType(type);
-        record.setAmount(amount);
-        record.setStatus("SUCCESS");
-        record.setRemark(remark);
-        record.setCreatedAt(LocalDateTime.now());
-        capitalRecordMapper.insert(record);
     }
 
     private void applyComplaintCreditPenalty(Complaint complaint) {
@@ -639,6 +774,9 @@ public class AdminServiceImpl implements AdminService {
             AdminAccount admin = adminAccountMapper.selectById(log.getOperatorId());
             return admin == null ? "管理员" : admin.getUsername();
         }
+        if ("SYSTEM".equals(log.getOperatorType()) || log.getOperatorId() == null) {
+            return "系统";
+        }
 
         UserAccount user = userAccountMapper.selectById(log.getOperatorId());
         return user == null ? "系统" : user.getNickname();
@@ -673,6 +811,14 @@ public class AdminServiceImpl implements AdminService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
         }
         return value.trim();
+    }
+
+    private int resolveRemainingCount(GroupOrder order) {
+        return Math.max(safeMemberCount(order.getTotalMemberCount()) - safeMemberCount(order.getCurrentMemberCount()), 0);
+    }
+
+    private int safeMemberCount(Integer count) {
+        return count == null ? 0 : Math.max(count, 0);
     }
 
     private String normalizeOrderStatus(String status) {

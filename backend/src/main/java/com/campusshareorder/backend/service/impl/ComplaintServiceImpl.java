@@ -29,6 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -110,8 +111,11 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         Page<Complaint> page = this.page(
                 new Page<>(request.getPage(), request.getPageSize()),
                 new LambdaQueryWrapper<Complaint>()
-                        .eq(Complaint::getComplainantUserId, userId)
+                        .and(wrapper -> wrapper.eq(Complaint::getComplainantUserId, userId)
+                                .or()
+                                .eq(Complaint::getAccusedUserId, userId))
                         .orderByDesc(Complaint::getCreatedAt)
+                        .orderByDesc(Complaint::getId)
         );
 
         List<ComplaintListItemVO> list = page.getRecords().stream().map(complaint -> {
@@ -125,6 +129,13 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
             vo.setHandledAt(complaint.getHandledAt());
             vo.setHandleResult(complaint.getHandleResult());
             vo.setOpenedBySystem(false);
+            vo.setViewerRoleInComplaint(resolveViewerRole(complaint, userId));
+
+            UserAccount complainantUser = userAccountMapper.selectById(complaint.getComplainantUserId());
+            if (complainantUser != null) {
+                vo.setComplainantUserId(complainantUser.getId());
+                vo.setComplainantNickname(complainantUser.getNickname());
+            }
 
             UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
             if (accusedUser != null) {
@@ -150,7 +161,7 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         if (complaint == null) {
             throw new BusinessException(ErrorCode.COMPLAINT_NOT_FOUND);
         }
-        if (!complaint.getComplainantUserId().equals(userId)) {
+        if (!isComplaintParticipant(complaint, userId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看此投诉");
         }
 
@@ -160,12 +171,18 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         vo.setOrderId(complaint.getGroupOrderId());
         vo.setComplainantUserId(complaint.getComplainantUserId());
         vo.setAccusedUserId(complaint.getAccusedUserId());
+        vo.setViewerRoleInComplaint(resolveViewerRole(complaint, userId));
 
         GroupOrder order = groupOrderMapper.selectById(complaint.getGroupOrderId());
         if (order != null) {
             vo.setOrderNo(order.getOrderNo());
             vo.setProductName(order.getProductName());
             vo.setOpenedBySystem(Boolean.TRUE.equals(order.getComplaintOpened()));
+        }
+
+        UserAccount complainantUser = userAccountMapper.selectById(complaint.getComplainantUserId());
+        if (complainantUser != null) {
+            vo.setComplainantNickname(complainantUser.getNickname());
         }
 
         UserAccount accusedUser = userAccountMapper.selectById(complaint.getAccusedUserId());
@@ -180,6 +197,21 @@ public class ComplaintServiceImpl extends ServiceImpl<ComplaintMapper, Complaint
         vo.setHandledAt(complaint.getHandledAt());
         vo.setCreatedAt(complaint.getCreatedAt());
         return vo;
+    }
+
+    private boolean isComplaintParticipant(Complaint complaint, Long userId) {
+        return Objects.equals(complaint.getComplainantUserId(), userId)
+                || Objects.equals(complaint.getAccusedUserId(), userId);
+    }
+
+    private String resolveViewerRole(Complaint complaint, Long userId) {
+        if (Objects.equals(complaint.getComplainantUserId(), userId)) {
+            return "COMPLAINANT";
+        }
+        if (Objects.equals(complaint.getAccusedUserId(), userId)) {
+            return "ACCUSED";
+        }
+        return "VIEWER";
     }
 
     private void insertOperationLog(String operatorType, Long operatorId, String bizType, Long bizId,

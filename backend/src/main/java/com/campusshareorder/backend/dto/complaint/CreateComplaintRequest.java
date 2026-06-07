@@ -13,6 +13,7 @@ public class CreateComplaintRequest {
     @Positive(message = "订单ID必须大于0")
     private Long orderId;
 
+    @Positive(message = "被投诉人ID必须大于0")
     private Long accusedUserId;
 
     @NotBlank(message = "投诉类型不能为空")
@@ -22,4 +23,12 @@ public class CreateComplaintRequest {
     @NotBlank(message = "投诉内容不能为空")
     @Size(max = 500, message = "投诉内容长度不能超过500")
     private String content;
+
+    public void setType(String type) {
+        this.type = type == null ? null : type.trim();
+    }
+
+    public void setContent(String content) {
+        this.content = content == null ? null : content.trim();
+    }
 }

@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
+import { creditReasonTypeTextMap } from '../../utils/enum'
 import { formatDateTime, formatSignedNumber, formatUserStatus } from '../../utils/format'
 
 const route = useRoute()
@@ -31,7 +32,7 @@ const stats = computed(() => {
     {
       label: '账号状态',
       value: formatUserStatus(user.value.status),
-      hint: '后台详情页直接消费用户详情字段',
+      hint: '用于判断账号是否可正常使用',
     },
     {
       label: '信用分',
@@ -41,10 +42,18 @@ const stats = computed(() => {
     {
       label: '信用记录',
       value: user.value.creditRecords?.length || 0,
-      hint: '来自用户详情聚合信息',
+      hint: '展示该用户近期信用变化次数',
     },
   ]
 })
+
+const formatReasonType = (value) => creditReasonTypeTextMap[value] || value || '--'
+
+const formatRelatedBiz = (row) => {
+  if (row.relatedComplaintId) return `投诉 #${row.relatedComplaintId}`
+  if (row.relatedOrderId) return `订单 #${row.relatedOrderId}`
+  return '--'
+}
 
 const loadDetail = async (userId = route.params.userId) => {
   if (!isValidUserId.value) {
@@ -190,6 +199,21 @@ onMounted(() => {
                     {{ formatSignedNumber(row.delta) }}
                   </template>
                 </el-table-column>
+                <el-table-column label="变更后分数">
+                  <template #default="{ row }">
+                    {{ row.currentScore ?? '--' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="原因类型">
+                  <template #default="{ row }">
+                    {{ formatReasonType(row.reasonType) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="关联业务">
+                  <template #default="{ row }">
+                    {{ formatRelatedBiz(row) }}
+                  </template>
+                </el-table-column>
               </el-table>
             </div>
 
@@ -205,6 +229,9 @@ onMounted(() => {
                 </div>
                 <ul class="mobile-record-fields">
                   <li><span>变更值</span><strong>{{ formatSignedNumber(row.delta) }}</strong></li>
+                  <li><span>变更后分数</span><strong>{{ row.currentScore ?? '--' }}</strong></li>
+                  <li><span>原因类型</span><strong>{{ formatReasonType(row.reasonType) }}</strong></li>
+                  <li><span>关联业务</span><strong>{{ formatRelatedBiz(row) }}</strong></li>
                 </ul>
               </article>
             </div>

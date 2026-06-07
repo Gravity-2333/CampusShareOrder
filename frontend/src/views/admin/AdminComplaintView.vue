@@ -60,10 +60,7 @@ onMounted(loadComplaints)
           <option value="PENDING">
             待处理
           </option>
-          <option value="PROCESSING">
-            处理中
-          </option>
-          <option value="RESOLVED">
+          <option value="PROCESSED">
             已处理
           </option>
         </select>

@@ -9,4 +9,8 @@ public class UserLoginRequest {
     private String phone;
     @NotBlank(message = "密码不能为空")
     private String password;
+
+    public void setPhone(String phone) {
+        this.phone = phone == null ? null : phone.trim();
+    }
 }

@@ -38,8 +38,11 @@ const handleProcess = async () => {
   if (!complaint.value || adminStore.submitting) return
 
   try {
-    await adminStore.processComplaint(complaint.value.complaintId, { handleResult: form.handleResult.trim() || '投诉已处理' })
-    ElMessage.success('投诉已处理')
+    await adminStore.processComplaint(complaint.value.complaintId, {
+      result: 'CONFIRMED',
+      handleResult: form.handleResult.trim() || '经核实投诉成立，按平台规则处理。',
+    })
+    ElMessage.success('投诉已判定成立')
     router.push('/admin/complaints') // 跳转回管理员投诉列表
   } catch (error) {
     if (error === 'cancel' || error?.message === 'cancel') return
@@ -51,7 +54,10 @@ const handleReject = async () => {
   if (!complaint.value || adminStore.submitting) return
 
   try {
-    await adminStore.processComplaint(complaint.value.complaintId, { handleResult: form.handleResult.trim() || '投诉已驳回' })
+    await adminStore.processComplaint(complaint.value.complaintId, {
+      result: 'REJECTED',
+      handleResult: form.handleResult.trim() || '经核实投诉证据不足，本次驳回。',
+    })
     ElMessage.success('投诉已驳回')
     router.push('/admin/complaints') // 跳转回管理员投诉列表
   } catch (error) {
@@ -102,6 +108,7 @@ onMounted(() => loadDetail())
           <li><span>关联订单</span><strong>{{ complaint.orderNo || '--' }} - {{ complaint.productName || '--' }}</strong></li>
           <li><span>投诉类型</span><strong>{{ formatComplaintType(complaint.type) }}</strong></li>
           <li><span>投诉人</span><strong>{{ complaint.complainantNickname || '--' }}</strong></li>
+          <li><span>被投诉人</span><strong>{{ complaint.accusedNickname || '--' }}</strong></li>
           <li><span>创建时间</span><strong>{{ formatDateTime(complaint.createdAt) }}</strong></li>
         </ul>
         <div style="border-top: 1px solid #e0d8cf; padding-top: 1rem; margin-top: 1rem;">
@@ -164,7 +171,7 @@ onMounted(() => loadDetail())
             :disabled="adminStore.submitting"
             @click="handleProcess"
           >
-            已解决
+            投诉成立
           </button>
           <button
             class="btn btn-danger"

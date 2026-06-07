@@ -1,20 +1,24 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import { useComplaintStore } from '../../stores/complaint'
 import { useOrderStore } from '../../stores/order'
 import { firstValidationError, requireValue } from '../../utils/validate'
 
+const route = useRoute()
 const router = useRouter()
 const complaintStore = useComplaintStore()
 const orderStore = useOrderStore()
 const loading = ref(false)
 const loadingOrders = ref(false)
+const loadingOrderDetail = ref(false)
 const complaintableOrders = ref([])
+const selectedOrderDetail = ref(null)
 
 const form = reactive({
+  accusedUserId: null,
   content: '',
   orderId: null,
   type: '',
@@ -32,6 +36,48 @@ const complaintTypes = [
 
 // 是否有可投诉订单
 const hasComplaintableOrders = computed(() => complaintableOrders.value.length > 0)
+const accusedOptions = computed(() => {
+  const detail = selectedOrderDetail.value
+  if (!detail) return []
+
+  const options = []
+  const currentUserId = Number(detail.currentUserMember?.userId || 0)
+  const pushUnique = (member) => {
+    if (
+      !member?.userId ||
+      Number(member.userId) === currentUserId ||
+      options.some((option) => option.userId === member.userId)
+    ) return
+    options.push({
+      userId: member.userId,
+      nickname: member.nickname || `用户 #${member.userId}`,
+      roleText: member.isCreator ? '发起人' : '参与成员',
+    })
+  }
+
+  pushUnique({
+    userId: detail.initiatorInfo?.userId,
+    nickname: detail.initiatorInfo?.nickname,
+    isCreator: true,
+  })
+  const activeMembers = (detail.memberList || []).filter((member) => member.joinStatus === 'ACTIVE')
+  activeMembers.forEach(pushUnique)
+
+  return options
+})
+const canSubmitComplaint = computed(
+  () =>
+    hasComplaintableOrders.value &&
+    selectedOrderDetail.value?.actionFlags?.canCreateComplaint === true &&
+    accusedOptions.value.length > 0,
+)
+const selectedOrderTip = computed(() => {
+  if (!form.orderId) return '请选择订单后，系统会校验当前订单是否已开放投诉。'
+  if (loadingOrderDetail.value) return '正在校验订单投诉权限...'
+  if (!selectedOrderDetail.value) return '暂未加载到订单详情，请重新选择订单。'
+  if (canSubmitComplaint.value) return '该订单当前已开放投诉，请选择被投诉人并填写描述。'
+  return '该订单当前不满足投诉条件，可能是投诉通道尚未开放或你已提交过投诉。'
+})
 
 // 加载可投诉的订单列表
 const loadComplaintableOrders = async () => {
@@ -53,10 +99,34 @@ const loadComplaintableOrders = async () => {
         productName: order.productName,
         label: `${order.orderNo} - ${order.productName}`,
       }))
+
+    const routeOrderId = Number(route.query.orderId || 0)
+    if (Number.isInteger(routeOrderId) && routeOrderId > 0) {
+      form.orderId = routeOrderId
+    } else if (!form.orderId && complaintableOrders.value.length === 1) {
+      form.orderId = complaintableOrders.value[0].orderId
+    }
   } catch (error) {
     ElMessage.error('加载订单列表失败：' + error.message)
   } finally {
     loadingOrders.value = false
+  }
+}
+
+const loadSelectedOrderDetail = async (orderId) => {
+  selectedOrderDetail.value = null
+  form.accusedUserId = null
+  if (!orderId) return
+
+  loadingOrderDetail.value = true
+  try {
+    selectedOrderDetail.value = await orderStore.loadOrderDetail(orderId)
+    const defaultAccused = accusedOptions.value.find((member) => member.roleText === '发起人') || accusedOptions.value[0]
+    form.accusedUserId = defaultAccused?.userId || null
+  } catch (error) {
+    ElMessage.error('加载订单详情失败：' + error.message)
+  } finally {
+    loadingOrderDetail.value = false
   }
 }
 
@@ -67,6 +137,8 @@ const handleSubmit = async () => {
 
   const errorMessage = firstValidationError([
     requireValue(form.orderId, '请选择要投诉的订单'),
+    !canSubmitComplaint.value ? '当前订单暂不支持发起投诉' : '',
+    requireValue(form.accusedUserId, '请选择被投诉人'),
     requireValue(form.type, '请选择投诉类型'),
     requireValue(form.content, '请填写投诉描述'),
     form.content.trim().length > 500 ? '投诉描述长度不能超过 500 个字符' : '',
@@ -81,6 +153,7 @@ const handleSubmit = async () => {
 
   try {
     const result = await complaintStore.submitComplaint({
+      accusedUserId: form.accusedUserId,
       orderId: form.orderId,
       type: form.type,
       content: form.content.trim(),
@@ -107,6 +180,13 @@ const handleCancel = () => {
 onMounted(() => {
   loadComplaintableOrders()
 })
+
+watch(
+  () => form.orderId,
+  (orderId) => {
+    loadSelectedOrderDetail(orderId)
+  },
+)
 </script>
 
 <template>
@@ -149,11 +229,36 @@ onMounted(() => {
           </el-select>
         </el-form-item>
 
+        <el-alert
+          class="full-span"
+          :title="selectedOrderTip"
+          :type="canSubmitComplaint ? 'success' : 'warning'"
+          :closable="false"
+          show-icon
+        />
+
+        <el-form-item label="被投诉人">
+          <el-select
+            v-model="form.accusedUserId"
+            placeholder="请选择被投诉人"
+            :loading="loadingOrderDetail"
+            :disabled="!canSubmitComplaint"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="member in accusedOptions"
+              :key="member.userId"
+              :label="`${member.nickname}（${member.roleText}）`"
+              :value="member.userId"
+            />
+          </el-select>
+        </el-form-item>
+
         <el-form-item label="投诉类型">
           <el-select
             v-model="form.type"
             placeholder="请选择投诉类型"
-            :disabled="!hasComplaintableOrders"
+            :disabled="!canSubmitComplaint"
             style="width: 100%"
           >
             <el-option
@@ -176,7 +281,7 @@ onMounted(() => {
             show-word-limit
             :rows="6"
             placeholder="请详细描述投诉内容..."
-            :disabled="!hasComplaintableOrders"
+            :disabled="!canSubmitComplaint"
           />
         </el-form-item>
       </el-form>
@@ -188,7 +293,7 @@ onMounted(() => {
         <el-button
           type="primary"
           :loading="loading"
-          :disabled="!hasComplaintableOrders"
+          :disabled="!canSubmitComplaint"
           @click="handleSubmit"
         >
           提交投诉

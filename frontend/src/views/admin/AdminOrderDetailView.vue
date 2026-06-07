@@ -146,7 +146,7 @@ onMounted(() => loadDetail())
                   {{ formatReceiveStatus(row.receiveStatus) }}
                 </span>
               </td>
-              <td>{{ row.amount || '--' }}</td>
+              <td>{{ row.amount ?? '--' }}</td>
             </tr>
           </tbody>
         </table>

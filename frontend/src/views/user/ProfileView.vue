@@ -21,7 +21,7 @@ const stats = computed(() => [
   {
     label: '资料完整度',
     value: `${userStore.profileCompletion}%`,
-    hint: '根据昵称、联系方式、学号三个核心字段估算',
+    hint: '根据昵称、联系方式、学号三个信息项估算',
   },
   {
     label: '认证状态',
@@ -31,7 +31,7 @@ const stats = computed(() => [
   {
     label: '信用等级',
     value: userStore.creditLevel,
-    hint: '基于当前信用分做展示，不参与前端业务判断',
+    hint: '根据信用分区间展示当前等级',
   },
 ])
 

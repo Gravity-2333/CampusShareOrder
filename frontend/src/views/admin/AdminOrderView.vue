@@ -92,8 +92,17 @@ onMounted(loadOrders)
           <option value="GROUPED">
             已成团
           </option>
+          <option value="WAIT_DELIVERY">
+            待送达
+          </option>
+          <option value="WAIT_RECEIVE">
+            待收货
+          </option>
           <option value="COMPLETED">
             已完成
+          </option>
+          <option value="CANCELED">
+            已取消
           </option>
         </select>
         <button
@@ -129,11 +138,11 @@ onMounted(loadOrders)
             <td>{{ row.productName }}</td>
             <td>{{ row.creatorNickname || '--' }}</td>
             <td>{{ row.currentMemberCount }}/{{ row.totalMemberCount }}</td>
-            <td>{{ row.estimatedTotalAmount || '--' }}</td>
+            <td>{{ row.estimatedTotalAmount ?? '--' }}</td>
             <td>
               <span
                 class="tag"
-                :class="`tag-${row.status === 'OPEN' ? 'warning' : row.status === 'GROUPED' || row.status === 'WAIT_DELIVERY' ? 'info' : row.status === 'COMPLETED' ? 'success' : 'info'}`"
+                :class="`tag-${row.status === 'OPEN' ? 'warning' : row.status === 'GROUPED' || row.status === 'WAIT_DELIVERY' || row.status === 'WAIT_RECEIVE' ? 'info' : row.status === 'COMPLETED' ? 'success' : row.status === 'CANCELED' ? 'danger' : 'info'}`"
               >
                 {{ formatOrderStatus(row.status) }}
               </span>

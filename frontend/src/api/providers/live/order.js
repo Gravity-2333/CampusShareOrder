@@ -12,8 +12,16 @@ export const payOrder = (orderId) => request.post(`/api/orders/${orderId}/pay`)
 
 export const exitOrder = (orderId) => request.post(`/api/orders/${orderId}/exit`)
 
-export const uploadReceipt = (orderId, payload) =>
-  request.post(`/api/orders/${orderId}/upload-receipt`, payload)
+export const cancelOrder = (orderId) => request.post(`/api/orders/${orderId}/cancel`)
+
+export const uploadReceipt = (orderId, payload) => {
+  const formData = new FormData()
+  formData.append('image', payload.image)
+  formData.append('actualTotalAmount', payload.actualTotalAmount)
+  formData.append('expectedDeliveryStartAt', payload.expectedDeliveryStartAt)
+  formData.append('expectedDeliveryEndAt', payload.expectedDeliveryEndAt)
+  return request.post(`/api/orders/${orderId}/upload-receipt`, formData)
+}
 
 export const markDelivered = (orderId) => request.post(`/api/orders/${orderId}/mark-delivered`)
 

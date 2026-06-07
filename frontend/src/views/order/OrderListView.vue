@@ -48,7 +48,7 @@ const stats = computed(() => {
     {
       label: '剩余名额',
       value: remainingSeats,
-      hint: '基于 remainingCount 聚合，便于快速浏览大厅供给',
+      hint: '当前列表中仍可加入的名额合计',
     },
     {
       label: '当前页',

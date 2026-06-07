@@ -32,7 +32,7 @@ const stats = computed(() => {
     {
       label: '账号状态',
       value: formatUserStatus(user.value.status),
-      hint: '后台详情页直接消费用户详情字段',
+      hint: '用于判断账号是否可正常使用',
     },
     {
       label: '信用分',
@@ -42,7 +42,7 @@ const stats = computed(() => {
     {
       label: '信用记录',
       value: user.value.creditRecords?.length || 0,
-      hint: '来自用户详情聚合信息',
+      hint: '展示该用户近期信用变化次数',
     },
   ]
 })

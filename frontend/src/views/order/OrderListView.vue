@@ -131,6 +131,12 @@ const handleJoin = async (order) => {
     return
   }
 
+  if (!userStore.session.isVerified) {
+    ElMessage.warning('请先完成实名认证，再加入拼单')
+    router.push('/verify-student')
+    return
+  }
+
   if (!canJoinOrder(order)) {
     if (order.status !== 'OPEN') {
       ElMessage.warning('当前订单已不可直接加入')

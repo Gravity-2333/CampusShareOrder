@@ -8,6 +8,7 @@ import PageSection from '../../components/common/PageSection.vue'
 import StatCard from '../../components/common/StatCard.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useOrderStore } from '../../stores/order'
+import { useUserStore } from '../../stores/user'
 import {
   formatCurrency,
   formatDateTime,
@@ -21,6 +22,7 @@ import {
 const route = useRoute()
 const router = useRouter()
 const orderStore = useOrderStore()
+const userStore = useUserStore()
 
 const receiptDialogVisible = ref(false)
 const uploadDialogVisible = ref(false)
@@ -307,6 +309,12 @@ const runAction = async (action) => {
 
     if (action === 'viewReceipt') {
       openReceiptDialog()
+      return
+    }
+
+    if (['join', 'pay'].includes(action) && !userStore.session.isVerified) {
+      ElMessage.warning('请先完成实名认证，再继续拼单操作')
+      router.push('/verify-student')
       return
     }
 

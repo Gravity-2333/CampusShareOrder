@@ -336,6 +336,7 @@ class OrderServiceImplTest {
 
         when(groupOrderMapper.selectById(1L)).thenReturn(order);
         when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+        when(userAccountMapper.selectById(101L)).thenReturn(user(101L, 80));
 
         orderService.joinOrder(1L, null, 101L);
 
@@ -360,6 +361,7 @@ class OrderServiceImplTest {
 
         when(groupOrderMapper.selectById(1L)).thenReturn(order);
         when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+        when(userAccountMapper.selectById(101L)).thenReturn(user(101L, 80));
 
         orderService.joinOrder(1L, null, 101L);
 
@@ -370,6 +372,37 @@ class OrderServiceImplTest {
         assertThat(order.getCurrentMemberCount()).isEqualTo(2);
         verify(groupOrderMemberMapper).updateById(exitedMember);
         verify(groupOrderMapper).updateById(order);
+    }
+
+    @Test
+    void joinOrderHandlesMissingCurrentMemberCount() {
+        GroupOrder order = groupedOrder();
+        order.setStatus("OPEN");
+        order.setCurrentMemberCount(null);
+
+        when(groupOrderMapper.selectById(1L)).thenReturn(order);
+        when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
+        when(userAccountMapper.selectById(101L)).thenReturn(user(101L, 80));
+
+        orderService.joinOrder(1L, null, 101L);
+
+        assertThat(order.getCurrentMemberCount()).isEqualTo(1);
+        verify(groupOrderMemberMapper).insert(any(GroupOrderMember.class));
+        verify(groupOrderMapper).updateById(order);
+    }
+
+    @Test
+    void unverifiedUserCannotJoinOrder() {
+        UserAccount user = user(101L, 80);
+        user.setIsVerified(false);
+        when(userAccountMapper.selectById(101L)).thenReturn(user);
+
+        assertThatThrownBy(() -> orderService.joinOrder(1L, null, 101L))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo(ErrorCode.USER_NOT_VERIFIED.getCode()));
+
+        verify(groupOrderMapper, never()).selectById(1L);
+        verify(groupOrderMemberMapper, never()).insert(any(GroupOrderMember.class));
     }
 
     @Test
@@ -425,6 +458,7 @@ class OrderServiceImplTest {
 
         when(groupOrderMapper.selectById(1L)).thenReturn(order);
         when(groupOrderMemberMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(exitedMember);
+        when(userAccountMapper.selectById(101L)).thenReturn(user(101L, 80));
 
         assertThatThrownBy(() -> orderService.payOrder(1L, 101L))
                 .isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -614,6 +648,7 @@ class OrderServiceImplTest {
         UserAccount user = new UserAccount();
         user.setId(userId);
         user.setCreditScore(creditScore);
+        user.setIsVerified(true);
         return user;
     }
 }

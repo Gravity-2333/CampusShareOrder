@@ -275,11 +275,12 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Override
     @Transactional
     public void joinOrder(Long orderId, JoinOrderRequest request, Long userId) {
+        requireVerifiedUser(userId);
         GroupOrder order = requireOrder(orderId);
         if (!"OPEN".equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
         }
-        if (order.getCurrentMemberCount() >= order.getTotalMemberCount()) {
+        if (safeMemberCount(order.getCurrentMemberCount()) >= safeMemberCount(order.getTotalMemberCount())) {
             throw new BusinessException(ErrorCode.ORDER_FULL);
         }
 
@@ -334,6 +335,7 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     @Override
     @Transactional
     public void payOrder(Long orderId, Long userId) {
+        requireVerifiedUser(userId);
         GroupOrder order = requireOrder(orderId);
         if (!"OPEN".equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.ORDER_STATUS_INVALID);
@@ -1025,11 +1027,14 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
     private ActionFlagsVO buildActionFlags(GroupOrder order, GroupOrderMember currentMember, OrderReceipt receipt, List<Complaint> complaints, Long userId) {
         ActionFlagsVO actionFlags = new ActionFlagsVO();
         boolean hasMyComplaint = complaints.stream().anyMatch(item -> Objects.equals(item.getComplainantUserId(), userId));
+        boolean verifiedUser = isVerifiedUser(userId);
         actionFlags.setCanJoin("OPEN".equals(order.getStatus())
+                && verifiedUser
                 && (currentMember == null || List.of("EXITED", "REFUNDED").contains(currentMember.getJoinStatus()))
                 && safeMemberCount(order.getCurrentMemberCount()) < safeMemberCount(order.getTotalMemberCount()));
         actionFlags.setCanPay(currentMember != null
                 && "OPEN".equals(order.getStatus())
+                && verifiedUser
                 && "ACTIVE".equals(currentMember.getJoinStatus())
                 && "UNPAID".equals(currentMember.getPayStatus()));
         actionFlags.setCanExit(currentMember != null
@@ -1066,6 +1071,24 @@ public class OrderServiceImpl extends ServiceImpl<GroupOrderMapper, GroupOrder> 
 
     private int safeMemberCount(Integer count) {
         return count == null ? 0 : Math.max(count, 0);
+    }
+
+    private void requireVerifiedUser(Long userId) {
+        UserAccount user = userAccountMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "用户不存在");
+        }
+        if (!Boolean.TRUE.equals(user.getIsVerified())) {
+            throw new BusinessException(ErrorCode.USER_NOT_VERIFIED);
+        }
+    }
+
+    private boolean isVerifiedUser(Long userId) {
+        if (userId == null || userId <= 0) {
+            return false;
+        }
+        UserAccount user = userAccountMapper.selectById(userId);
+        return user != null && Boolean.TRUE.equals(user.getIsVerified());
     }
 
     private List<TimelineItemVO> buildTimeline(GroupOrder order, UserAccount creator, OrderReceipt receipt, List<Complaint> complaints, Long userId) {

@@ -7,6 +7,7 @@ import EmptyState from '../../components/common/EmptyState.vue'
 import StatusTag from '../../components/common/StatusTag.vue'
 import { useComplaintStore } from '../../stores/complaint'
 import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
+import { isValidId, normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,8 +15,8 @@ const complaintStore = useComplaintStore()
 
 const complaint = computed(() => complaintStore.complaintDetail)
 const currentComplaintId = computed(() => route.params.complaintId)
-const normalizedComplaintId = computed(() => String(currentComplaintId.value || '').trim())
-const isValidComplaintId = computed(() => normalizedComplaintId.value.length > 0)
+const normalizedComplaintId = computed(() => normalizeId(currentComplaintId.value))
+const isValidComplaintId = computed(() => isValidId(normalizedComplaintId.value))
 const detailErrorText = computed(() =>
   isValidComplaintId.value
     ? '当前未能加载到投诉详情，请返回列表重新选择。'

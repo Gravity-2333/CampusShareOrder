@@ -12,6 +12,7 @@ import {
   formatReceiveStatus,
   formatRole,
 } from '../../utils/format'
+import { isValidId, normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,8 +20,8 @@ const adminStore = useAdminStore()
 
 const detail = computed(() => adminStore.orderDetail)
 const currentOrderId = computed(() => route.params.orderId)
-const normalizedOrderId = computed(() => Number(currentOrderId.value || 0))
-const isValidOrderId = computed(() => Number.isInteger(normalizedOrderId.value) && normalizedOrderId.value > 0)
+const normalizedOrderId = computed(() => normalizeId(currentOrderId.value))
+const isValidOrderId = computed(() => isValidId(normalizedOrderId.value))
 
 const loadDetail = async (orderId = route.params.orderId) => {
   if (!isValidOrderId.value) {

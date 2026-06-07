@@ -10,6 +10,7 @@ import StatusTag from '../../components/common/StatusTag.vue'
 import { useAdminStore } from '../../stores/admin'
 import { creditReasonTypeTextMap } from '../../utils/enum'
 import { formatDateTime, formatSignedNumber, formatUserStatus } from '../../utils/format'
+import { isValidId, normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,8 +18,8 @@ const adminStore = useAdminStore()
 
 const user = computed(() => adminStore.userDetail)
 const currentUserId = computed(() => route.params.userId)
-const normalizedUserId = computed(() => Number(currentUserId.value || 0))
-const isValidUserId = computed(() => Number.isInteger(normalizedUserId.value) && normalizedUserId.value > 0)
+const normalizedUserId = computed(() => normalizeId(currentUserId.value))
+const isValidUserId = computed(() => isValidId(normalizedUserId.value))
 const detailErrorText = computed(() =>
   isValidUserId.value ? '当前未能加载到用户详情，请返回列表重新选择。' : '当前路由中的用户 ID 无效，请返回用户列表重新进入详情页。',
 )

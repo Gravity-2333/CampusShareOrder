@@ -15,6 +15,7 @@ import {
   handleAdminComplaint,
   unbanUser,
 } from '../api/admin'
+import { sameId } from '../utils/id'
 import { defaultPageData, loadNormalizedPage } from '../utils/page'
 
 export const useAdminStore = defineStore('admin', {
@@ -128,7 +129,7 @@ export const useAdminStore = defineStore('admin', {
           this.loadDashboardOverview(),
         ]
 
-        if (this.userDetail?.userId === Number(row.userId)) {
+        if (sameId(this.userDetail?.userId, row.userId)) {
           refreshTasks.push(this.loadUserDetail(row.userId))
         }
 
@@ -180,7 +181,7 @@ export const useAdminStore = defineStore('admin', {
           this.loadDashboardOverview(),
         ]
 
-        if (this.orderDetail?.basicInfo?.orderId === Number(orderId)) {
+        if (sameId(this.orderDetail?.basicInfo?.orderId, orderId)) {
           refreshTasks.push(this.loadOrderDetail(orderId))
         }
 
@@ -236,7 +237,7 @@ export const useAdminStore = defineStore('admin', {
           this.loadDashboardOverview(),
         ]
 
-        if (this.complaintDetail?.complaintId === Number(complaintId)) {
+        if (sameId(this.complaintDetail?.complaintId, complaintId)) {
           refreshTasks.push(this.loadComplaintDetail(complaintId))
         }
 

@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useAdminStore } from '../../stores/admin'
 import { formatComplaintStatus, formatComplaintType, formatDateTime } from '../../utils/format'
+import { isValidId, normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,10 +13,10 @@ const adminStore = useAdminStore()
 
 const complaint = computed(() => adminStore.complaintDetail)
 const currentComplaintId = computed(() => route.params.complaintId)
-const normalizedComplaintId = computed(() => Number(currentComplaintId.value || 0))
-const isValidComplaintId = computed(() => Number.isInteger(normalizedComplaintId.value) && normalizedComplaintId.value > 0)
-const relatedOrderId = computed(() => Number(complaint.value?.orderId || 0))
-const canViewRelatedOrder = computed(() => Number.isInteger(relatedOrderId.value) && relatedOrderId.value > 0)
+const normalizedComplaintId = computed(() => normalizeId(currentComplaintId.value))
+const isValidComplaintId = computed(() => isValidId(normalizedComplaintId.value))
+const relatedOrderId = computed(() => normalizeId(complaint.value?.orderId))
+const canViewRelatedOrder = computed(() => isValidId(relatedOrderId.value))
 
 const form = reactive({
   handleResult: '',

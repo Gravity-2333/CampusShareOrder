@@ -5,6 +5,7 @@ import { ElMessage } from 'element-plus'
 
 import { useComplaintStore } from '../../stores/complaint'
 import { useOrderStore } from '../../stores/order'
+import { normalizeId, sameId } from '../../utils/id'
 import { firstValidationError, requireValue } from '../../utils/validate'
 
 const route = useRoute()
@@ -41,13 +42,13 @@ const accusedOptions = computed(() => {
   if (!detail) return []
 
   const options = []
-  const currentUserId = String(detail.currentUserMember?.userId || '')
+  const currentUserId = normalizeId(detail.currentUserMember?.userId)
   const pushUnique = (member) => {
-    const memberUserId = String(member?.userId || '')
+    const memberUserId = normalizeId(member?.userId)
     if (
       !memberUserId ||
-      memberUserId === currentUserId ||
-      options.some((option) => option.userId === memberUserId)
+      sameId(memberUserId, currentUserId) ||
+      options.some((option) => sameId(option.userId, memberUserId))
     ) return
     options.push({
       userId: memberUserId,
@@ -101,7 +102,7 @@ const loadComplaintableOrders = async () => {
         label: `${order.orderNo} - ${order.productName}`,
       }))
 
-    const routeOrderId = String(route.query.orderId || '')
+    const routeOrderId = normalizeId(route.query.orderId)
     if (routeOrderId) {
       form.orderId = routeOrderId
     } else if (!form.orderId && complaintableOrders.value.length === 1) {

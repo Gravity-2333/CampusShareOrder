@@ -1,3 +1,5 @@
+import { normalizeId } from '../../utils/id'
+
 const ensureArray = (value) => (Array.isArray(value) ? value : [])
 
 const normalizeRole = (role, isCreator = false) => {
@@ -17,14 +19,6 @@ const normalizeTimelineItem = (item = {}) => ({
   at: item.at || item.time || '',
   description: item.description || '',
 })
-
-const normalizeId = (value) => {
-  if (value === null || value === undefined || value === '') {
-    return ''
-  }
-
-  return String(value)
-}
 
 const normalizeMember = (member = {}) => ({
   exitedAt: member.exitedAt || null,

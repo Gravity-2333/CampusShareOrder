@@ -39,8 +39,8 @@ let countdownTimer = null
 
 const detail = computed(() => orderStore.detail)
 const currentOrderId = computed(() => route.params.orderId)
-const normalizedOrderId = computed(() => Number(currentOrderId.value || 0))
-const isValidOrderId = computed(() => Number.isInteger(normalizedOrderId.value) && normalizedOrderId.value > 0)
+const normalizedOrderId = computed(() => String(currentOrderId.value || '').trim())
+const isValidOrderId = computed(() => normalizedOrderId.value.length > 0)
 
 const activeMemberList = computed(
   () => detail.value?.memberList?.filter((member) => member.joinStatus === 'ACTIVE') || [],
@@ -279,8 +279,8 @@ const navigateToComplaint = () => {
   }
 
   if (detail.value.actionFlags.canCreateComplaint) {
-    const orderId = Number(detail.value.basicInfo.orderId || 0)
-    if (!Number.isInteger(orderId) || orderId <= 0) {
+    const orderId = String(detail.value.basicInfo.orderId || '').trim()
+    if (!orderId) {
       ElMessage.warning('当前订单 ID 无效，请返回详情页重新加载')
       return
     }

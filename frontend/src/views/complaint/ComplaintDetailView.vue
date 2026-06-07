@@ -14,10 +14,8 @@ const complaintStore = useComplaintStore()
 
 const complaint = computed(() => complaintStore.complaintDetail)
 const currentComplaintId = computed(() => route.params.complaintId)
-const normalizedComplaintId = computed(() => Number(currentComplaintId.value || 0))
-const isValidComplaintId = computed(
-  () => Number.isInteger(normalizedComplaintId.value) && normalizedComplaintId.value > 0,
-)
+const normalizedComplaintId = computed(() => String(currentComplaintId.value || '').trim())
+const isValidComplaintId = computed(() => normalizedComplaintId.value.length > 0)
 const detailErrorText = computed(() =>
   isValidComplaintId.value
     ? '当前未能加载到投诉详情，请返回列表重新选择。'

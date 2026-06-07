@@ -41,16 +41,17 @@ const accusedOptions = computed(() => {
   if (!detail) return []
 
   const options = []
-  const currentUserId = Number(detail.currentUserMember?.userId || 0)
+  const currentUserId = String(detail.currentUserMember?.userId || '')
   const pushUnique = (member) => {
+    const memberUserId = String(member?.userId || '')
     if (
-      !member?.userId ||
-      Number(member.userId) === currentUserId ||
-      options.some((option) => option.userId === member.userId)
+      !memberUserId ||
+      memberUserId === currentUserId ||
+      options.some((option) => option.userId === memberUserId)
     ) return
     options.push({
-      userId: member.userId,
-      nickname: member.nickname || `用户 #${member.userId}`,
+      userId: memberUserId,
+      nickname: member.nickname || `用户 #${memberUserId}`,
       roleText: member.isCreator ? '发起人' : '参与成员',
     })
   }
@@ -100,8 +101,8 @@ const loadComplaintableOrders = async () => {
         label: `${order.orderNo} - ${order.productName}`,
       }))
 
-    const routeOrderId = Number(route.query.orderId || 0)
-    if (Number.isInteger(routeOrderId) && routeOrderId > 0) {
+    const routeOrderId = String(route.query.orderId || '')
+    if (routeOrderId) {
       form.orderId = routeOrderId
     } else if (!form.orderId && complaintableOrders.value.length === 1) {
       form.orderId = complaintableOrders.value[0].orderId

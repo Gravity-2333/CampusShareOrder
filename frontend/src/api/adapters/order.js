@@ -18,11 +18,19 @@ const normalizeTimelineItem = (item = {}) => ({
   description: item.description || '',
 })
 
+const normalizeId = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return ''
+  }
+
+  return String(value)
+}
+
 const normalizeMember = (member = {}) => ({
   exitedAt: member.exitedAt || null,
   joinStatus: member.joinStatus || 'CANCELED',
   joinedAt: member.joinedAt || null,
-  memberId: Number(member.memberId || member.userId || 0),
+  memberId: normalizeId(member.memberId || member.userId),
   nickname: member.nickname || '',
   paidAt: member.paidAt || null,
   payAmount: Number(member.payAmount || 0),
@@ -31,7 +39,7 @@ const normalizeMember = (member = {}) => ({
   receiveStatus: member.receiveStatus || 'NOT_READY',
   refundAmountTotal: Number(member.refundAmountTotal || 0),
   role: normalizeRole(member.role, member.isCreator),
-  userId: Number(member.userId || 0),
+  userId: normalizeId(member.userId),
 })
 
 const normalizeCurrentUserMember = (member = {}) => ({
@@ -71,7 +79,7 @@ export const normalizeOrderDetail = (detail = {}) => {
       estimatedTotalAmount:
         Number(detail.basicInfo?.estimatedTotalAmount || detail.paymentSummary?.estimatedTotalAmount || 0),
       expectedDeliveryEndAt: detail.basicInfo?.expectedDeliveryEndAt || '',
-      orderId: Number(detail.basicInfo?.orderId || 0),
+      orderId: normalizeId(detail.basicInfo?.orderId),
       orderNo: detail.basicInfo?.orderNo || '',
       pickupPoint: detail.basicInfo?.pickupPoint || '',
       productDesc: detail.basicInfo?.productDesc || '',
@@ -87,8 +95,8 @@ export const normalizeOrderDetail = (detail = {}) => {
         detail.complaintInfo?.myComplaintId === null || detail.complaintInfo?.myComplaintId === undefined
           ? detail.complaintInfo?.complaintId === null || detail.complaintInfo?.complaintId === undefined
             ? null
-            : Number(detail.complaintInfo.complaintId)
-          : Number(detail.complaintInfo.myComplaintId),
+            : normalizeId(detail.complaintInfo.complaintId)
+          : normalizeId(detail.complaintInfo.myComplaintId),
       myComplaintStatus: detail.complaintInfo?.myComplaintStatus || detail.complaintInfo?.status || null,
     },
     currentUserMember: detail.currentUserMember
@@ -98,7 +106,7 @@ export const normalizeOrderDetail = (detail = {}) => {
       nickname: detail.initiatorInfo?.nickname || '',
       phoneMasked: detail.initiatorInfo?.phoneMasked || detail.initiatorInfo?.phone || '',
       studentNoMasked: detail.initiatorInfo?.studentNoMasked || '',
-      userId: Number(detail.initiatorInfo?.userId || 0),
+      userId: normalizeId(detail.initiatorInfo?.userId),
     },
     memberList,
     paymentSummary: {
